@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-background: #182332;
+  --color-primary: #c7b079;
+  --color-secondary: #232d3c;
+  --color-accent: #233c58;
+}
+body {
+  background: var(--color-background) !important;
+  color: #f1f1f1;
+}
+main, section, .main-container {
+  background-color: #182332 !important;
+}
+
+/* BRUTE-FORCE OVERRIDES */
+* {
+  background-color: transparent !important;
+}
+html, body, main, #__next, [data-radix-popper-content-wrapper] {
+  background-color: #182332 !important;
+  color: white !important;
+}
