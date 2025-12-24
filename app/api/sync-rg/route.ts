@@ -17,3 +17,6 @@ export async function POST() {
   return new Response(`Başarılı kayıt: ${ok}, Hatalı: ${fail}`, { status: 200 });
 }
 
+
+
+

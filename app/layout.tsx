@@ -11,7 +11,7 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Inter:wght@400;500;700&display=swap" rel="stylesheet" />
         <link rel="icon" type="image/png" href="/favicon.png" />
       </head>
-      <body  style={{ margin: 0, padding: 0 }}>{children}</body>
+      <body style={{ backgroundColor: '#182332', color: 'white', margin: 0, padding: 0 }}>{children}</body>
     </html>
   )
 }

@@ -191,7 +191,7 @@ processing: "La IA está analizando...", download: "DESCARGAR INFORME OFICIAL (.
       >
         <span style={{ fontSize: 29, color: gold, fontWeight: 800 }}>☰</span>
       </button>
-      <div style={{ minHeight: '100vh', backgroundColor: darkBlue, color: '#f8fafc', display: 'flex', flexDirection: 'row', alignItems: 'stretch', paddingTop: 60 }}>
+      <div style={{ minHeight: '100vh', backgroundColor: '#182332', color: 'white', display: 'flex', flexDirection: 'row', alignItems: 'stretch', paddingTop: 60 }}>
 
 
       {/* Sidebar - Gold Glassmorphism */}

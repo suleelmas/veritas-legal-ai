@@ -104,3 +104,6 @@ export default function DistanceAgreement() {
   return lang === 'TR' ? MESAFE_TR : MESAFE_EN;
 }
 
+
+
+
