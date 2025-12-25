@@ -17,7 +17,7 @@ export default function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState("");
-  const [language, setLanguage] = useState("TR");
+  const [language, setLanguage] = useState("EN");
   const [activeTab, setActiveTab] = useState<Tab>("analyze");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
@@ -177,11 +177,47 @@ export default function Home() {
     setLoading(true);
     setResult("");
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const res = await fetch('/api/analyze', { method: 'POST', body: formData });
+      // PDF'den metin çıkarma
+      const pdfjsLib = await import('pdfjs-dist');
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+      
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      let fullText = '';
+      
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map((item: any) => item.str).join(' ');
+        fullText += pageText + '\n';
+      }
+
+      // Dil kodunu belirle
+      const langMap: any = {
+        'TR': 'Türkçe',
+        'EN': 'English',
+        'FR': 'Français',
+        'DE': 'Deutsch',
+        'RU': 'Русский',
+        'ZH': '中文',
+        'AR': 'العربية'
+      };
+      const targetLang = langMap[language] || 'English';
+
+      // API'ye gönder
+      const res = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          pdfText: fullText,
+          targetLang: targetLang
+        })
+      });
+
       const data = await res.json();
-      setResult(data.result || data.error || 'Analysis complete');
+      setResult(data.reply || data.error || 'Analysis complete');
     } catch (err: any) {
       setResult(err.message || 'Error occurred');
     } finally {
@@ -273,7 +309,7 @@ export default function Home() {
         </div>
         
         {/* SAĞ ÜST DİL MENÜSÜ */}
-        <div style={{ position: 'relative' }} data-language-menu>
+        <div style={{ position: 'relative', marginRight: '20px' }} data-language-menu>
           <button 
             onClick={() => setLanguageMenuOpen(!languageMenuOpen)}
             style={{ 
@@ -290,16 +326,19 @@ export default function Home() {
               gap: '8px'
             }}
           >
-            <span>🌐</span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="12" cy="12" r="10" stroke={gold} strokeWidth="2" fill="none"/>
+              <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" stroke={gold} strokeWidth="1.5" fill="none"/>
+            </svg>
             <span>{language}</span>
-            <span style={{ fontSize: '10px' }}>{languageMenuOpen ? '▲' : '▼'}</span>
+            <span style={{ fontSize: '10px', color: gold }}>{languageMenuOpen ? '▲' : '▼'}</span>
           </button>
           
           {languageMenuOpen && (
             <div style={{ 
               position: 'absolute', 
               top: '100%', 
-              right: 0, 
+              right: '-40px', 
               marginTop: '8px', 
               background: '#131b26', 
               border: `1px solid ${gold}`, 
@@ -358,49 +397,70 @@ export default function Home() {
                 style={{ 
                   width: '100%', 
                   padding: '12px', 
-                  background: activeTab === 'analyze' ? gold : 'transparent', 
-                  color: activeTab === 'analyze' ? '#000000' : gold, 
+                  background: activeTab === 'analyze' ? `rgba(199, 176, 121, 0.25)` : 'transparent', 
+                  color: activeTab === 'analyze' ? gold : '#ffffff', 
                   border: `1px solid ${gold}`, 
                   borderRadius: '10px', 
                   cursor: 'pointer', 
                   fontWeight: 'bold', 
-                  textAlign: 'left' 
+                  textAlign: 'left',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px'
                 }}
               >
-                🔎 Analiz
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="11" cy="11" r="8" stroke={activeTab === 'analyze' ? gold : '#ffffff'} strokeWidth="2" fill="none"/>
+                  <path d="m21 21-4.35-4.35" stroke={activeTab === 'analyze' ? gold : '#ffffff'} strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+                <span>Analiz</span>
               </button>
               <button 
                 onClick={() => {setActiveTab('pricing'); setSidebarOpen(false);}} 
                 style={{ 
                   width: '100%', 
                   padding: '12px', 
-                  background: activeTab === 'pricing' ? gold : 'transparent', 
-                  color: activeTab === 'pricing' ? '#000000' : gold, 
+                  background: activeTab === 'pricing' ? `rgba(199, 176, 121, 0.25)` : 'transparent', 
+                  color: activeTab === 'pricing' ? gold : '#ffffff', 
                   border: `1px solid ${gold}`, 
                   borderRadius: '10px', 
                   cursor: 'pointer', 
                   fontWeight: 'bold', 
-                  textAlign: 'left' 
+                  textAlign: 'left',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px'
                 }}
               >
-                💳 Paketler
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="1" y="4" width="22" height="16" rx="2" stroke={activeTab === 'pricing' ? gold : '#ffffff'} strokeWidth="2" fill="none"/>
+                  <path d="M1 10h22" stroke={activeTab === 'pricing' ? gold : '#ffffff'} strokeWidth="2"/>
+                </svg>
+                <span>Paketler</span>
               </button>
               <button 
                 onClick={() => {setActiveTab('about'); setSidebarOpen(false);}} 
                 style={{ 
                   width: '100%', 
                   padding: '12px', 
-                  background: activeTab === 'about' ? gold : 'transparent', 
-                  color: activeTab === 'about' ? '#000000' : gold, 
+                  background: activeTab === 'about' ? `rgba(199, 176, 121, 0.25)` : 'transparent', 
+                  color: activeTab === 'about' ? gold : '#ffffff', 
                   border: `1px solid ${gold}`, 
                   borderRadius: '10px', 
                   cursor: 'pointer', 
                   fontWeight: 'bold', 
                   textAlign: 'left', 
-                  marginTop: '20px' 
+                  marginTop: '20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px'
                 }}
               >
-                ❓ {ui[language].aboutBtn}
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="12" cy="12" r="10" stroke={activeTab === 'about' ? gold : '#ffffff'} strokeWidth="2" fill="none"/>
+                  <path d="M12 16v-4M12 8h.01" stroke={activeTab === 'about' ? gold : '#ffffff'} strokeWidth="2" strokeLinecap="round"/>
+                </svg>
+                <span>{ui[language].aboutBtn}</span>
               </button>
              </div>
           </aside>
@@ -432,7 +492,7 @@ export default function Home() {
                 }}
               >
                 <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="24" /> 
-                <span style={{ color: darkBlue }}>{ui[language].googleBtn}</span>
+                <span style={{ color: darkBlue, fontWeight: 'bold' }}>{ui[language].googleBtn}</span>
               </button>
             </div>
           ) : (
@@ -452,7 +512,7 @@ export default function Home() {
                     />
                     <button 
                       onClick={() => document.getElementById('pdfInputFinal')?.click()} 
-                      style={{ background: gold, color: darkBlue, padding: '12px 30px', borderRadius: '10px', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}
+                      style={{ background: '#ffffff', color: darkBlue, padding: '12px 30px', borderRadius: '10px', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}
                     >
                       {ui[language].select}
                     </button>
@@ -493,7 +553,7 @@ export default function Home() {
                           style={{ 
                             marginTop: '20px', 
                             background: gold, 
-                            color: darkBlue, 
+                            color: '#ffffff', 
                             padding: '12px 25px', 
                             borderRadius: '10px', 
                             border: 'none', 
@@ -573,6 +633,8 @@ export default function Home() {
         }}>
           <a 
             href="/kvkk" 
+            target="_blank"
+            rel="noopener noreferrer"
             style={{ 
               color: gold, 
               textDecoration: 'none', 
@@ -587,6 +649,8 @@ export default function Home() {
           </a>
           <a 
             href="/distance-agreement" 
+            target="_blank"
+            rel="noopener noreferrer"
             style={{ 
               color: gold, 
               textDecoration: 'none', 
@@ -601,6 +665,8 @@ export default function Home() {
           </a>
           <a 
             href="/privacy" 
+            target="_blank"
+            rel="noopener noreferrer"
             style={{ 
               color: gold, 
               textDecoration: 'none', 
