@@ -20,6 +20,7 @@ export default function Home() {
   const [language, setLanguage] = useState("TR");
   const [activeTab, setActiveTab] = useState<Tab>("analyze");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
 
   const gold = "#c7b079"; 
@@ -149,6 +150,21 @@ export default function Home() {
     initAuth();
   }, [supabase]);
 
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (languageMenuOpen && !target.closest('[data-language-menu]')) {
+        setLanguageMenuOpen(false);
+      }
+    };
+    if (languageMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [languageMenuOpen]);
+
   const handleAuth = async () => {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -201,9 +217,9 @@ export default function Home() {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: darkBlue, color: 'white', fontFamily: 'sans-serif' }}>
       
-      {/* ÜST BAR - Logo İkonu ve Dil Seçenekleri */}
-      <nav style={{ width: '100%', background: '#131b26', padding: '15px 20px', position: 'fixed', top: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: `1px solid ${gold}33` }}>
-        <div style={{ position: 'absolute', left: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+      {/* ÜST BAR - Logo İkonu ve Sağ Üst Dil Menüsü */}
+      <nav style={{ width: '100%', background: '#131b26', padding: '15px 20px', position: 'fixed', top: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${gold}33` }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
           <button 
             onClick={() => {setActiveTab('analyze'); setSidebarOpen(false);}} 
             style={{ 
@@ -216,20 +232,20 @@ export default function Home() {
               justifyContent: 'center'
             }}
           >
-            <svg width="36" height="36" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-              {/* House outline - triangular roof and side walls, no bottom */}
-              <path d="M20 30 L50 10 L80 30" stroke={gold} strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-              <line x1="20" y1="30" x2="20" y2="70" stroke={gold} strokeWidth="3" strokeLinecap="round"/>
-              <line x1="80" y1="30" x2="80" y2="70" stroke={gold} strokeWidth="3" strokeLinecap="round"/>
-              {/* Sword - vertical, hilt at roof, blade pointing down */}
-              <line x1="50" y1="12" x2="50" y2="70" stroke={gold} strokeWidth="2.5" strokeLinecap="round"/>
-              <path d="M47 15 L50 12 L53 15" stroke={gold} strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-              {/* Scales of justice - at bottom, balanced */}
-              <line x1="50" y1="70" x2="50" y2="75" stroke={gold} strokeWidth="2" strokeLinecap="round"/>
-              <line x1="50" y1="75" x2="42" y2="82" stroke={gold} strokeWidth="2" strokeLinecap="round"/>
-              <line x1="50" y1="75" x2="58" y2="82" stroke={gold} strokeWidth="2" strokeLinecap="round"/>
-              <circle cx="42" cy="82" r="3" fill={gold}/>
-              <circle cx="58" cy="82" r="3" fill={gold}/>
+            <svg width="40" height="40" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+              {/* House outline - triangular roof and two side walls, no bottom line */}
+              <path d="M25 35 L50 15 L75 35" stroke={gold} strokeWidth="3.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+              <line x1="25" y1="35" x2="25" y2="75" stroke={gold} strokeWidth="3.5" strokeLinecap="round"/>
+              <line x1="75" y1="35" x2="75" y2="75" stroke={gold} strokeWidth="3.5" strokeLinecap="round"/>
+              {/* Sword - vertical, hilt at roof apex, blade pointing down to base */}
+              <line x1="50" y1="15" x2="50" y2="75" stroke={gold} strokeWidth="3" strokeLinecap="round"/>
+              <path d="M46 20 L50 15 L54 20" stroke={gold} strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+              {/* Scales of justice - at bottom, directly beneath sword tip, balanced */}
+              <line x1="50" y1="75" x2="50" y2="80" stroke={gold} strokeWidth="2.5" strokeLinecap="round"/>
+              <line x1="50" y1="80" x2="40" y2="88" stroke={gold} strokeWidth="2.5" strokeLinecap="round"/>
+              <line x1="50" y1="80" x2="60" y2="88" stroke={gold} strokeWidth="2.5" strokeLinecap="round"/>
+              <circle cx="40" cy="88" r="3.5" fill={gold}/>
+              <circle cx="60" cy="88" r="3.5" fill={gold}/>
             </svg>
           </button>
           {/* HAMBURGER MENÜ BUTONU - Logo İkonunun Altında */}
@@ -249,32 +265,85 @@ export default function Home() {
             }}
           >
             <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-              <div style={{ width: '16px', height: '2.5px', backgroundColor: gold, borderRadius: '1px' }}></div>
-              <div style={{ width: '16px', height: '2.5px', backgroundColor: gold, borderRadius: '1px' }}></div>
-              <div style={{ width: '16px', height: '2.5px', backgroundColor: gold, borderRadius: '1px' }}></div>
+              <div style={{ width: '16px', height: '2.5px', backgroundColor: gold, borderRadius: '1px', boxShadow: `0 0 2px ${gold}` }}></div>
+              <div style={{ width: '16px', height: '2.5px', backgroundColor: gold, borderRadius: '1px', boxShadow: `0 0 2px ${gold}` }}></div>
+              <div style={{ width: '16px', height: '2.5px', backgroundColor: gold, borderRadius: '1px', boxShadow: `0 0 2px ${gold}` }}></div>
             </div>
           </button>
         </div>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
-          {["TR", "EN", "FR", "DE", "RU", "ZH", "AR"].map(l => (
-            <button 
-              key={l} 
-              onClick={() => setLanguage(l)} 
-              style={{ 
-                background: language === l ? gold : 'transparent', 
-                color: language === l ? '#000000' : gold, 
-                border: `1px solid ${gold}`, 
-                padding: '5px 15px', 
-                borderRadius: '15px', 
-                cursor: 'pointer', 
-                fontWeight: 'bold', 
-                margin: '0 5px',
-                fontSize: '13px'
-              }}
-            >
-              {l}
-            </button>
-          ))}
+        
+        {/* SAĞ ÜST DİL MENÜSÜ */}
+        <div style={{ position: 'relative' }} data-language-menu>
+          <button 
+            onClick={() => setLanguageMenuOpen(!languageMenuOpen)}
+            style={{ 
+              background: 'transparent', 
+              border: `1px solid ${gold}`, 
+              color: gold, 
+              padding: '8px 15px', 
+              borderRadius: '8px', 
+              cursor: 'pointer', 
+              fontWeight: 'bold',
+              fontSize: '14px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            <span>🌐</span>
+            <span>{language}</span>
+            <span style={{ fontSize: '10px' }}>{languageMenuOpen ? '▲' : '▼'}</span>
+          </button>
+          
+          {languageMenuOpen && (
+            <div style={{ 
+              position: 'absolute', 
+              top: '100%', 
+              right: 0, 
+              marginTop: '8px', 
+              background: '#131b26', 
+              border: `1px solid ${gold}`, 
+              borderRadius: '8px', 
+              minWidth: '120px',
+              boxShadow: `0 4px 12px rgba(0,0,0,0.3)`,
+              zIndex: 1100,
+              overflow: 'hidden'
+            }}>
+              {["EN", "TR", "FR", "DE", "RU", "ZH", "AR"].map(l => (
+                <button 
+                  key={l} 
+                  onClick={() => {
+                    setLanguage(l);
+                    setLanguageMenuOpen(false);
+                  }} 
+                  style={{ 
+                    width: '100%',
+                    background: language === l ? gold : 'transparent', 
+                    color: language === l ? '#000000' : '#ffffff', 
+                    border: 'none',
+                    padding: '10px 15px', 
+                    cursor: 'pointer', 
+                    fontWeight: 'bold', 
+                    fontSize: '13px',
+                    textAlign: 'left',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (language !== l) {
+                      e.currentTarget.style.background = `${gold}33`;
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (language !== l) {
+                      e.currentTarget.style.background = 'transparent';
+                    }
+                  }}
+                >
+                  {l}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </nav>
 
@@ -282,8 +351,8 @@ export default function Home() {
         {/* SIDEBAR */}
         {sidebarOpen && (
           <aside style={{ width: '260px', background: '#131b26', height: '100vh', position: 'fixed', left: 0, padding: '20px', borderRight: `1px solid ${gold}44`, zIndex: 1050, display: 'flex', flexDirection: 'column' }}>
-            <h2 style={{ color: gold, textAlign: 'center', marginBottom: '30px' }}>VERITAS AI</h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+             <h2 style={{ color: gold, textAlign: 'center', marginBottom: '30px' }}>VERITAS AI</h2>
+             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <button 
                 onClick={() => {setActiveTab('analyze'); setSidebarOpen(false);}} 
                 style={{ 
@@ -333,7 +402,7 @@ export default function Home() {
               >
                 ❓ {ui[language].aboutBtn}
               </button>
-            </div>
+             </div>
           </aside>
         )}
 
@@ -486,6 +555,69 @@ export default function Home() {
           )}
         </main>
       </div>
+      
+      {/* FOOTER */}
+      <footer style={{ 
+        background: '#131b26', 
+        padding: '30px 20px', 
+        marginTop: '60px',
+        borderTop: `1px solid ${gold}33`,
+        textAlign: 'center'
+      }}>
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          gap: '30px', 
+          flexWrap: 'wrap',
+          marginBottom: '20px'
+        }}>
+          <a 
+            href="/kvkk" 
+            style={{ 
+              color: gold, 
+              textDecoration: 'none', 
+              fontSize: '14px',
+              fontWeight: '500',
+              transition: 'opacity 0.2s'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.opacity = '0.7'}
+            onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+          >
+            KVKK Aydınlatma Metni
+          </a>
+          <a 
+            href="/distance-agreement" 
+            style={{ 
+              color: gold, 
+              textDecoration: 'none', 
+              fontSize: '14px',
+              fontWeight: '500',
+              transition: 'opacity 0.2s'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.opacity = '0.7'}
+            onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+          >
+            Mesafeli Satış Sözleşmesi
+          </a>
+          <a 
+            href="/privacy" 
+            style={{ 
+              color: gold, 
+              textDecoration: 'none', 
+              fontSize: '14px',
+              fontWeight: '500',
+              transition: 'opacity 0.2s'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.opacity = '0.7'}
+            onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+          >
+            Gizlilik Politikası
+          </a>
+        </div>
+        <p style={{ color: '#888', fontSize: '12px', margin: 0 }}>
+          © {new Date().getFullYear()} Veritas Legal AI. Tüm hakları saklıdır.
+        </p>
+      </footer>
     </div>
   );
 }

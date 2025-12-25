@@ -40,20 +40,22 @@ export default function PricingCard({ gold, plan, price, features, popular }: Pr
     }}>
       {popular && <div style={{
         position: 'absolute',
-        top: -16,
-        right: 16,
+        top: -18,
+        right: 20,
         background: gold,
         color: '#000000',
-        padding: '3px 16px',
+        padding: '4px 18px',
         borderRadius: 14,
         fontWeight: 800,
         fontSize: '.98rem',
         boxShadow: `0 2px 9px ${gold}22`,
+        zIndex: 10,
+        whiteSpace: 'nowrap'
       }}>★ POPÜLER</div>}
       <div style={{ fontSize: 27, fontWeight: 900, color: gold, marginBottom: 10 }}>{plan}</div>
       <div style={{ fontSize: 19, fontWeight: 700, marginBottom: 22, color: '#f8fafc' }}>{price}</div>
       <ul style={{ padding: 0, margin: 0, listStyle: 'none', marginBottom: 18 }}>
-        {features.map((f) => <li key={f} style={{ marginBottom: 7, color: '#ffe18d', fontWeight: 700 }}>&#10003; {f}</li>)}
+        {features.map((f) => <li key={f} style={{ marginBottom: 7, color: 'rgba(255, 255, 255, 0.95)', fontWeight: 700 }}>&#10003; {f}</li>)}
       </ul>
       <button
         style={{ width: '100%', padding: '13px 0', background: gold, color: '#000000', fontWeight: 800, fontSize: '1rem', border: 'none', borderRadius: 15, cursor: 'pointer', marginTop: 12 }}
