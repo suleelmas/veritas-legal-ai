@@ -19,42 +19,75 @@ export async function fetchOpenJurist(): Promise<Array<{ title: string; content:
 
     // HTML parsing - OpenJurist sitesinin yapısına göre
     // Genellikle case başlıkları ve linkler olur
-    const titleMatches = html.matchAll(/<a[^>]*href=["']([^"']*case[^"']*|/[^"']*)["'][^>]*>(.*?)<\/a>/gi);
-    const dateMatches = html.matchAll(/<time[^>]*>(.*?)<\/time>|<span[^>]*class=["'][^"']*date[^"']*["'][^>]*>(.*?)<\/span>/gi);
+    // Daha güvenli pattern kullan - önce tüm linkleri bul, sonra filtrele
+    const allLinks = html.match(/<a[^>]*href=["']([^"']+)["'][^>]*>([^<]+)<\/a>/gi) || [];
+    const titleMatches: Array<{ link: string; title: string }> = [];
+    
+    for (const linkTag of allLinks) {
+      const hrefMatch = linkTag.match(/href=["']([^"']+)["']/i);
+      const textMatch = linkTag.match(/>([^<]+)</);
+      
+      if (hrefMatch && textMatch) {
+        const link = hrefMatch[1];
+        const title = textMatch[1].trim();
+        
+        // Sadece case/opinion/decision içeren veya / ile başlayan linkleri al
+        if (link && title && title.length > 10 &&
+            (link.toLowerCase().includes('case') || 
+             link.toLowerCase().includes('opinion') || 
+             link.toLowerCase().includes('decision') ||
+             link.startsWith('/'))) {
+          titleMatches.push({ link, title });
+        }
+      }
+    }
+    
+    // Tarihleri bul
+    const datePattern = /<time[^>]*>([^<]+)<\/time>|<span[^>]*class=["'][^"']*date[^"']*["'][^>]*>([^<]+)<\/span>/gi;
+    const dateMatches = Array.from(html.matchAll(datePattern));
     
     let titles: Array<{ title: string; link?: string }> = [];
     let dates: string[] = [];
     
-    // Case başlıklarını çıkar
+    // Case başlıklarını filtrele ve ekle
     for (const match of titleMatches) {
-      const link = match[1];
-      const titleText = match[2].replace(/<[^>]*>/g, '').trim();
-      if (titleText && titleText.length > 10 && 
+      const link = match.link;
+      const titleText = match.title.replace(/<[^>]*>/g, '').trim();
+      
+      if (titleText && titleText.length > 10 &&
           !titleText.toLowerCase().includes('openjurist') &&
           !titleText.toLowerCase().includes('home') &&
-          !titleText.toLowerCase().includes('about')) {
+          !titleText.toLowerCase().includes('about') &&
+          !titleText.toLowerCase().includes('login') &&
+          !titleText.toLowerCase().includes('sign')) {
+        const fullLink = link.startsWith('http') ? link : `https://openjurist.org${link}`;
         titles.push({
           title: titleText,
-          link: link.startsWith('http') ? link : `https://openjurist.org${link}`
+          link: fullLink
         });
       }
     }
 
     // Tarihleri çıkar
     for (const match of dateMatches) {
-      const dateStr = (match[1] || match[2]).replace(/<[^>]*>/g, '').trim();
-      if (dateStr && /^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}$/.test(dateStr)) {
+      const dateStr = (match[1] || match[2] || '').trim();
+      if (dateStr && (
+        /^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}$/.test(dateStr) ||
+        /^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}$/.test(dateStr) ||
+        /^[A-Z][a-z]{2}\s+\d{1,2},?\s+\d{4}$/.test(dateStr)
+      )) {
         dates.push(dateStr);
       }
     }
 
     // Alternatif: Daha spesifik pattern'ler dene
     if (titles.length === 0) {
-      // Case başlıklarını farklı pattern ile ara
-      const caseMatches = html.matchAll(/<h[23][^>]*>(.*?)(?:v\.|v\.|versus)(.*?)<\/h[23]>/gi);
-      for (const match of caseMatches) {
-        const title = `${match[1].trim()} v. ${match[2].trim()}`;
-        if (title.length > 10) {
+      // Case başlıklarını farklı pattern ile ara - "v." veya "versus" içeren başlıklar
+      const headingPattern = /<h[23][^>]*>([^<]*(?:v\.|versus)[^<]*)<\/h[23]>/gi;
+      const headingMatches = Array.from(html.matchAll(headingPattern));
+      for (const match of headingMatches) {
+        const title = match[1].replace(/<[^>]*>/g, '').trim();
+        if (title && title.length > 10) {
           titles.push({ title });
         }
       }

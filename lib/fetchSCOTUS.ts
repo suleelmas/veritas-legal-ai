@@ -50,11 +50,12 @@ export async function fetchSCOTUS(): Promise<Array<{ title: string; content: str
 
     // Alternatif: Daha spesifik pattern'ler dene
     if (titles.length === 0) {
-      // Opinion başlıklarını farklı pattern ile ara
-      const opinionMatches = html.matchAll(/<h[23][^>]*>(.*?)(?:v\.|v\.|versus)(.*?)<\/h[23]>/gi);
-      for (const match of opinionMatches) {
-        const title = `${match[1].trim()} v. ${match[2].trim()}`;
-        if (title.length > 10) {
+      // Opinion başlıklarını farklı pattern ile ara - "v." veya "versus" içeren başlıklar
+      const headingPattern = /<h[23][^>]*>([^<]*(?:v\.|versus)[^<]*)<\/h[23]>/gi;
+      const headingMatches = Array.from(html.matchAll(headingPattern));
+      for (const match of headingMatches) {
+        const title = match[1].replace(/<[^>]*>/g, '').trim();
+        if (title && title.length > 10) {
           titles.push({ title });
         }
       }
