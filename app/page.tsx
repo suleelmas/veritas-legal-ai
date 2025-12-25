@@ -201,29 +201,60 @@ export default function Home() {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: darkBlue, color: 'white', fontFamily: 'sans-serif' }}>
       
-      {/* ÜST BAR - Minimal Ev İkonu ve Dil Seçenekleri */}
+      {/* ÜST BAR - Logo İkonu ve Dil Seçenekleri */}
       <nav style={{ width: '100%', background: '#131b26', padding: '15px 20px', position: 'fixed', top: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: `1px solid ${gold}33` }}>
-        <button 
-          onClick={() => {setActiveTab('analyze'); setSidebarOpen(false);}} 
-          style={{ 
-            background: 'transparent', 
-            border: `1px solid ${gold}44`, 
-            color: gold, 
-            fontSize: '18px', 
-            cursor: 'pointer', 
-            position: 'absolute', 
-            left: '20px', 
-            padding: '8px 10px',
-            borderRadius: '8px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: '36px',
-            height: '36px'
-          }}
-        >
-          🏠
-        </button>
+        <div style={{ position: 'absolute', left: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+          <button 
+            onClick={() => {setActiveTab('analyze'); setSidebarOpen(false);}} 
+            style={{ 
+              background: 'transparent', 
+              border: 'none', 
+              cursor: 'pointer', 
+              padding: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            <svg width="36" height="36" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+              {/* House outline - triangular roof and side walls, no bottom */}
+              <path d="M20 30 L50 10 L80 30" stroke={gold} strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+              <line x1="20" y1="30" x2="20" y2="70" stroke={gold} strokeWidth="3" strokeLinecap="round"/>
+              <line x1="80" y1="30" x2="80" y2="70" stroke={gold} strokeWidth="3" strokeLinecap="round"/>
+              {/* Sword - vertical, hilt at roof, blade pointing down */}
+              <line x1="50" y1="12" x2="50" y2="70" stroke={gold} strokeWidth="2.5" strokeLinecap="round"/>
+              <path d="M47 15 L50 12 L53 15" stroke={gold} strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+              {/* Scales of justice - at bottom, balanced */}
+              <line x1="50" y1="70" x2="50" y2="75" stroke={gold} strokeWidth="2" strokeLinecap="round"/>
+              <line x1="50" y1="75" x2="42" y2="82" stroke={gold} strokeWidth="2" strokeLinecap="round"/>
+              <line x1="50" y1="75" x2="58" y2="82" stroke={gold} strokeWidth="2" strokeLinecap="round"/>
+              <circle cx="42" cy="82" r="3" fill={gold}/>
+              <circle cx="58" cy="82" r="3" fill={gold}/>
+            </svg>
+          </button>
+          {/* HAMBURGER MENÜ BUTONU - Logo İkonunun Altında */}
+          <button 
+            onClick={() => setSidebarOpen(!sidebarOpen)} 
+            style={{ 
+              background: 'transparent', 
+              border: `2px solid ${gold}`, 
+              width: 32, 
+              height: 32, 
+              borderRadius: '6px', 
+              cursor: 'pointer', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              boxShadow: `0 0 10px ${gold}44`
+            }}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+              <div style={{ width: '16px', height: '2.5px', backgroundColor: gold, borderRadius: '1px' }}></div>
+              <div style={{ width: '16px', height: '2.5px', backgroundColor: gold, borderRadius: '1px' }}></div>
+              <div style={{ width: '16px', height: '2.5px', backgroundColor: gold, borderRadius: '1px' }}></div>
+            </div>
+          </button>
+        </div>
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
           {["TR", "EN", "FR", "DE", "RU", "ZH", "AR"].map(l => (
             <button 
@@ -246,33 +277,6 @@ export default function Home() {
           ))}
         </div>
       </nav>
-
-      {/* HAMBURGER MENÜ BUTONU - Altın Renk ve Kesin Görünür */}
-      <button 
-        onClick={() => setSidebarOpen(!sidebarOpen)} 
-        style={{ 
-          position: 'fixed', 
-          top: 15, 
-          left: 15, 
-          zIndex: 1100, 
-          background: 'transparent', 
-          border: `2px solid ${gold}`, 
-          width: 40, 
-          height: 40, 
-          borderRadius: '8px', 
-          cursor: 'pointer', 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center',
-          boxShadow: `0 0 10px ${gold}44`
-        }}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <div style={{ width: '20px', height: '3px', backgroundColor: gold, borderRadius: '2px' }}></div>
-          <div style={{ width: '20px', height: '3px', backgroundColor: gold, borderRadius: '2px' }}></div>
-          <div style={{ width: '20px', height: '3px', backgroundColor: gold, borderRadius: '2px' }}></div>
-        </div>
-      </button>
 
       <div style={{ display: 'flex', paddingTop: '70px' }}>
         {/* SIDEBAR */}
@@ -345,7 +349,7 @@ export default function Home() {
                 onClick={handleAuth} 
                 style={{ 
                   background: '#ffffff', 
-                  color: '#000000', 
+                  color: darkBlue, 
                   padding: '15px 35px', 
                   borderRadius: '12px', 
                   border: 'none', 
@@ -359,7 +363,7 @@ export default function Home() {
                 }}
               >
                 <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="24" /> 
-                <span style={{ color: '#000000' }}>{ui[language].googleBtn}</span>
+                <span style={{ color: darkBlue }}>{ui[language].googleBtn}</span>
               </button>
             </div>
           ) : (
