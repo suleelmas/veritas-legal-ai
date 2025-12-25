@@ -43,7 +43,7 @@ export default function PricingCard({ gold, plan, price, features, popular }: Pr
         top: -16,
         right: 16,
         background: gold,
-        color: '#181F3A',
+        color: '#000000',
         padding: '3px 16px',
         borderRadius: 14,
         fontWeight: 800,
@@ -51,12 +51,12 @@ export default function PricingCard({ gold, plan, price, features, popular }: Pr
         boxShadow: `0 2px 9px ${gold}22`,
       }}>★ POPÜLER</div>}
       <div style={{ fontSize: 27, fontWeight: 900, color: gold, marginBottom: 10 }}>{plan}</div>
-      <div style={{ fontSize: 19, fontWeight: 700, marginBottom: 22 }}>{price}</div>
+      <div style={{ fontSize: 19, fontWeight: 700, marginBottom: 22, color: '#f8fafc' }}>{price}</div>
       <ul style={{ padding: 0, margin: 0, listStyle: 'none', marginBottom: 18 }}>
         {features.map((f) => <li key={f} style={{ marginBottom: 7, color: '#ffe18d', fontWeight: 700 }}>&#10003; {f}</li>)}
       </ul>
       <button
-        style={{ width: '100%', padding: '13px 0', background: gold, color: '#1e222e', fontWeight: 800, fontSize: '1rem', border: 'none', borderRadius: 15, cursor: 'pointer', marginTop: 12 }}
+        style={{ width: '100%', padding: '13px 0', background: gold, color: '#000000', fontWeight: 800, fontSize: '1rem', border: 'none', borderRadius: 15, cursor: 'pointer', marginTop: 12 }}
         onClick={() => setShowPayment(s => !s)}
       >
         Satın Al / Buy
@@ -67,7 +67,7 @@ export default function PricingCard({ gold, plan, price, features, popular }: Pr
             <>
               <div style={{ display:'flex', flexDirection:'column', alignItems:'center' }}>
                 <div style={{ fontSize: '1.08rem', fontWeight: 800, color: gold, marginBottom: 8 }}>Shopier ile Güvenli Ödeme</div>
-                <a href={plan === "Basic" ? "https://www.shopier.com/mirale/42406232" : plan === "Professional" ? "https://www.shopier.com/mirale/42406252" : plan === "Elite" ? "https://www.shopier.com/mirale/42406288" : undefined} target="_blank" rel="noopener noreferrer" style={{ display:'flex', alignItems:'center', gap:8, padding: '9px 24px', background: gold, color: '#181F3A', fontWeight: 800, border: 'none', borderRadius: 12, fontSize: '.99rem', cursor: 'pointer', textDecoration: 'none' }}>
+                <a href={plan === "Basic" ? "https://www.shopier.com/mirale/42406232" : plan === "Professional" ? "https://www.shopier.com/mirale/42406252" : plan === "Elite" ? "https://www.shopier.com/mirale/42406288" : undefined} target="_blank" rel="noopener noreferrer" style={{ display:'flex', alignItems:'center', gap:8, padding: '9px 24px', background: gold, color: '#000000', fontWeight: 800, border: 'none', borderRadius: 12, fontSize: '.99rem', cursor: 'pointer', textDecoration: 'none' }}>
   <svg width="60" height="22" viewBox="0 0 120 42" fill="none" xmlns="http://www.w3.org/2000/svg" style={{marginRight:3}}><rect width="120" height="42" rx="8" fill="white"/><text x="50%" y="54%" textAnchor="middle" fontFamily="Arial, Helvetica, sans-serif" fontWeight="bold" fontSize="14" fill="#6926A8" dy=".3em">Shopier</text></svg>
   Shopier ile Satın Al
 </a>
@@ -77,7 +77,7 @@ export default function PricingCard({ gold, plan, price, features, popular }: Pr
             <>
               <div style={{ display:'flex', flexDirection:'column', alignItems:'center' }}>
                 <div style={{ fontSize: '1.08rem', fontWeight: 800, color: gold, marginBottom: 8 }}>Lemon Squeezy ile Secure Checkout</div>
-                <button style={{ display:'flex', alignItems:'center', gap:10, padding: '9px 24px', background: gold, color: '#181F3A', fontWeight: 800, border: 'none', borderRadius: 12, fontSize: '.99rem', cursor: 'pointer' }}>
+                <button style={{ display:'flex', alignItems:'center', gap:10, padding: '9px 24px', background: gold, color: '#000000', fontWeight: 800, border: 'none', borderRadius: 12, fontSize: '.99rem', cursor: 'pointer' }}>
                   <img src={LEMON_LOGO} alt="Lemon Squeezy" style={{height:23, background:'white', borderRadius:7, padding:'2px 6px'}} />
                   Buy with Lemon Squeezy
                 </button>

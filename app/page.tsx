@@ -205,7 +205,22 @@ export default function Home() {
       <nav style={{ width: '100%', background: '#131b26', padding: '15px 20px', position: 'fixed', top: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: `1px solid ${gold}33` }}>
         <button 
           onClick={() => {setActiveTab('analyze'); setSidebarOpen(false);}} 
-          style={{ background: 'transparent', border: 'none', color: gold, fontSize: '24px', cursor: 'pointer', position: 'absolute', left: '20px', padding: '5px' }}
+          style={{ 
+            background: 'transparent', 
+            border: `1px solid ${gold}44`, 
+            color: gold, 
+            fontSize: '18px', 
+            cursor: 'pointer', 
+            position: 'absolute', 
+            left: '20px', 
+            padding: '8px 10px',
+            borderRadius: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: '36px',
+            height: '36px'
+          }}
         >
           🏠
         </button>
@@ -216,7 +231,7 @@ export default function Home() {
               onClick={() => setLanguage(l)} 
               style={{ 
                 background: language === l ? gold : 'transparent', 
-                color: language === l ? darkBlue : gold, 
+                color: language === l ? '#000000' : gold, 
                 border: `1px solid ${gold}`, 
                 padding: '5px 15px', 
                 borderRadius: '15px', 
@@ -267,19 +282,50 @@ export default function Home() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <button 
                 onClick={() => {setActiveTab('analyze'); setSidebarOpen(false);}} 
-                style={{ width: '100%', padding: '12px', background: activeTab === 'analyze' ? gold : 'transparent', color: activeTab === 'analyze' ? darkBlue : 'white', border: `1px solid ${gold}`, borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', textAlign: 'left' }}
+                style={{ 
+                  width: '100%', 
+                  padding: '12px', 
+                  background: activeTab === 'analyze' ? gold : 'transparent', 
+                  color: activeTab === 'analyze' ? '#000000' : gold, 
+                  border: `1px solid ${gold}`, 
+                  borderRadius: '10px', 
+                  cursor: 'pointer', 
+                  fontWeight: 'bold', 
+                  textAlign: 'left' 
+                }}
               >
                 🔎 Analiz
               </button>
               <button 
                 onClick={() => {setActiveTab('pricing'); setSidebarOpen(false);}} 
-                style={{ width: '100%', padding: '12px', background: activeTab === 'pricing' ? gold : 'transparent', color: activeTab === 'pricing' ? darkBlue : 'white', border: `1px solid ${gold}`, borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', textAlign: 'left' }}
+                style={{ 
+                  width: '100%', 
+                  padding: '12px', 
+                  background: activeTab === 'pricing' ? gold : 'transparent', 
+                  color: activeTab === 'pricing' ? '#000000' : gold, 
+                  border: `1px solid ${gold}`, 
+                  borderRadius: '10px', 
+                  cursor: 'pointer', 
+                  fontWeight: 'bold', 
+                  textAlign: 'left' 
+                }}
               >
                 💳 Paketler
               </button>
               <button 
                 onClick={() => {setActiveTab('about'); setSidebarOpen(false);}} 
-                style={{ width: '100%', padding: '12px', background: activeTab === 'about' ? gold : 'transparent', color: activeTab === 'about' ? darkBlue : 'white', border: `1px solid ${gold}`, borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', textAlign: 'left', marginTop: '20px' }}
+                style={{ 
+                  width: '100%', 
+                  padding: '12px', 
+                  background: activeTab === 'about' ? gold : 'transparent', 
+                  color: activeTab === 'about' ? '#000000' : gold, 
+                  border: `1px solid ${gold}`, 
+                  borderRadius: '10px', 
+                  cursor: 'pointer', 
+                  fontWeight: 'bold', 
+                  textAlign: 'left', 
+                  marginTop: '20px' 
+                }}
               >
                 ❓ {ui[language].aboutBtn}
               </button>
@@ -290,7 +336,7 @@ export default function Home() {
         <main style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px', width: '100%' }}>
           {!user ? (
             /* GİRİŞ EKRANI - Logo 450px, Google Butonu Saf Beyaz */
-            <div style={{ textAlign: 'center', marginTop: '80px' }}>
+            <div style={{ textAlign: 'center', marginTop: '20px' }}>
               <img src="/logoverl.png" alt="Logo" style={{ width: '450px', marginBottom: '30px' }} />
               <h1 style={{ color: gold, fontSize: '2.5rem', marginBottom: '10px' }}>{ui[language].title}</h1>
               <p style={{ color: 'white', fontSize: '1.2rem', marginBottom: '40px' }}>{ui[language].sub}</p>
