@@ -15,7 +15,7 @@ async function syncResmiGazete() {
         // Önce bu başlığın daha önce kaydedilip kaydedilmediğini kontrol et
         const { data: existing } = await supabase
           .from('documents')
-          .select('id, content')
+          .select('id, content, metadata')
           .eq('content', h)
           .eq('metadata->>source', 'resmigazete')
           .maybeSingle();
@@ -30,7 +30,7 @@ async function syncResmiGazete() {
           newCount++;
         } else {
           // Mevcut başlık, güncelleme tarihini güncelle
-          const currentMetadata = existing.metadata || {};
+          const currentMetadata = (existing.metadata as any) || {};
           await supabase
             .from('documents')
             .update({ 
