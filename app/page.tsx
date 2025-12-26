@@ -26,6 +26,7 @@ export default function Home() {
   const gold = "#c7b079"; 
   const darkBlue = "#182332"; 
   const midBlue = "#232d3c"; 
+  const lightText = "#f1efca"; // Kirli beyaz / beyaza yakın gold - normal yazılar için 
 
   const ui: any = {
     TR: { 
@@ -251,7 +252,7 @@ export default function Home() {
   };
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: darkBlue, color: 'white', fontFamily: 'sans-serif' }}>
+    <div style={{ minHeight: '100vh', backgroundColor: darkBlue, color: lightText, fontFamily: 'sans-serif' }}>
       
       {/* ÜST BAR - Logo İkonu ve Sağ Üst Dil Menüsü */}
       <nav style={{ width: '100%', background: '#131b26', padding: '15px 20px', position: 'fixed', top: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${gold}33` }}>
@@ -309,7 +310,7 @@ export default function Home() {
         </div>
         
         {/* SAĞ ÜST DİL MENÜSÜ */}
-        <div style={{ position: 'relative', marginRight: '20px' }} data-language-menu>
+        <div style={{ position: 'relative', marginRight: '40px' }} data-language-menu>
           <button 
             onClick={() => setLanguageMenuOpen(!languageMenuOpen)}
             style={{ 
@@ -330,7 +331,7 @@ export default function Home() {
               <circle cx="12" cy="12" r="10" stroke={gold} strokeWidth="2" fill="none"/>
               <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" stroke={gold} strokeWidth="1.5" fill="none"/>
             </svg>
-            <span>{language}</span>
+            <span style={{ color: gold }}>{language}</span>
             <span style={{ fontSize: '10px', color: gold }}>{languageMenuOpen ? '▲' : '▼'}</span>
           </button>
           
@@ -358,7 +359,7 @@ export default function Home() {
                   style={{ 
                     width: '100%',
                     background: language === l ? gold : 'transparent', 
-                    color: language === l ? '#000000' : '#ffffff', 
+                    color: language === l ? '#000000' : lightText, 
                     border: 'none',
                     padding: '10px 15px', 
                     cursor: 'pointer', 
@@ -398,7 +399,7 @@ export default function Home() {
                   width: '100%', 
                   padding: '12px', 
                   background: activeTab === 'analyze' ? `rgba(199, 176, 121, 0.25)` : 'transparent', 
-                  color: activeTab === 'analyze' ? gold : '#ffffff', 
+                  color: activeTab === 'analyze' ? gold : lightText, 
                   border: `1px solid ${gold}`, 
                   borderRadius: '10px', 
                   cursor: 'pointer', 
@@ -410,8 +411,8 @@ export default function Home() {
                 }}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="11" cy="11" r="8" stroke={activeTab === 'analyze' ? gold : '#ffffff'} strokeWidth="2" fill="none"/>
-                  <path d="m21 21-4.35-4.35" stroke={activeTab === 'analyze' ? gold : '#ffffff'} strokeWidth="2" strokeLinecap="round"/>
+                  <circle cx="11" cy="11" r="8" stroke={activeTab === 'analyze' ? gold : lightText} strokeWidth="2" fill="none"/>
+                  <path d="m21 21-4.35-4.35" stroke={activeTab === 'analyze' ? gold : lightText} strokeWidth="2" strokeLinecap="round"/>
                 </svg>
                 <span>Analiz</span>
               </button>
@@ -421,7 +422,7 @@ export default function Home() {
                   width: '100%', 
                   padding: '12px', 
                   background: activeTab === 'pricing' ? `rgba(199, 176, 121, 0.25)` : 'transparent', 
-                  color: activeTab === 'pricing' ? gold : '#ffffff', 
+                  color: activeTab === 'pricing' ? gold : lightText, 
                   border: `1px solid ${gold}`, 
                   borderRadius: '10px', 
                   cursor: 'pointer', 
@@ -433,8 +434,8 @@ export default function Home() {
                 }}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <rect x="1" y="4" width="22" height="16" rx="2" stroke={activeTab === 'pricing' ? gold : '#ffffff'} strokeWidth="2" fill="none"/>
-                  <path d="M1 10h22" stroke={activeTab === 'pricing' ? gold : '#ffffff'} strokeWidth="2"/>
+                  <rect x="1" y="4" width="22" height="16" rx="2" stroke={activeTab === 'pricing' ? gold : lightText} strokeWidth="2" fill="none"/>
+                  <path d="M1 10h22" stroke={activeTab === 'pricing' ? gold : lightText} strokeWidth="2"/>
                 </svg>
                 <span>Paketler</span>
               </button>
@@ -444,7 +445,7 @@ export default function Home() {
                   width: '100%', 
                   padding: '12px', 
                   background: activeTab === 'about' ? `rgba(199, 176, 121, 0.25)` : 'transparent', 
-                  color: activeTab === 'about' ? gold : '#ffffff', 
+                  color: activeTab === 'about' ? gold : lightText, 
                   border: `1px solid ${gold}`, 
                   borderRadius: '10px', 
                   cursor: 'pointer', 
@@ -457,8 +458,8 @@ export default function Home() {
                 }}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="12" cy="12" r="10" stroke={activeTab === 'about' ? gold : '#ffffff'} strokeWidth="2" fill="none"/>
-                  <path d="M12 16v-4M12 8h.01" stroke={activeTab === 'about' ? gold : '#ffffff'} strokeWidth="2" strokeLinecap="round"/>
+                  <circle cx="12" cy="12" r="10" stroke={activeTab === 'about' ? gold : lightText} strokeWidth="2" fill="none"/>
+                  <path d="M12 16v-4M12 8h.01" stroke={activeTab === 'about' ? gold : lightText} strokeWidth="2" strokeLinecap="round"/>
                 </svg>
                 <span>{ui[language].aboutBtn}</span>
               </button>
@@ -472,27 +473,43 @@ export default function Home() {
             <div style={{ textAlign: 'center', marginTop: '20px' }}>
               <img src="/logoverl.png" alt="Logo" style={{ width: '450px', marginBottom: '30px' }} />
               <h1 style={{ color: gold, fontSize: '2.5rem', marginBottom: '10px' }}>{ui[language].title}</h1>
-              <p style={{ color: 'white', fontSize: '1.2rem', marginBottom: '40px' }}>{ui[language].sub}</p>
+              <p style={{ color: lightText, fontSize: '1.2rem', marginBottom: '40px' }}>{ui[language].sub}</p>
               
               <button 
                 onClick={handleAuth} 
                 style={{ 
-                  background: '#ffffff', 
-                  color: darkBlue, 
-                  padding: '15px 35px', 
-                  borderRadius: '12px', 
+                  backgroundColor: '#ffffff', 
+                  color: '#000000', 
+                  padding: '15px 50px', 
+                  minWidth: '300px',
+                  borderRadius: '50px', 
                   border: 'none', 
                   fontWeight: 'bold', 
                   cursor: 'pointer', 
                   display: 'flex', 
                   alignItems: 'center', 
+                  justifyContent: 'center',
                   gap: '12px', 
                   margin: '0 auto', 
-                  boxShadow: '0 4px 15px rgba(0,0,0,0.5)' 
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.1)',
+                  transition: 'background-color 0.3s ease',
+                  fontSize: '16px'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f5f5f5';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#ffffff';
                 }}
               >
-                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="24" /> 
-                <span style={{ color: darkBlue, fontWeight: 'bold' }}>{ui[language].googleBtn}</span>
+                <img 
+                  src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" 
+                  alt="Google Logo" 
+                  width="24" 
+                  height="24"
+                  style={{ display: 'block' }}
+                /> 
+                <span style={{ color: '#000000', fontWeight: 'bold' }}>{ui[language].googleBtn}</span>
               </button>
             </div>
           ) : (
@@ -502,7 +519,7 @@ export default function Home() {
                 <>
                   <img src="/logoverl.png" alt="Logo" style={{ width: '250px', marginBottom: '30px' }} />
                   <div style={{ background: midBlue, padding: '50px', borderRadius: '25px', border: `2px dashed ${gold}44` }}>
-                    <p style={{ color: 'white', fontSize: '1.2rem', marginBottom: '20px' }}>{ui[language].upload}</p>
+                    <p style={{ color: lightText, fontSize: '1.2rem', marginBottom: '20px' }}>{ui[language].upload}</p>
                     <input 
                       type="file" 
                       id="pdfInputFinal" 
@@ -514,7 +531,7 @@ export default function Home() {
                       onClick={() => document.getElementById('pdfInputFinal')?.click()} 
                       style={{ background: '#ffffff', color: darkBlue, padding: '12px 30px', borderRadius: '10px', fontWeight: 'bold', border: 'none', cursor: 'pointer' }}
                     >
-                      {ui[language].select}
+                      <span style={{ color: darkBlue }}>{ui[language].select}</span>
                     </button>
                     {file && <p style={{ marginTop: '20px', color: '#4ade80', fontWeight: 'bold' }}>● {file.name}</p>}
                     <button 
@@ -524,7 +541,7 @@ export default function Home() {
                         width: '100%', 
                         padding: '18px', 
                         background: file ? gold : '#444', 
-                        color: darkBlue, 
+                        color: file ? '#000000' : lightText, 
                         borderRadius: '12px', 
                         border: 'none', 
                         marginTop: '30px', 
@@ -533,7 +550,7 @@ export default function Home() {
                         opacity: file && !loading ? 1 : 0.6
                       }}
                     >
-                      {loading ? ui[language].loading : ui[language].btn}
+                      <span style={{ color: file ? '#000000' : lightText }}>{loading ? ui[language].loading : ui[language].btn}</span>
                     </button>
                     {result && (
                       <div 
@@ -547,13 +564,13 @@ export default function Home() {
                         }}
                       >
                         <h3 style={{ color: gold, marginBottom: '15px' }}>{ui[language].resultTitle}</h3>
-                        <div style={{ color: 'white', whiteSpace: 'pre-wrap', textAlign: 'left' }}>{result}</div>
+                        <div style={{ color: lightText, whiteSpace: 'pre-wrap', textAlign: 'left' }}>{result}</div>
                         <button 
                           onClick={handleDownloadPDF}
                           style={{ 
                             marginTop: '20px', 
                             background: gold, 
-                            color: '#ffffff', 
+                            color: '#000000', 
                             padding: '12px 25px', 
                             borderRadius: '10px', 
                             border: 'none', 
@@ -561,7 +578,7 @@ export default function Home() {
                             cursor: 'pointer' 
                           }}
                         >
-                          {ui[language].download}
+                          <span style={{ color: '#000000' }}>{ui[language].download}</span>
                         </button>
                       </div>
                     )}
@@ -571,7 +588,7 @@ export default function Home() {
 
               {activeTab === 'pricing' && (
                 <div style={{ marginTop: '40px' }}>
-                  <h2 style={{ color: gold, fontSize: '2rem', marginBottom: '40px' }}>{ui[language].pricing}</h2>
+                  <h2 style={{ color: gold, fontSize: '2rem', marginBottom: '40px', textAlign: 'center' }}>{ui[language].pricing}</h2>
                   <div style={{ display: 'flex', gap: '25px', justifyContent: 'center', flexWrap: 'wrap' }}>
                     <PricingCard 
                       gold={gold}
@@ -599,10 +616,10 @@ export default function Home() {
               {activeTab === 'about' && (
                 <div style={{ marginTop: '40px', maxWidth: '700px', textAlign: 'left' }}>
                   <h2 style={{ color: gold, fontSize: '2rem', marginBottom: '30px', textAlign: 'center' }}>{ui[language].aboutTitle}</h2>
-                  <p style={{ color: 'white', fontSize: '1.1rem', lineHeight: '1.8', marginBottom: '20px' }}>{ui[language].aboutText}</p>
+                  <p style={{ color: lightText, fontSize: '1.1rem', lineHeight: '1.8', marginBottom: '20px' }}>{ui[language].aboutText}</p>
                   <div style={{ background: midBlue, padding: '25px', borderRadius: '15px', marginTop: '30px' }}>
                     <h3 style={{ color: gold, marginBottom: '15px' }}>{ui[language].features}</h3>
-                    <ul style={{ color: 'white', lineHeight: '2' }}>
+                    <ul style={{ color: lightText, lineHeight: '2' }}>
                       <li>✓ Hızlı PDF analizi</li>
                       <li>✓ Mevzuat uyumluluk kontrolü</li>
                       <li>✓ Risk değerlendirme raporları</li>
@@ -680,7 +697,7 @@ export default function Home() {
             Gizlilik Politikası
           </a>
         </div>
-        <p style={{ color: '#888', fontSize: '12px', margin: 0 }}>
+        <p style={{ color: lightText, fontSize: '12px', margin: 0, opacity: 0.8 }}>
           © {new Date().getFullYear()} Veritas Legal AI. Tüm hakları saklıdır.
         </p>
       </footer>
