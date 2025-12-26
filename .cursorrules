@@ -1,0 +1,1 @@
+Mevcut dosyadaki (page.tsx) hiçbir fonksiyonu, state'i (useState), API çağrısını veya daha önce tanımlanmış UI bileşenini silme. Sadece talep edilen görsel veya yapısal değişiklikleri mevcut koda entegre et. Eğer bir çakışma olursa, eski kodu silmek yerine yeni kodla uyumlu hale getir.
