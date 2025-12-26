@@ -19,8 +19,9 @@ export async function fetchCongressGov(): Promise<Array<{ title: string; content
     const xml = await response.text();
     const bills: Array<{ title: string; content: string; date?: string }> = [];
 
-    // RSS XML parsing
-    const itemMatches = xml.matchAll(/<item>(.*?)<\/item>/gis);
+    // RSS XML parsing - s flag yerine [\s\S] kullan (newline dahil tüm karakterler)
+    const itemPattern = /<item>([\s\S]*?)<\/item>/gi;
+    const itemMatches = Array.from(xml.matchAll(itemPattern));
     
     for (const match of itemMatches) {
       const item = match[1];
