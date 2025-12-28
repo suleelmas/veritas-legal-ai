@@ -33,8 +33,8 @@ export default function Home() {
       title: "VERITAS LEGAL AI", 
       sub: "YÜKSEK HUKUK ANALİTİĞİ", 
       aboutBtn: "Veritas AI Nedir?", 
-      aboutTitle: "Veritas Legal AI Hakkında",
-      aboutText: "Veritas, avukatlar ve hukuk profesyonelleri için geliştirilmiş, ileri seviye yapay zeka tabanlı bir hukuk analitiği platformudur. Karmaşık PDF belgelerini saniyeler içinde analiz eder, mevzuat dayanaklarını bulur ve risk raporları oluşturur.",
+      aboutTitle: "Hukukun Geleceği: Veritas AI ile Tanışın",
+      aboutText: "Veritas Legal AI, hukuk profesyonellerinin çalışma biçimini dönüştürmek için tasarlanmış ileri seviye bir analiz ekosistemidir. Karmaşık hukuk belgelerini (PDF), güncel mevzuat ve yüksek mahkeme içtihatları ışığında saniyeler içinde tarar.\n\nSadece bir kelime arama motoru değil, metnin hukuki mantığını kavrayan bir yardımcıdır. Sözleşmelerdeki gizli riskleri tespit eder, dava dosyalarındaki eksiklikleri raporlar ve avukatlara stratejik karar alma süreçlerinde veri temelli bir dayanak sunar. Veritas ile manuel dosya inceleme saatlerini saniyelere indirerek, adaletin hızıyla teknolojinin gücünü birleştiriyoruz.",
       googleBtn: "Google ile Giriş Yap", 
       select: "Dosya Seç", 
       btn: "ANALİZİ BAŞLAT", 
@@ -49,8 +49,8 @@ export default function Home() {
       title: "VERITAS LEGAL AI", 
       sub: "SUPREME LEGAL ANALYTICS", 
       aboutBtn: "What is Veritas AI?", 
-      aboutTitle: "About Veritas Legal AI",
-      aboutText: "Veritas is an advanced AI-driven legal analytics platform developed for lawyers and legal professionals. It analyzes complex documents in seconds, identifies legal bases, and generates risk assessments.",
+      aboutTitle: "The Future of Law: Meet Veritas AI",
+      aboutText: "Veritas Legal AI is an advanced analytics ecosystem designed to transform how legal professionals work. It scans complex legal documents (PDFs) in seconds, illuminated by current legislation and high court precedents.\n\nIt's not just a word search engine, but an assistant that understands the legal logic of text. It detects hidden risks in contracts, reports deficiencies in case files, and provides lawyers with data-driven support in strategic decision-making processes. With Veritas, we combine the speed of justice with the power of technology by reducing manual file review hours to seconds.",
       googleBtn: "Sign in with Google", 
       select: "Select File", 
       btn: "START ANALYSIS", 
@@ -258,7 +258,14 @@ export default function Home() {
       <nav style={{ width: '100%', background: '#131b26', padding: '15px 20px', position: 'relative', top: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${gold}33` }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
           <button 
-            onClick={() => {setActiveTab('analyze'); setSidebarOpen(false);}} 
+            onClick={() => {
+              setActiveTab('analyze'); 
+              setSidebarOpen(false);
+              if (user) {
+                setFile(null);
+                setResult("");
+              }
+            }} 
             style={{ 
               background: 'transparent', 
               border: 'none', 
@@ -269,7 +276,25 @@ export default function Home() {
               justifyContent: 'center'
             }}
           >
-            <img src="/mainicon.png" alt="Home" width="30" height="30" />
+            <img 
+              src="/mainicon.png" 
+              alt="Home" 
+              width="32" 
+              height="32" 
+              style={{ 
+                cursor: 'pointer', 
+                transition: 'opacity 0.2s',
+                display: 'block'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.opacity = '0.8';
+                e.currentTarget.style.filter = 'brightness(1.2)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.opacity = '1';
+                e.currentTarget.style.filter = 'brightness(1)';
+              }}
+            />
           </button>
           {/* HAMBURGER MENÜ BUTONU - Logo İkonunun Altında */}
           <button 
@@ -345,7 +370,7 @@ export default function Home() {
                   style={{ 
                     width: '100%',
                     background: language === l ? gold : 'transparent', 
-                    color: language === l ? '#000000' : lightText, 
+                    color: language === l ? '#ffffff' : lightText, 
                     border: 'none',
                     padding: '10px 15px', 
                     cursor: 'pointer', 
@@ -379,8 +404,8 @@ export default function Home() {
           <aside style={{ width: '260px', background: '#131b26', height: '100vh', position: 'fixed', left: 0, padding: '20px', borderRight: `1px solid ${gold}44`, zIndex: 1050, display: 'flex', flexDirection: 'column' }}>
              <h2 style={{ color: gold, textAlign: 'center', marginBottom: '30px' }}>VERITAS AI</h2>
              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {/* Analiz butonu sadece giriş yapılmışsa görünsün */}
-              {user && (
+              {/* Analiz butonu - Giriş yapılmışsa görünür ve çalışır, yapılmamışsa giriş yapmaya yönlendirir */}
+              {user ? (
                 <button 
                   onClick={() => {
                     setActiveTab('analyze'); 
@@ -408,6 +433,34 @@ export default function Home() {
                     <path d="m21 21-4.35-4.35" stroke={activeTab === 'analyze' ? gold : '#ffffff'} strokeWidth="2" strokeLinecap="round"/>
                   </svg>
                   <span style={{ color: activeTab === 'analyze' ? gold : '#ffffff' }}>Analiz</span>
+                </button>
+              ) : (
+                <button 
+                  onClick={() => {
+                    setSidebarOpen(false);
+                    handleAuth();
+                  }} 
+                  style={{ 
+                    width: '100%', 
+                    padding: '12px', 
+                    background: 'transparent', 
+                    color: '#ffffff', 
+                    border: `1px solid ${gold}`, 
+                    borderRadius: '10px', 
+                    cursor: 'pointer', 
+                    fontWeight: 'bold', 
+                    textAlign: 'left',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    opacity: 0.7
+                  }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="11" cy="11" r="8" stroke="#ffffff" strokeWidth="2" fill="none"/>
+                    <path d="m21 21-4.35-4.35" stroke="#ffffff" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                  <span style={{ color: '#ffffff' }}>Analiz (Giriş Gerekli)</span>
                 </button>
               )}
               <button 
@@ -465,11 +518,43 @@ export default function Home() {
           {!user ? (
             /* LANDING PAGE - Giriş Yapılmamışsa */
             <div style={{ textAlign: 'center', width: '100%', maxWidth: '1200px', marginTop: '40px' }}>
-              {/* Header: Logo ve Slogan */}
-              <div style={{ marginBottom: '50px', marginTop: '-50px' }}>
-                <img src="/logoverl.png" alt="Logo" style={{ width: '300px', marginBottom: '20px', maxWidth: '90%' }} />
-                <h1 style={{ color: gold, fontSize: '2.5rem', marginBottom: '10px', fontWeight: 'bold' }}>{ui[language].title}</h1>
-                <p style={{ color: lightText, fontSize: '1.3rem', marginBottom: '0' }}>{ui[language].sub}</p>
+              {/* Header: Logo, İsim ve Slogan */}
+              <div style={{ 
+                display: 'flex', 
+                flexDirection: 'column', 
+                alignItems: 'center', 
+                gap: '20px',
+                marginBottom: '50px', 
+                marginTop: '-50px' 
+              }}>
+                <img 
+                  src="/logoverl.png" 
+                  alt="Logo" 
+                  style={{ 
+                    width: '180px', 
+                    height: '180px',
+                    objectFit: 'contain',
+                    maxWidth: '90%'
+                  }} 
+                />
+                <h1 style={{ 
+                  color: gold, 
+                  fontSize: '3rem', 
+                  fontWeight: 'bold',
+                  margin: 0,
+                  lineHeight: '1.2'
+                }}>
+                  {ui[language].title}
+                </h1>
+                <p style={{ 
+                  color: gold, 
+                  fontSize: '1.25rem', 
+                  margin: 0,
+                  fontWeight: '500',
+                  opacity: 0.9
+                }}>
+                  {ui[language].sub}
+                </p>
               </div>
 
               {/* Hero Image: Mockup */}
@@ -533,7 +618,7 @@ export default function Home() {
                     style={{ display: 'block' }}
                   /> 
                   <span style={{ color: '#000000 !important', fontWeight: 'bold' }}>{ui[language].googleBtn}</span>
-                </button>
+              </button>
               </div>
             </div>
           ) : (
@@ -563,7 +648,17 @@ export default function Home() {
                         fontWeight: 'bold', 
                         border: 'none', 
                         cursor: 'pointer',
-                        marginBottom: '20px'
+                        marginBottom: '20px',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                        transition: 'all 0.2s ease'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
+                        e.currentTarget.style.transform = 'translateY(0)';
                       }}
                     >
                       <span style={{ color: darkBlue }}>{ui[language].select}</span>
@@ -651,7 +746,7 @@ export default function Home() {
               {activeTab === 'about' && (
                 <div style={{ marginTop: '40px', maxWidth: '700px', textAlign: 'left' }}>
                   <h2 style={{ color: gold, fontSize: '2rem', marginBottom: '30px', textAlign: 'center' }}>{ui[language].aboutTitle}</h2>
-                  <p style={{ color: lightText, fontSize: '1.1rem', lineHeight: '1.8', marginBottom: '20px' }}>{ui[language].aboutText}</p>
+                  <p style={{ color: lightText, fontSize: '1.1rem', lineHeight: '1.8', marginBottom: '20px', whiteSpace: 'pre-line' }}>{ui[language].aboutText}</p>
                   <div style={{ background: midBlue, padding: '25px', borderRadius: '15px', marginTop: '30px' }}>
                     <h3 style={{ color: gold, marginBottom: '15px' }}>{ui[language].features}</h3>
                     <ul style={{ color: lightText, lineHeight: '2' }}>
