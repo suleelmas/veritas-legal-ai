@@ -74,9 +74,9 @@ export default function PricingCard({ gold, plan, priceTR, priceGlobal, features
     }}>
       {popular && <div style={{
         position: 'absolute',
-        top: '-50%',
-        right: 20,
-        transform: 'translateY(-50%)',
+        top: '-12px',
+        left: '50%',
+        transform: 'translateX(-50%)',
         background: '#182332',
         color: gold,
         padding: '6px 20px',

@@ -423,8 +423,8 @@ export default function Home() {
             <img 
               src="/mainicon.png" 
               alt="Home" 
-              width="18" 
-              height="18" 
+              width="48" 
+              height="48" 
               style={{ 
                 cursor: 'pointer', 
                 transition: 'opacity 0.2s',
