@@ -62,3 +62,4 @@ export async function fetchAnayasaMahkemesiKararlari(): Promise<Array<{ title: s
   }
 }
 
+

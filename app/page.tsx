@@ -32,22 +32,37 @@ export default function Home() {
     {
       name: "Basic",
       fullName: "Veritas AI Basic Analiz Paketi",
-      price: "49 TL",
+      fullNameGlobal: "Veritas Legal AI Basic Plan (Starter)",
+      priceTR: "49 TL",
+      priceGlobal: "$19.00 / month",
       description: "Hukuki süreçlerinize hız kazandırmak için ilk adımı atın! Bireysel kullanıcılar ve küçük ölçekli ofisler için ideal.",
+      descriptionGlobal: "Take the first step to accelerate your legal processes! Ideal for individual users and small-scale offices.",
       features: [
         "Ayda 10 Adet Detaylı Analiz Hakkı",
         "Yapay Zeka Destekli Anlık Analiz",
         "7/24 Web Tabanlı Erişim",
         "Bireysel Dosya Takibi"
       ],
+      featuresGlobal: [
+        "10 Detailed Analysis Credits Per Month",
+        "AI-Powered Instant Analysis",
+        "24/7 Web-Based Access",
+        "Individual File Tracking"
+      ],
       buttonText: "Satın Al",
-      isPopular: false
+      buttonTextGlobal: "Buy with Lemon Squeezy",
+      isPopular: false,
+      shopierLink: "https://www.shopier.com/mirale/42406232",
+      lemonSqueezyLink: "https://veritaslegalai.lemonsqueezy.com/checkout/buy/03856d56-2876-4a9a-a979-90d00ee77a6a"
     },
     {
       name: "Professional",
       fullName: "Veritas AI Professional – Uzman Paketi ★",
-      price: "149 TL",
+      fullNameGlobal: "Veritas AI Professional Plan (Advocate) ★",
+      priceTR: "149 TL",
+      priceGlobal: "$49.00 / month",
       description: "İş yükünü hafifletmek isteyen profesyoneller için tasarlandı! En popüler ve verimli çözümümüz.",
+      descriptionGlobal: "Designed for professionals who want to lighten their workload! Our most popular and efficient solution.",
       features: [
         "Ayda 50 Adet Gelişmiş Analiz Hakkı",
         "PDF veya Word Olarak Rapor İndirme",
@@ -55,14 +70,27 @@ export default function Home() {
         "Yapılandırılmış Hukuki Görüş Çıktısı",
         "Hızlı İşlem Onayı"
       ],
+      featuresGlobal: [
+        "50 Advanced Analysis Credits Per Month",
+        "Download Reports as PDF or Word",
+        "Comprehensive Legislation Scanning",
+        "Structured Legal Opinion Output",
+        "Fast Transaction Approval"
+      ],
       buttonText: "Hemen Başla",
-      isPopular: true
+      buttonTextGlobal: "Subscribe Now",
+      isPopular: true,
+      shopierLink: "https://www.shopier.com/mirale/42406252",
+      lemonSqueezyLink: "https://veritaslegalai.lemonsqueezy.com/checkout/buy/3b88cbb9-24b7-4749-af97-5cdb4e28538f"
     },
     {
       name: "Enterprise",
       fullName: "Veritas AI Enterprise – Kurumsal Çözüm",
-      price: "399 TL",
+      fullNameGlobal: "Veritas AI Enterprise – Global Partner",
+      priceTR: "399 TL",
+      priceGlobal: "$129.00 / month",
       description: "Hukuki operasyonlarınızda sınırları kaldırın! Büyük ofisler ve kurumsal şirketler için limitsiz prestij paketi.",
+      descriptionGlobal: "Remove boundaries in your legal operations! Unlimited prestige package for large offices and corporate companies.",
       features: [
         "Sınırsız Analiz Hakkı (Kota Sınırı Yok)",
         "Geçmiş Analiz Kayıtlarına Sınırsız Erişim",
@@ -70,8 +98,18 @@ export default function Home() {
         "En Yüksek İşlemci Önceliği",
         "Kurumsal Güvence ve Maksimum Verimlilik"
       ],
+      featuresGlobal: [
+        "Unlimited Analysis Credits (No Quota Limit)",
+        "Unlimited Access to Historical Analysis Records",
+        "File Management and Archiving",
+        "Highest Processor Priority",
+        "Corporate Assurance and Maximum Efficiency"
+      ],
       buttonText: "Sınırsızlığa Geç",
-      isPopular: false
+      buttonTextGlobal: "Get Unlimited Access",
+      isPopular: false,
+      shopierLink: "https://www.shopier.com/mirale/42406288",
+      lemonSqueezyLink: "https://veritaslegalai.lemonsqueezy.com/checkout/buy/599f8b7f-860a-4803-9920-4b0b07165e45"
     }
   ]; 
 
@@ -90,7 +128,12 @@ export default function Home() {
       loading: "⏳ Analiz Ediliyor...",
       resultTitle: "Analiz Sonucu",
       features: "Özellikler",
-      pricing: "Fiyatlandırma"
+      pricing: "Fiyatlandırma",
+      popularBadge: "★ EN POPÜLER",
+      shopierSecurePayment: "Shopier ile Güvenli Ödeme",
+      shopierBuy: "Shopier ile Satın Al",
+      lemonSqueezyCheckout: "Lemon Squeezy ile Güvenli Ödeme",
+      buyWithLemonSqueezy: "Lemon Squeezy ile Satın Al"
     },
     EN: { 
       title: "VERITAS LEGAL AI", 
@@ -106,7 +149,16 @@ export default function Home() {
       loading: "⏳ Analyzing...",
       resultTitle: "Analysis Result",
       features: "Features",
-      pricing: "Pricing"
+      pricing: "Pricing",
+      popularBadge: "★ MOST POPULAR",
+      shopierSecurePayment: "Secure Payment with Shopier",
+      shopierBuy: "Buy with Shopier",
+      lemonSqueezyCheckout: "Secure Checkout with Lemon Squeezy",
+      buyWithLemonSqueezy: "Buy with Lemon Squeezy",
+      feature1: "✓ Fast PDF analysis",
+      feature2: "✓ Legal compliance check",
+      feature3: "✓ Risk assessment reports",
+      feature4: "✓ Multi-language support"
     },
     FR: { 
       title: "VERITAS LEGAL AI", 
@@ -122,7 +174,16 @@ export default function Home() {
       loading: "⏳ Analyse en cours...",
       resultTitle: "Résultat de l'analyse",
       features: "Caractéristiques",
-      pricing: "Tarification"
+      pricing: "Tarification",
+      popularBadge: "★ LE PLUS POPULAIRE",
+      shopierSecurePayment: "Paiement sécurisé avec Shopier",
+      shopierBuy: "Acheter avec Shopier",
+      lemonSqueezyCheckout: "Paiement sécurisé avec Lemon Squeezy",
+      buyWithLemonSqueezy: "Acheter avec Lemon Squeezy",
+      feature1: "✓ Analyse PDF rapide",
+      feature2: "✓ Vérification de conformité légale",
+      feature3: "✓ Rapports d'évaluation des risques",
+      feature4: "✓ Support multilingue"
     },
     DE: { 
       title: "VERITAS LEGAL AI", 
@@ -138,7 +199,16 @@ export default function Home() {
       loading: "⏳ Analyse läuft...",
       resultTitle: "Analyseergebnis",
       features: "Funktionen",
-      pricing: "Preise"
+      pricing: "Preise",
+      popularBadge: "★ BELIEBTESTE",
+      shopierSecurePayment: "Sicherer Zahlung mit Shopier",
+      shopierBuy: "Mit Shopier kaufen",
+      lemonSqueezyCheckout: "Sicherer Checkout mit Lemon Squeezy",
+      buyWithLemonSqueezy: "Mit Lemon Squeezy kaufen",
+      feature1: "✓ Schnelle PDF-Analyse",
+      feature2: "✓ Rechtliche Compliance-Prüfung",
+      feature3: "✓ Risikobewertungsberichte",
+      feature4: "✓ Mehrsprachige Unterstützung"
     },
     RU: { 
       title: "VERITAS LEGAL AI", 
@@ -154,7 +224,16 @@ export default function Home() {
       loading: "⏳ Анализ выполняется...",
       resultTitle: "Результат анализа",
       features: "Функции",
-      pricing: "Цены"
+      pricing: "Цены",
+      popularBadge: "★ САМЫЙ ПОПУЛЯРНЫЙ",
+      shopierSecurePayment: "Безопасная оплата через Shopier",
+      shopierBuy: "Купить через Shopier",
+      lemonSqueezyCheckout: "Безопасная оплата через Lemon Squeezy",
+      buyWithLemonSqueezy: "Купить через Lemon Squeezy",
+      feature1: "✓ Быстрый анализ PDF",
+      feature2: "✓ Проверка правового соответствия",
+      feature3: "✓ Отчеты об оценке рисков",
+      feature4: "✓ Многоязычная поддержка"
     },
     ZH: { 
       title: "VERITAS LEGAL AI", 
@@ -170,7 +249,16 @@ export default function Home() {
       loading: "⏳ 分析中...",
       resultTitle: "分析结果",
       features: "功能",
-      pricing: "定价"
+      pricing: "定价",
+      popularBadge: "★ 最受欢迎",
+      shopierSecurePayment: "通过 Shopier 安全支付",
+      shopierBuy: "通过 Shopier 购买",
+      lemonSqueezyCheckout: "通过 Lemon Squeezy 安全结账",
+      buyWithLemonSqueezy: "通过 Lemon Squeezy 购买",
+      feature1: "✓ 快速 PDF 分析",
+      feature2: "✓ 法律合规检查",
+      feature3: "✓ 风险评估报告",
+      feature4: "✓ 多语言支持"
     },
     AR: { 
       title: "VERITAS LEGAL AI", 
@@ -186,7 +274,16 @@ export default function Home() {
       loading: "⏳ جاري التحليل...",
       resultTitle: "نتيجة التحليل",
       features: "الميزات",
-      pricing: "التسعير"
+      pricing: "التسعير",
+      popularBadge: "★ الأكثر شعبية",
+      shopierSecurePayment: "الدفع الآمن مع Shopier",
+      shopierBuy: "شراء مع Shopier",
+      lemonSqueezyCheckout: "الدفع الآمن مع Lemon Squeezy",
+      buyWithLemonSqueezy: "شراء مع Lemon Squeezy",
+      feature1: "✓ تحليل PDF سريع",
+      feature2: "✓ فحص الامتثال القانوني",
+      feature3: "✓ تقارير تقييم المخاطر",
+      feature4: "✓ دعم متعدد اللغات"
     }
   };
 
@@ -227,7 +324,7 @@ export default function Home() {
     try {
       // PDF'den metin çıkarma
       const pdfjsLib = await import('pdfjs-dist');
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
       
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -326,8 +423,8 @@ export default function Home() {
             <img 
               src="/mainicon.png" 
               alt="Home" 
-              width="32" 
-              height="32" 
+              width="18" 
+              height="18" 
               style={{ 
                 cursor: 'pointer', 
                 transition: 'opacity 0.2s',
@@ -675,10 +772,10 @@ export default function Home() {
                 <div style={{ background: midBlue, padding: '25px', borderRadius: '15px', marginTop: '30px' }}>
                   <h3 style={{ color: gold, marginBottom: '15px' }}>{ui[language].features}</h3>
                   <ul style={{ color: lightText, lineHeight: '2' }}>
-                    <li>✓ Hızlı PDF analizi</li>
-                    <li>✓ Mevzuat uyumluluk kontrolü</li>
-                    <li>✓ Risk değerlendirme raporları</li>
-                    <li>✓ Çoklu dil desteği</li>
+                    <li>{ui[language].feature1}</li>
+                    <li>{ui[language].feature2}</li>
+                    <li>{ui[language].feature3}</li>
+                    <li>{ui[language].feature4}</li>
                   </ul>
                 </div>
               </div>
@@ -692,12 +789,21 @@ export default function Home() {
                       key={pkg.name}
                       gold={gold}
                       plan={pkg.name}
-                      price={pkg.price}
+                      priceTR={pkg.priceTR}
+                      priceGlobal={pkg.priceGlobal}
                       features={pkg.features}
+                      featuresGlobal={pkg.featuresGlobal}
                       popular={pkg.isPopular}
                       fullName={pkg.fullName}
+                      fullNameGlobal={pkg.fullNameGlobal}
                       description={pkg.description}
+                      descriptionGlobal={pkg.descriptionGlobal}
                       buttonText={pkg.buttonText}
+                      buttonTextGlobal={pkg.buttonTextGlobal}
+                      shopierLink={pkg.shopierLink}
+                      lemonSqueezyLink={pkg.lemonSqueezyLink}
+                      language={language}
+                      ui={ui}
                     />
                   ))}
                 </div>
@@ -810,12 +916,21 @@ export default function Home() {
                         key={pkg.name}
                         gold={gold}
                         plan={pkg.name}
-                        price={pkg.price}
+                        priceTR={pkg.priceTR}
+                        priceGlobal={pkg.priceGlobal}
                         features={pkg.features}
+                        featuresGlobal={pkg.featuresGlobal}
                         popular={pkg.isPopular}
                         fullName={pkg.fullName}
+                        fullNameGlobal={pkg.fullNameGlobal}
                         description={pkg.description}
+                        descriptionGlobal={pkg.descriptionGlobal}
                         buttonText={pkg.buttonText}
+                        buttonTextGlobal={pkg.buttonTextGlobal}
+                        shopierLink={pkg.shopierLink}
+                        lemonSqueezyLink={pkg.lemonSqueezyLink}
+                        language={language}
+                        ui={ui}
                       />
                     ))}
                   </div>
@@ -828,12 +943,12 @@ export default function Home() {
                   <p style={{ color: lightText, fontSize: '1.1rem', lineHeight: '1.8', marginBottom: '20px', whiteSpace: 'pre-line' }}>{ui[language].aboutText}</p>
                   <div style={{ background: midBlue, padding: '25px', borderRadius: '15px', marginTop: '30px' }}>
                     <h3 style={{ color: gold, marginBottom: '15px' }}>{ui[language].features}</h3>
-                    <ul style={{ color: lightText, lineHeight: '2' }}>
-                      <li>✓ Hızlı PDF analizi</li>
-                      <li>✓ Mevzuat uyumluluk kontrolü</li>
-                      <li>✓ Risk değerlendirme raporları</li>
-                      <li>✓ Çoklu dil desteği</li>
-                    </ul>
+                  <ul style={{ color: lightText, lineHeight: '2' }}>
+                    <li>{ui[language].feature1}</li>
+                    <li>{ui[language].feature2}</li>
+                    <li>{ui[language].feature3}</li>
+                    <li>{ui[language].feature4}</li>
+                  </ul>
                   </div>
                 </div>
               )}
