@@ -269,21 +269,7 @@ export default function Home() {
               justifyContent: 'center'
             }}
           >
-            <svg width="40" height="40" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-              {/* House outline - triangular roof and two side walls, no bottom line */}
-              <path d="M25 35 L50 15 L75 35" stroke={gold} strokeWidth="3.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-              <line x1="25" y1="35" x2="25" y2="75" stroke={gold} strokeWidth="3.5" strokeLinecap="round"/>
-              <line x1="75" y1="35" x2="75" y2="75" stroke={gold} strokeWidth="3.5" strokeLinecap="round"/>
-              {/* Sword - vertical, hilt at roof apex, blade pointing down to base */}
-              <line x1="50" y1="15" x2="50" y2="75" stroke={gold} strokeWidth="3" strokeLinecap="round"/>
-              <path d="M46 20 L50 15 L54 20" stroke={gold} strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-              {/* Scales of justice - at bottom, directly beneath sword tip, balanced */}
-              <line x1="50" y1="75" x2="50" y2="80" stroke={gold} strokeWidth="2.5" strokeLinecap="round"/>
-              <line x1="50" y1="80" x2="40" y2="88" stroke={gold} strokeWidth="2.5" strokeLinecap="round"/>
-              <line x1="50" y1="80" x2="60" y2="88" stroke={gold} strokeWidth="2.5" strokeLinecap="round"/>
-              <circle cx="40" cy="88" r="3.5" fill={gold}/>
-              <circle cx="60" cy="88" r="3.5" fill={gold}/>
-            </svg>
+            <img src="/mainicon.png" alt="Home" width="30" height="30" />
           </button>
           {/* HAMBURGER MENÜ BUTONU - Logo İkonunun Altında */}
           <button 
@@ -480,7 +466,7 @@ export default function Home() {
             /* LANDING PAGE - Giriş Yapılmamışsa */
             <div style={{ textAlign: 'center', width: '100%', maxWidth: '1200px', marginTop: '40px' }}>
               {/* Header: Logo ve Slogan */}
-              <div style={{ marginBottom: '50px' }}>
+              <div style={{ marginBottom: '50px', marginTop: '-50px' }}>
                 <img src="/logoverl.png" alt="Logo" style={{ width: '300px', marginBottom: '20px', maxWidth: '90%' }} />
                 <h1 style={{ color: gold, fontSize: '2.5rem', marginBottom: '10px', fontWeight: 'bold' }}>{ui[language].title}</h1>
                 <p style={{ color: lightText, fontSize: '1.3rem', marginBottom: '0' }}>{ui[language].sub}</p>
@@ -515,22 +501,21 @@ export default function Home() {
                 <button 
                   onClick={handleAuth} 
                   style={{ 
-                    backgroundColor: '#ffffff', 
-                    color: '#000000', 
+                    backgroundColor: '#ffffff !important', 
+                    color: '#000000 !important', 
                     borderRadius: '50px', 
-                    padding: '16px 40px', 
-                    fontWeight: 'bold', 
-                    border: 'none', 
+                    padding: '15px 40px', 
+                    width: 'fit-content',
                     display: 'flex', 
                     alignItems: 'center', 
                     gap: '10px',
+                    margin: '20px auto',
+                    fontWeight: 'bold', 
+                    border: 'none', 
                     cursor: 'pointer',
-                    margin: '0 auto',
                     boxShadow: '0 4px 20px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.1)',
                     transition: 'background-color 0.3s ease',
                     fontSize: '16px',
-                    minWidth: '300px',
-                    maxWidth: '90%',
                     justifyContent: 'center'
                   }}
                   onMouseEnter={(e) => {
@@ -547,8 +532,8 @@ export default function Home() {
                     height="24"
                     style={{ display: 'block' }}
                   /> 
-                  <span style={{ color: '#000000', fontWeight: 'bold' }}>{ui[language].googleBtn}</span>
-              </button>
+                  <span style={{ color: '#000000 !important', fontWeight: 'bold' }}>{ui[language].googleBtn}</span>
+                </button>
               </div>
             </div>
           ) : (

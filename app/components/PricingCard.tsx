@@ -49,8 +49,9 @@ export default function PricingCard({ gold, plan, price, features, popular }: Pr
         fontWeight: 800,
         fontSize: '.98rem',
         boxShadow: `0 2px 9px ${gold}22`,
-        zIndex: 10,
-        whiteSpace: 'nowrap'
+        zIndex: 20,
+        whiteSpace: 'nowrap',
+        border: `2px solid ${gold}`
       }}>★ POPÜLER</div>}
       <div style={{ fontSize: 27, fontWeight: 900, color: gold, marginBottom: 10 }}>{plan}</div>
       <div style={{ fontSize: 19, fontWeight: 700, marginBottom: 22, color: '#f8fafc' }}>{price}</div>
