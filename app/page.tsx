@@ -26,7 +26,54 @@ export default function Home() {
   const gold = "#c7b079"; 
   const darkBlue = "#182332"; 
   const midBlue = "#232d3c"; 
-  const lightText = "#f1efca"; // Kirli beyaz / beyaza yakın gold - normal yazılar için 
+  const lightText = "#f1efca"; // Kirli beyaz / beyaza yakın gold - normal yazılar için
+
+  const packages = [
+    {
+      name: "Basic",
+      fullName: "Veritas AI Basic Analiz Paketi",
+      price: "49 TL",
+      description: "Hukuki süreçlerinize hız kazandırmak için ilk adımı atın! Bireysel kullanıcılar ve küçük ölçekli ofisler için ideal.",
+      features: [
+        "Ayda 10 Adet Detaylı Analiz Hakkı",
+        "Yapay Zeka Destekli Anlık Analiz",
+        "7/24 Web Tabanlı Erişim",
+        "Bireysel Dosya Takibi"
+      ],
+      buttonText: "Satın Al",
+      isPopular: false
+    },
+    {
+      name: "Professional",
+      fullName: "Veritas AI Professional – Uzman Paketi ★",
+      price: "149 TL",
+      description: "İş yükünü hafifletmek isteyen profesyoneller için tasarlandı! En popüler ve verimli çözümümüz.",
+      features: [
+        "Ayda 50 Adet Gelişmiş Analiz Hakkı",
+        "PDF veya Word Olarak Rapor İndirme",
+        "Geniş Mevzuat Taraması",
+        "Yapılandırılmış Hukuki Görüş Çıktısı",
+        "Hızlı İşlem Onayı"
+      ],
+      buttonText: "Hemen Başla",
+      isPopular: true
+    },
+    {
+      name: "Enterprise",
+      fullName: "Veritas AI Enterprise – Kurumsal Çözüm",
+      price: "399 TL",
+      description: "Hukuki operasyonlarınızda sınırları kaldırın! Büyük ofisler ve kurumsal şirketler için limitsiz prestij paketi.",
+      features: [
+        "Sınırsız Analiz Hakkı (Kota Sınırı Yok)",
+        "Geçmiş Analiz Kayıtlarına Sınırsız Erişim",
+        "Dosya Yönetimi ve Arşivleme",
+        "En Yüksek İşlemci Önceliği",
+        "Kurumsal Güvence ve Maksimum Verimlilik"
+      ],
+      buttonText: "Sınırsızlığa Geç",
+      isPopular: false
+    }
+  ]; 
 
   const ui: any = {
     TR: { 
@@ -620,6 +667,41 @@ export default function Home() {
                   <span style={{ color: '#000000 !important', fontWeight: 'bold' }}>{ui[language].googleBtn}</span>
               </button>
               </div>
+
+              {/* Veritas Nedir? Bölümü - Her zaman görünür */}
+              <div style={{ marginTop: '80px', maxWidth: '700px', textAlign: 'left', width: '100%' }}>
+                <h2 style={{ color: gold, fontSize: '2rem', marginBottom: '30px', textAlign: 'center' }}>{ui[language].aboutTitle}</h2>
+                <p style={{ color: lightText, fontSize: '1.1rem', lineHeight: '1.8', marginBottom: '20px', whiteSpace: 'pre-line' }}>{ui[language].aboutText}</p>
+                <div style={{ background: midBlue, padding: '25px', borderRadius: '15px', marginTop: '30px' }}>
+                  <h3 style={{ color: gold, marginBottom: '15px' }}>{ui[language].features}</h3>
+                  <ul style={{ color: lightText, lineHeight: '2' }}>
+                    <li>✓ Hızlı PDF analizi</li>
+                    <li>✓ Mevzuat uyumluluk kontrolü</li>
+                    <li>✓ Risk değerlendirme raporları</li>
+                    <li>✓ Çoklu dil desteği</li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* Paketler Bölümü - Her zaman görünür */}
+              <div style={{ marginTop: '80px', width: '100%' }}>
+                <h2 style={{ color: gold, fontSize: '2rem', marginBottom: '40px', textAlign: 'center' }}>{ui[language].pricing}</h2>
+                <div style={{ display: 'flex', gap: '25px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                  {packages.map((pkg) => (
+                    <PricingCard 
+                      key={pkg.name}
+                      gold={gold}
+                      plan={pkg.name}
+                      price={pkg.price}
+                      features={pkg.features}
+                      popular={pkg.isPopular}
+                      fullName={pkg.fullName}
+                      description={pkg.description}
+                      buttonText={pkg.buttonText}
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
           ) : (
             /* DASHBOARD - Giriş Yapılmışsa */
@@ -630,7 +712,6 @@ export default function Home() {
                   {/* PDF Yükleme Alanı */}
                   <div style={{ background: midBlue, padding: '50px', borderRadius: '25px', border: `2px dashed ${gold}44` }}>
                     <h2 style={{ color: gold, fontSize: '2rem', marginBottom: '30px' }}>{ui[language].title}</h2>
-                    <p style={{ color: lightText, fontSize: '1.2rem', marginBottom: '30px' }}>{ui[language].upload}</p>
                     <input 
                       type="file" 
                       id="pdfInputFinal" 
@@ -641,27 +722,31 @@ export default function Home() {
                     <button 
                       onClick={() => document.getElementById('pdfInputFinal')?.click()} 
                       style={{ 
-                        background: '#ffffff', 
-                        color: darkBlue, 
-                        padding: '12px 30px', 
-                        borderRadius: '10px', 
-                        fontWeight: 'bold', 
-                        border: 'none', 
+                        backgroundColor: '#ffffff', 
+                        color: '#000000', 
+                        borderRadius: '50px', 
+                        padding: '15px 40px', 
+                        fontWeight: 'bold',
+                        border: 'none',
                         cursor: 'pointer',
                         marginBottom: '20px',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                        transition: 'all 0.2s ease'
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: 'fit-content',
+                        margin: '0 auto 20px auto',
+                        boxShadow: '0 4px 20px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.1)',
+                        transition: 'background-color 0.3s ease',
+                        fontSize: '16px'
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
-                        e.currentTarget.style.transform = 'translateY(-1px)';
+                        e.currentTarget.style.backgroundColor = '#f5f5f5';
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
-                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.backgroundColor = '#ffffff';
                       }}
                     >
-                      <span style={{ color: darkBlue }}>{ui[language].select}</span>
+                      <span style={{ color: '#000000', fontWeight: 'bold' }}>Analiz İçin Dosya Seçin</span>
                     </button>
                     {file && <p style={{ marginTop: '20px', color: '#4ade80', fontWeight: 'bold', fontSize: '1rem' }}>● {file.name}</p>}
                     <button 
@@ -720,25 +805,19 @@ export default function Home() {
                 <div style={{ marginTop: '40px' }}>
                   <h2 style={{ color: gold, fontSize: '2rem', marginBottom: '40px', textAlign: 'center' }}>{ui[language].pricing}</h2>
                   <div style={{ display: 'flex', gap: '25px', justifyContent: 'center', flexWrap: 'wrap' }}>
-                    <PricingCard 
-                      gold={gold}
-                      plan="Basic"
-                      price="₺299/ay"
-                      features={["10 Analiz/Ay", "Temel Risk Raporu", "Email Desteği"]}
-                    />
-                    <PricingCard 
-                      gold={gold}
-                      plan="Professional"
-                      price="₺799/ay"
-                      features={["50 Analiz/Ay", "Detaylı Risk Raporu", "Öncelikli Destek", "API Erişimi"]}
-                      popular
-                    />
-                    <PricingCard 
-                      gold={gold}
-                      plan="Elite"
-                      price="₺1,999/ay"
-                      features={["Sınırsız Analiz", "Premium Raporlar", "7/24 Destek", "Özel Entegrasyon", "Özel Eğitim"]}
-                    />
+                    {packages.map((pkg) => (
+                      <PricingCard 
+                        key={pkg.name}
+                        gold={gold}
+                        plan={pkg.name}
+                        price={pkg.price}
+                        features={pkg.features}
+                        popular={pkg.isPopular}
+                        fullName={pkg.fullName}
+                        description={pkg.description}
+                        buttonText={pkg.buttonText}
+                      />
+                    ))}
                   </div>
                 </div>
               )}
