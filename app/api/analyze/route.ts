@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/utils/supabase/server";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -12,6 +12,7 @@ function getUserKey(req: Request) {
 
 async function getRelevantDocuments(pdfText: string, targetLang: string = 'TR', limit: number = 5) {
   try {
+    const supabase = await createClient();
     // PDF metninden embedding oluştur
     const embeddingResp = await fetch('https://api.openai.com/v1/embeddings', {
       method: 'POST',
@@ -79,6 +80,7 @@ async function getRelevantDocuments(pdfText: string, targetLang: string = 'TR', 
 
 export async function POST(req: Request) {
   try {
+    const supabase = await createClient();
     const { pdfText, targetLang } = await req.json();
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json({ reply: "API Key eksik!" }, { status: 500 });

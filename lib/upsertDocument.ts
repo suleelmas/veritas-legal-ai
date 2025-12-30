@@ -1,6 +1,10 @@
-import { supabase } from './supabase';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
-export async function upsertDocument(content: string, metadata: any = {}) {
+export async function upsertDocument(
+  content: string, 
+  metadata: any = {},
+  supabase: SupabaseClient
+) {
   try {
     // 1. OpenAI EMBEDDING REQUEST
     const embeddingResp = await fetch('https://api.openai.com/v1/embeddings', {
@@ -29,6 +33,7 @@ export async function upsertDocument(content: string, metadata: any = {}) {
     throw err;
   }
 }
+
 
 
 

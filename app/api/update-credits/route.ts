@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/utils/supabase/server";
 
 export async function POST(req: Request) {
   try {
+    const supabase = await createClient();
     const { user_key, purchased_package } = await req.json();
     // Shopier webhooksdan veya admin panelden: purchased_package="basic" ise 10, pro 50, elite 9999
     let credit = 1;
@@ -20,6 +21,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: false, error: String(err) }, { status: 500 });
   }
 }
+
 
 
 

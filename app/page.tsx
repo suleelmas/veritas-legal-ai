@@ -3,6 +3,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import PricingCard from "./components/PricingCard";
+import Header from "./components/Header";
+import Sidebar from "./components/Sidebar";
+import AnalysisResult from "./components/AnalysisResult";
 import { createBrowserClient } from '@supabase/ssr';
 import { jsPDF } from "jspdf";
 import html2canvas from 'html2canvas';
@@ -103,6 +106,9 @@ export default function Home() {
   const [selectedLegislation, setSelectedLegislation] = useState<{title: string, content: string} | null>(null);
   const [showLegislationModal, setShowLegislationModal] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
+
+  // Admin test modunda adminTestPackage, normal modda userPackage kullan
+  const effectivePackage = adminTestMode && adminTestPackage ? adminTestPackage : userPackage;
 
   const gold = "#c7b079"; 
   const darkBlue = "#182332"; 
@@ -494,7 +500,8 @@ export default function Home() {
                 title: a.file_name,
                 date: new Date(a.created_at).toLocaleString(language === 'TR' ? 'tr-TR' : 'en-US'),
                 summary: a.analysis_summary || a.analysis_result.substring(0, 200) + '...',
-                fullResult: a.analysis_result
+                fullResult: a.analysis_result,
+                riskScore: extractRiskScore(a.analysis_result)
               }));
               setAnalysisHistory(history);
             }
@@ -535,12 +542,11 @@ export default function Home() {
     const pkg = effectivePackage;
     if (!pkg) return false;
     
-    const limits: Record<UserPackage, number> = {
+    const limits: Record<Exclude<UserPackage, null>, number> = {
       'free': 1,
       'basic': 10,
       'professional': 50,
-      'enterprise': Infinity,
-      null: 1
+      'enterprise': Infinity
     };
     
     const limit = limits[pkg] || 1;
@@ -628,12 +634,11 @@ export default function Home() {
     const pkg = effectivePackage;
     if (!pkg) return 0;
     
-    const limits: Record<UserPackage, number> = {
+    const limits: Record<Exclude<UserPackage, null>, number> = {
       'free': 1,
       'basic': 10,
       'professional': 50,
-      'enterprise': Infinity,
-      null: 1
+      'enterprise': Infinity
     };
     
     const limit = limits[pkg] || 1;
@@ -822,6 +827,47 @@ export default function Home() {
     return localizedText;
   };
 
+  // Mevzuat detaylarını getir
+  const fetchLegislationDetail = (law: string, article: string) => {
+    // Basit bir implementasyon - gerçek uygulamada API çağrısı yapılabilir
+    const legislationContent = `${law} - Madde ${article} detayları burada gösterilecek.`;
+    setSelectedLegislation({
+      title: `${law} - Madde ${article}`,
+      content: legislationContent
+    });
+    setShowLegislationModal(true);
+  };
+
+  // Mevzuat referanslarını tespit et
+  const detectLegislationReferences = (text: string): Array<{match: string, law: string, article: string}> => {
+    if (!text) return [];
+    
+    const references: Array<{match: string, law: string, article: string}> = [];
+    
+    // Yaygın mevzuat referansları için regex pattern'leri
+    const patterns = [
+      // KVKK m. 5, GDPR Article 5 gibi formatlar
+      /(KVKK|GDPR|GDPR \(Personal Data Protection Law\))\s*(?:m\.|madde|article|art\.)\s*(\d+)/gi,
+      // 6698 sayılı Kanun m. 5 gibi formatlar
+      /\d+\s*sayılı\s*(?:Kanun|Law)\s*(?:m\.|madde|article|art\.)\s*(\d+)/gi,
+      // Article 5 of GDPR gibi formatlar
+      /(?:article|art\.|madde|m\.)\s*(\d+)\s*(?:of|)\s*(KVKK|GDPR|GDPR \(Personal Data Protection Law\))/gi
+    ];
+    
+    patterns.forEach(pattern => {
+      const matches = text.matchAll(pattern);
+      for (const match of matches) {
+        references.push({
+          match: match[0],
+          law: match[1] || match[2] || 'Unknown',
+          article: match[2] || match[1] || 'Unknown'
+        });
+      }
+    });
+    
+    return references;
+  };
+
   // Sonuç metnini özet ve detaylı analiz olarak ayır
   const parseAnalysisResult = (text: string) => {
     if (!text) return { summary: '', detailed: '' };
@@ -943,6 +989,39 @@ export default function Home() {
       provider: 'google',
       options: { redirectTo: `${window.location.origin}/auth/callback` }
     });
+  };
+
+  const handleChatSend = async () => {
+    if (!chatInput.trim() || chatLoading) return;
+    
+    const userMessage = chatInput.trim();
+    setChatInput('');
+    setChatMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    setChatLoading(true);
+    
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: [...chatMessages, { role: 'user', content: userMessage }],
+          pdfText: pdfText,
+          language: language
+        })
+      });
+      
+      const data = await res.json();
+      const assistantMessage = data.reply || data.error || 'Sorry, I could not process your request.';
+      
+      setChatMessages(prev => [...prev, { role: 'assistant', content: assistantMessage }]);
+    } catch (error) {
+      console.error('Chat error:', error);
+      setChatMessages(prev => [...prev, { role: 'assistant', content: 'An error occurred. Please try again.' }]);
+    } finally {
+      setChatLoading(false);
+    }
   };
 
   const handleAnalyze = async () => {
@@ -1247,619 +1326,44 @@ export default function Home() {
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: darkBlue, color: lightText, fontFamily: 'sans-serif' }}>
-      
-      {/* ÜST BAR - Logo İkonu ve Sağ Üst Dil Menüsü */}
-      <nav style={{ width: '100%', background: '#131b26', padding: '15px 20px', position: 'relative', top: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${gold}33` }}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-          <Link
-            href="/"
-            onClick={(e) => {
-              // State'i sıfırla ve sayfayı en üste kaydır
-              setActiveTab('analyze'); 
-              setSidebarOpen(false);
-              setFile(null);
-              setResult("");
-              setLoading(false);
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            style={{ 
-              background: 'transparent', 
-              border: 'none', 
-              cursor: 'pointer', 
-              padding: '4px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              textDecoration: 'none'
-            }}
-          >
-            <img 
-              src="/mainicon.png" 
-              alt="Home" 
-              width="48" 
-              height="48" 
-              style={{ 
-                cursor: 'pointer', 
-                transition: 'opacity 0.2s',
-                display: 'block'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.opacity = '0.8';
-                e.currentTarget.style.filter = 'brightness(1.2)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.opacity = '1';
-                e.currentTarget.style.filter = 'brightness(1)';
-              }}
-            />
-          </Link>
-          {/* HAMBURGER MENÜ BUTONU - Logo İkonunun Altında */}
-          <button 
-            onClick={() => setSidebarOpen(!sidebarOpen)} 
-            style={{ 
-              background: 'transparent', 
-              border: `2px solid ${gold}`, 
-              width: 32, 
-              height: 32, 
-              borderRadius: '6px', 
-              cursor: 'pointer', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              boxShadow: `0 0 10px ${gold}44`
-            }}
-          >
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
-              <div style={{ width: '16px', height: '2.5px', backgroundColor: gold, borderRadius: '1px', boxShadow: `0 0 2px ${gold}` }}></div>
-              <div style={{ width: '16px', height: '2.5px', backgroundColor: gold, borderRadius: '1px', boxShadow: `0 0 2px ${gold}` }}></div>
-              <div style={{ width: '16px', height: '2.5px', backgroundColor: gold, borderRadius: '1px', boxShadow: `0 0 2px ${gold}` }}></div>
-            </div>
-          </button>
-        </div>
-        
-        {/* SAĞ ÜST MENÜLER - Dil ve Kullanıcı */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '15px', marginRight: '40px' }}>
-          {/* DİL MENÜSÜ */}
-          <div style={{ position: 'relative' }} data-language-menu>
-            <button 
-              onClick={() => setLanguageMenuOpen(!languageMenuOpen)}
-              style={{ 
-                background: 'transparent', 
-                border: `1px solid ${gold}`, 
-                color: gold, 
-                padding: '8px 15px', 
-                borderRadius: '8px', 
-                cursor: 'pointer', 
-                fontWeight: 'bold',
-                fontSize: '14px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="12" cy="12" r="10" stroke={gold} strokeWidth="2" fill="none"/>
-                <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" stroke={gold} strokeWidth="1.5" fill="none"/>
-              </svg>
-              <span style={{ color: gold }}>{language}</span>
-              <span style={{ fontSize: '10px', color: gold }}>{languageMenuOpen ? '▲' : '▼'}</span>
-            </button>
-
-            {languageMenuOpen && (
-              <div style={{ 
-                position: 'absolute', 
-                top: '100%', 
-                right: '0', 
-                marginTop: '8px', 
-                background: '#131b26', 
-                border: `1px solid ${gold}`, 
-                borderRadius: '8px', 
-                minWidth: '120px',
-                boxShadow: `0 4px 12px rgba(0,0,0,0.3)`,
-                zIndex: 1100,
-                overflow: 'hidden'
-              }}>
-                {["EN", "TR", "FR", "DE", "RU", "ZH", "AR"].map(l => (
-                  <button 
-                    key={l} 
-                    onClick={() => {
-                      setLanguage(l);
-                      setLanguageMenuOpen(false);
-                    }} 
-                    style={{ 
-                      width: '100%',
-                      background: language === l ? gold : 'transparent', 
-                      color: language === l ? '#ffffff' : lightText, 
-                      border: 'none',
-                      padding: '10px 15px', 
-                      cursor: 'pointer', 
-                      fontWeight: 'bold', 
-                      fontSize: '13px',
-                      textAlign: 'left',
-                      transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (language !== l) {
-                        e.currentTarget.style.background = `${gold}33`;
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (language !== l) {
-                        e.currentTarget.style.background = 'transparent';
-                      }
-                    }}
-                  >
-                    {l}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* KULLANICI MENÜSÜ - Sadece giriş yapılmışsa görünür */}
-          {user && (
-            <div style={{ position: 'relative' }} data-user-menu>
-              <button
-                onClick={() => setUserMenuOpen(!userMenuOpen)}
-                style={{
-                  background: `linear-gradient(135deg, ${gold}, #d4c08a)`,
-                  border: `2px solid ${gold}`,
-                  color: darkBlue,
-                  padding: '0',
-                  borderRadius: '50%',
-                  cursor: 'pointer',
-                  width: '40px',
-                  height: '40px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '14px',
-                  fontWeight: 'bold',
-                  transition: 'all 0.2s',
-                  boxShadow: `0 2px 8px rgba(199, 176, 121, 0.3)`
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'scale(1.1)';
-                  e.currentTarget.style.boxShadow = `0 4px 12px rgba(199, 176, 121, 0.5)`;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'scale(1)';
-                  e.currentTarget.style.boxShadow = `0 2px 8px rgba(199, 176, 121, 0.3)`;
-                }}
-                title={user.user_metadata?.full_name || user.email || 'User'}
-              >
-                {getAvatarInitials(user)}
-      </button>
-
-              {userMenuOpen && (
-                <div style={{
-                  position: 'absolute',
-                  top: '100%',
-                  right: '0',
-                  marginTop: '8px',
-                  background: '#131b26',
-                  border: `1px solid ${gold}`,
-                  borderRadius: '8px',
-                  minWidth: '200px',
-                  boxShadow: `0 4px 12px rgba(0,0,0,0.3)`,
-                  zIndex: 1100,
-                  overflow: 'hidden'
-                }}>
-                  <div style={{
-                    padding: '12px 15px',
-                    borderBottom: `1px solid ${gold}33`,
-                    color: lightText,
-                    fontSize: '12px',
-                    opacity: 0.7
-                  }}>
-                    {user.email}
-                  </div>
-                  
-                  <Link href="/profile" style={{ textDecoration: 'none' }}>
-                    <button
-                      onClick={() => setUserMenuOpen(false)}
-                      style={{
-                        width: '100%',
-                        background: 'transparent',
-                        color: lightText,
-                        border: 'none',
-                        padding: '12px 15px',
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                        fontSize: '14px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        transition: 'background 0.2s'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = `rgba(199, 176, 121, 0.2)`;
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'transparent';
-                      }}
-                    >
-                      <span>👤</span> Profile
-                    </button>
-                  </Link>
-
-                  {canAccessHistory() && (
-                    <button
-                      onClick={() => {
-                        setActiveTab('history');
-                        setUserMenuOpen(false);
-                        setSidebarOpen(false);
-                      }}
-                      style={{
-                        width: '100%',
-                        background: 'transparent',
-                        color: lightText,
-                        border: 'none',
-                        padding: '12px 15px',
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                        fontSize: '14px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        transition: 'background 0.2s'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = `rgba(199, 176, 121, 0.2)`;
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'transparent';
-                      }}
-                    >
-                      <span>📋</span> My Analyses
-                    </button>
-                  )}
-
-                  <button
-                    onClick={async () => {
-                      await supabase.auth.signOut();
-                      setUser(null);
-                      setUserMenuOpen(false);
-                      window.location.href = '/';
-                    }}
-                    style={{
-                      width: '100%',
-                      background: 'transparent',
-                      color: '#ff6b6b',
-                      border: 'none',
-                      padding: '12px 15px',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                      fontSize: '14px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px',
-                      transition: 'background 0.2s',
-                      borderTop: `1px solid ${gold}33`
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = `rgba(255, 107, 107, 0.2)`;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'transparent';
-                    }}
-                  >
-                    <span>🚪</span> Logout
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-          {/* KULLANICI MENÜSÜ - Sadece giriş yapılmışsa görünür */}
-          {user && (
-            <div style={{ position: 'relative' }} data-user-menu>
-              <button
-                onClick={() => setUserMenuOpen(!userMenuOpen)}
-                style={{
-                  background: `linear-gradient(135deg, ${gold}, #d4c08a)`,
-                  border: `2px solid ${gold}`,
-                  color: darkBlue,
-                  padding: '0',
-                  borderRadius: '50%',
-                  cursor: 'pointer',
-                  width: '40px',
-                  height: '40px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '14px',
-                  fontWeight: 'bold',
-                  transition: 'all 0.2s',
-                  boxShadow: `0 2px 8px rgba(199, 176, 121, 0.3)`
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'scale(1.1)';
-                  e.currentTarget.style.boxShadow = `0 4px 12px rgba(199, 176, 121, 0.5)`;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'scale(1)';
-                  e.currentTarget.style.boxShadow = `0 2px 8px rgba(199, 176, 121, 0.3)`;
-                }}
-                title={user.user_metadata?.full_name || user.email || 'User'}
-              >
-                {getAvatarInitials(user)}
-      </button>
-
-              {userMenuOpen && (
-                <div style={{
-                  position: 'absolute',
-                  top: '100%',
-                  right: '0',
-                  marginTop: '8px',
-                  background: '#131b26',
-                  border: `1px solid ${gold}`,
-                  borderRadius: '8px',
-                  minWidth: '200px',
-                  boxShadow: `0 4px 12px rgba(0,0,0,0.3)`,
-                  zIndex: 1100,
-                  overflow: 'hidden'
-                }}>
-                  <div style={{
-                    padding: '12px 15px',
-                    borderBottom: `1px solid ${gold}33`,
-                    color: lightText,
-                    fontSize: '12px',
-                    opacity: 0.7
-                  }}>
-                    {user.email}
-                  </div>
-                  
-                  <Link href="/profile" style={{ textDecoration: 'none' }}>
-                    <button
-                      onClick={() => setUserMenuOpen(false)}
-                      style={{
-                        width: '100%',
-                        background: 'transparent',
-                        color: lightText,
-                        border: 'none',
-                        padding: '12px 15px',
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                        fontSize: '14px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        transition: 'background 0.2s'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = `rgba(199, 176, 121, 0.2)`;
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'transparent';
-                      }}
-                    >
-                      <span>👤</span> Profile
-                    </button>
-                  </Link>
-
-                  {canAccessHistory() && (
-                    <button
-                      onClick={() => {
-                        setActiveTab('history');
-                        setUserMenuOpen(false);
-                        setSidebarOpen(false);
-                      }}
-                      style={{
-                        width: '100%',
-                        background: 'transparent',
-                        color: lightText,
-                        border: 'none',
-                        padding: '12px 15px',
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                        fontSize: '14px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '10px',
-                        transition: 'background 0.2s'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = `rgba(199, 176, 121, 0.2)`;
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'transparent';
-                      }}
-                    >
-                      <span>📋</span> My Analyses
-                    </button>
-                  )}
-
-                  <button
-                    onClick={async () => {
-                      await supabase.auth.signOut();
-                      setUser(null);
-                      setUserMenuOpen(false);
-                      window.location.href = '/';
-                    }}
-                    style={{
-                      width: '100%',
-                      background: 'transparent',
-                      color: '#ff6b6b',
-                      border: 'none',
-                      padding: '12px 15px',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                      fontSize: '14px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px',
-                      transition: 'background 0.2s',
-                      borderTop: `1px solid ${gold}33`
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = `rgba(255, 107, 107, 0.2)`;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'transparent';
-                    }}
-                  >
-                    <span>🚪</span> Logout
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </nav>
+      <Header
+        gold={gold}
+        darkBlue={darkBlue}
+        lightText={lightText}
+        language={language}
+        setLanguage={setLanguage}
+        languageMenuOpen={languageMenuOpen}
+        setLanguageMenuOpen={setLanguageMenuOpen}
+        user={user}
+        userMenuOpen={userMenuOpen}
+        setUserMenuOpen={setUserMenuOpen}
+        sidebarOpen={sidebarOpen}
+        setSidebarOpen={setSidebarOpen}
+        setActiveTab={setActiveTab}
+        setFile={setFile}
+        setResult={setResult}
+        setLoading={setLoading}
+        supabase={supabase}
+        setUser={setUser}
+        canAccessHistory={canAccessHistory}
+        getAvatarInitials={getAvatarInitials}
+      />
 
       <div style={{ display: 'flex', paddingTop: '0' }}>
-        {/* SIDEBAR */}
-        {sidebarOpen && (
-          <aside style={{ width: '260px', background: '#131b26', height: '100vh', position: 'fixed', left: 0, padding: '20px', borderRight: `1px solid ${gold}44`, zIndex: 1050, display: 'flex', flexDirection: 'column' }}>
-             <h2 style={{ color: gold, textAlign: 'center', marginBottom: '30px' }}>VERITAS AI</h2>
-             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {/* Analiz butonu - Giriş yapılmışsa görünür ve çalışır, yapılmamışsa giriş yapmaya yönlendirir */}
-              {user ? (
-                <button 
-                  onClick={() => {
-                    setActiveTab('analyze'); 
-                    setSidebarOpen(false);
-                    setFile(null);
-                    setResult("");
-                  }} 
-                  style={{ 
-                    width: '100%', 
-                    padding: '12px', 
-                    background: activeTab === 'analyze' ? `rgba(199, 176, 121, 0.25)` : 'transparent', 
-                    color: activeTab === 'analyze' ? gold : '#ffffff', 
-                    border: `1px solid ${gold}`, 
-                    borderRadius: '10px', 
-                    cursor: 'pointer', 
-                    fontWeight: 'bold', 
-                    textAlign: 'left',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px'
-                  }}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="11" cy="11" r="8" stroke={activeTab === 'analyze' ? gold : '#ffffff'} strokeWidth="2" fill="none"/>
-                    <path d="m21 21-4.35-4.35" stroke={activeTab === 'analyze' ? gold : '#ffffff'} strokeWidth="2" strokeLinecap="round"/>
-                  </svg>
-                  <span style={{ color: activeTab === 'analyze' ? gold : '#ffffff' }}>Analiz</span>
-                </button>
-              ) : (
-                <button 
-                  onClick={() => {
-                    setSidebarOpen(false);
-                    handleAuth();
-                  }} 
-                  style={{ 
-                    width: '100%', 
-                    padding: '12px', 
-                    background: 'transparent', 
-                    color: '#ffffff', 
-                    border: `1px solid ${gold}`, 
-                    borderRadius: '10px', 
-                    cursor: 'pointer', 
-                    fontWeight: 'bold', 
-                    textAlign: 'left',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    opacity: 0.7
-                  }}
-                >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="11" cy="11" r="8" stroke="#ffffff" strokeWidth="2" fill="none"/>
-                    <path d="m21 21-4.35-4.35" stroke="#ffffff" strokeWidth="2" strokeLinecap="round"/>
-                  </svg>
-                  <span style={{ color: '#ffffff' }}>Analiz (Giriş Gerekli)</span>
-                </button>
-              )}
-              <button 
-                onClick={() => {setActiveTab('pricing'); setSidebarOpen(false);}} 
-                style={{ 
-                  width: '100%', 
-                  padding: '12px', 
-                  background: activeTab === 'pricing' ? `rgba(199, 176, 121, 0.25)` : 'transparent', 
-                  color: activeTab === 'pricing' ? gold : '#ffffff', 
-                  border: `1px solid ${gold}`, 
-                  borderRadius: '10px', 
-                  cursor: 'pointer', 
-                  fontWeight: 'bold', 
-                  textAlign: 'left',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px'
-                }}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <rect x="1" y="4" width="22" height="16" rx="2" stroke={activeTab === 'pricing' ? gold : '#ffffff'} strokeWidth="2" fill="none"/>
-                  <path d="M1 10h22" stroke={activeTab === 'pricing' ? gold : '#ffffff'} strokeWidth="2"/>
-                </svg>
-                <span style={{ color: activeTab === 'pricing' ? gold : '#ffffff' }}>Paketler</span>
-              </button>
-              <button 
-                onClick={() => {
-                  if (canAccessHistory()) {
-                    setActiveTab('history');
-                    setSidebarOpen(false);
-                  } else {
-                    alert(language === 'TR' ? 'Bu özellik sadece Enterprise paketi için geçerlidir.' : 'This feature is only available for Enterprise members.');
-                  }
-                }} 
-                style={{ 
-                  width: '100%', 
-                  padding: '12px', 
-                  background: activeTab === 'history' ? `rgba(199, 176, 121, 0.25)` : 'transparent', 
-                  color: canAccessHistory() ? (activeTab === 'history' ? gold : '#ffffff') : '#666666', 
-                  border: `1px solid ${canAccessHistory() ? gold : '#666666'}`, 
-                  borderRadius: '10px', 
-                  cursor: canAccessHistory() ? 'pointer' : 'not-allowed', 
-                  fontWeight: 'bold', 
-                  textAlign: 'left', 
-                  marginTop: '20px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  opacity: canAccessHistory() ? 1 : 0.5
-                }}
-                title={!canAccessHistory() ? (language === 'TR' ? 'Bu özellik sadece Enterprise paketi için geçerlidir' : 'This feature is only for Enterprise members') : ''}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <rect x="3" y="4" width="18" height="18" rx="2" stroke={canAccessHistory() ? (activeTab === 'history' ? gold : '#ffffff') : '#666666'} strokeWidth="2" fill="none"/>
-                  <path d="M8 2v4M16 2v4M3 10h18" stroke={canAccessHistory() ? (activeTab === 'history' ? gold : '#ffffff') : '#666666'} strokeWidth="2"/>
-                </svg>
-                <span style={{ color: canAccessHistory() ? (activeTab === 'history' ? gold : '#ffffff') : '#666666' }}>
-                  {language === 'TR' ? 'Geçmiş' : 'History'}
-                  {!canAccessHistory() && ' 🔒'}
-                </span>
-              </button>
-              <button 
-                onClick={() => {setActiveTab('about'); setSidebarOpen(false);}} 
-                style={{ 
-                  width: '100%', 
-                  padding: '12px', 
-                  background: activeTab === 'about' ? `rgba(199, 176, 121, 0.25)` : 'transparent', 
-                  color: activeTab === 'about' ? gold : '#ffffff', 
-                  border: `1px solid ${gold}`, 
-                  borderRadius: '10px', 
-                  cursor: 'pointer', 
-                  fontWeight: 'bold', 
-                  textAlign: 'left', 
-                  marginTop: '20px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px'
-                }}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="12" cy="12" r="10" stroke={activeTab === 'about' ? gold : '#ffffff'} strokeWidth="2" fill="none"/>
-                  <path d="M12 16v-4M12 8h.01" stroke={activeTab === 'about' ? gold : '#ffffff'} strokeWidth="2" strokeLinecap="round"/>
-                </svg>
-                <span style={{ color: activeTab === 'about' ? gold : '#ffffff' }}>{ui[language].aboutBtn}</span>
-              </button>
-             </div>
-          </aside>
-        )}
+        <Sidebar
+          sidebarOpen={sidebarOpen}
+          setSidebarOpen={setSidebarOpen}
+          gold={gold}
+          language={language}
+          user={user}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          setFile={setFile}
+          setResult={setResult}
+          handleAuth={handleAuth}
+          canAccessHistory={canAccessHistory}
+          ui={ui}
+        />
 
         <main style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px', width: '100%' }}>
           {!user ? (
@@ -2223,546 +1727,39 @@ export default function Home() {
                         {loading ? ui[language].loading : (isLimitReached() ? (language === 'TR' ? 'Limit Doldu' : 'Limit Reached') : ui[language].btn)}
                       </span>
                     </button>
-                    {result && (() => {
-                      const { summary, detailed } = parseAnalysisResult(result);
-                      return (
-                        <div 
-                          ref={reportRef} 
-                          style={{ 
-                            marginTop: '30px', 
-                            background: '#1a1f2e', 
-                            padding: '30px', 
-                            borderRadius: '15px', 
-                            border: `1px solid ${gold}44` 
-                          }}
-                        >
-                          <h3 style={{ color: gold, marginBottom: '20px', fontSize: '1.5rem' }}>{ui[language].resultTitle}</h3>
-                          
-                          {/* Sekme Butonları */}
-                          <div style={{
-                            display: 'flex',
-                            gap: '10px',
-                            marginBottom: '25px',
-                            borderBottom: `2px solid ${gold}33`
-                          }}>
-                            <button
-                              onClick={() => setActiveResultTab('summary')}
-                              style={{
-                                padding: '12px 24px',
-                                background: activeResultTab === 'summary' ? 'transparent' : 'transparent',
-                                color: activeResultTab === 'summary' ? gold : lightText,
-                                border: 'none',
-                                borderBottom: activeResultTab === 'summary' ? `3px solid ${gold}` : '3px solid transparent',
-                                cursor: 'pointer',
-                                fontWeight: activeResultTab === 'summary' ? 'bold' : 'normal',
-                                fontSize: '15px',
-                                transition: 'all 0.2s',
-                                opacity: activeResultTab === 'summary' ? 1 : 0.7
-                              }}
-                              onMouseEnter={(e) => {
-                                if (activeResultTab !== 'summary') {
-                                  e.currentTarget.style.opacity = '1';
-                                }
-                              }}
-                              onMouseLeave={(e) => {
-                                if (activeResultTab !== 'summary') {
-                                  e.currentTarget.style.opacity = '0.7';
-                                }
-                              }}
-                            >
-                              {language === 'TR' ? 'Yönetici Özeti' : 'Executive Summary'}
-                            </button>
-                            <button
-                              onClick={() => setActiveResultTab('detailed')}
-                              style={{
-                                padding: '12px 24px',
-                                background: activeResultTab === 'detailed' ? 'transparent' : 'transparent',
-                                color: activeResultTab === 'detailed' ? gold : lightText,
-                                border: 'none',
-                                borderBottom: activeResultTab === 'detailed' ? `3px solid ${gold}` : '3px solid transparent',
-                                cursor: 'pointer',
-                                fontWeight: activeResultTab === 'detailed' ? 'bold' : 'normal',
-                                fontSize: '15px',
-                                transition: 'all 0.2s',
-                                opacity: activeResultTab === 'detailed' ? 1 : 0.7,
-                                position: 'relative'
-                              }}
-                              onMouseEnter={(e) => {
-                                if (activeResultTab !== 'detailed') {
-                                  e.currentTarget.style.opacity = '1';
-                                }
-                              }}
-                              onMouseLeave={(e) => {
-                                if (activeResultTab !== 'detailed') {
-                                  e.currentTarget.style.opacity = '0.7';
-                                }
-                              }}
-                            >
-                              {language === 'TR' ? 'Ayrıntılı Analiz' : 'Detailed Analysis'}
-                              {!canViewDetailedAnalysis() && (
-                                <span style={{ 
-                                  marginLeft: '8px', 
-                                  fontSize: '12px',
-                                  opacity: 0.8
-                                }}>🔒</span>
-                              )}
-                            </button>
-                          </div>
-
-                          {/* Sekme İçerikleri */}
-                          <div style={{ minHeight: '200px' }}>
-                            {activeResultTab === 'summary' && (
-                              <div style={{ color: lightText, whiteSpace: 'pre-wrap', textAlign: 'left', lineHeight: '1.8' }}>
-                                {summary || result}
-                              </div>
-                            )}
-                            {activeResultTab === 'detailed' && (() => {
-                              const riskScore = extractRiskScore(result);
-                              const riskColor = getRiskColor(riskScore);
-                              const riskLevel = getRiskLevel(riskScore);
-                              const canViewDetailed = effectivePackage === 'professional' || effectivePackage === 'enterprise';
-                              
-                              return (
-                                <div style={{ position: 'relative' }}>
-                                  {/* Risk Skoru Göstergesi - Sadece Professional/Enterprise için net görünür */}
-                                  <div style={{
-                                    marginBottom: '30px',
-                                    padding: '25px',
-                                    background: midBlue,
-                                    borderRadius: '15px',
-                                    border: `1px solid ${gold}44`,
-                                    filter: canViewDetailed ? 'none' : 'blur(8px)',
-                                    opacity: canViewDetailed ? 1 : 0.3,
-                                    pointerEvents: canViewDetailed ? 'auto' : 'none',
-                                    position: 'relative'
-                                  }}>
-                                    <h4 style={{ 
-                                      color: gold, 
-                                      fontSize: '1.2rem', 
-                                      marginBottom: '20px',
-                                      fontWeight: 'bold',
-                                      textAlign: 'center'
-                                    }}>
-                                      {language === 'TR' ? 'Risk Skoru Değerlendirmesi' : 'Risk Assessment Score'}
-                                    </h4>
-                                    
-                                    {/* Yatay Bar Göstergesi */}
-                                    <div style={{ marginBottom: '15px' }}>
-                                      <div style={{
-                                        width: '100%',
-                                        height: '24px',
-                                        background: 'linear-gradient(90deg, #4ade80 0%, #fbbf24 50%, #f97316 75%, #ef4444 100%)',
-                                        borderRadius: '12px',
-                                        position: 'relative',
-                                        overflow: 'hidden',
-                                        boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)'
-                                      }}>
-                                        <div style={{
-                                          width: `${currentRiskScore}%`,
-                                          height: '100%',
-                                          background: 'rgba(255,255,255,0.3)',
-                                          borderRadius: '12px',
-                                          transition: 'width 0.5s ease'
-                                        }} />
-                                        <div style={{
-                                          position: 'absolute',
-                                          left: `${currentRiskScore}%`,
-                                          top: '50%',
-                                          transform: 'translate(-50%, -50%)',
-                                          width: '32px',
-                                          height: '32px',
-                                          background: riskColor,
-                                          borderRadius: '50%',
-                                          border: '3px solid #ffffff',
-                                          boxShadow: `0 2px 8px ${riskColor}80`,
-                                          transition: 'left 0.5s ease'
-                                        }} />
-                                      </div>
-                                      
-                                      {/* Skor ve Seviye */}
-                                      <div style={{
-                                        display: 'flex',
-                                        justifyContent: 'space-between',
-                                        alignItems: 'center',
-                                        marginTop: '15px'
-                                      }}>
-                                        <div style={{ textAlign: 'left' }}>
-                                          <div style={{ 
-                                            color: lightText, 
-                                            fontSize: '14px', 
-                                            opacity: 0.8,
-                                            marginBottom: '5px'
-                                          }}>
-                                            {language === 'TR' ? 'Risk Seviyesi' : 'Risk Level'}
-                                          </div>
-                                          <div style={{ 
-                                            color: riskColor, 
-                                            fontSize: '1.5rem', 
-                                            fontWeight: 'bold'
-                                          }}>
-                                            {riskLevel}
-                                          </div>
-                                        </div>
-                                        <div style={{ textAlign: 'right' }}>
-                                          <div style={{ 
-                                            color: lightText, 
-                                            fontSize: '14px', 
-                                            opacity: 0.8,
-                                            marginBottom: '5px'
-                                          }}>
-                                            {language === 'TR' ? 'Skor' : 'Score'}
-                                          </div>
-                                          <div style={{ 
-                                            color: riskColor, 
-                                            fontSize: '2rem', 
-                                            fontWeight: 'bold'
-                                          }}>
-                                            {currentRiskScore}
-                                            <span style={{ fontSize: '1rem', opacity: 0.7 }}>/100</span>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  {/* İçerik - Blur efekti ile */}
-                                  <div style={{ 
-                                    color: lightText, 
-                                    whiteSpace: 'pre-wrap', 
-                                    textAlign: 'left', 
-                                    lineHeight: '1.8',
-                                    filter: canViewDetailed ? 'none' : 'blur(8px)',
-                                    opacity: canViewDetailed ? 1 : 0.3,
-                                    userSelect: canViewDetailed ? 'auto' : 'none',
-                                    pointerEvents: canViewDetailed ? 'auto' : 'none'
-                                  }}>
-                                    {(() => {
-                                      const content = detailed || result;
-                                      const references = detectLegislationReferences(content);
-                                      
-                                      // Mevzuat referanslarını vurgula
-                                      let highlightedContent = content;
-                                      const uniqueRefs = Array.from(new Map(references.map(ref => [ref.match, ref])).values());
-                                      
-                                      uniqueRefs.forEach(ref => {
-                                        const escapedMatch = ref.match.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                                        const regex = new RegExp(`(${escapedMatch})`, 'gi');
-                                        highlightedContent = highlightedContent.replace(regex, (match) => {
-                                          if (canAccessLegislationDetails()) {
-                                            return `<span style="color: ${gold}; font-weight: bold; cursor: pointer; text-decoration: underline; border-bottom: 1px dotted ${gold};" data-law="${ref.law}" data-article="${ref.article}">${match}</span>`;
-                                          }
-                                          return `<span style="color: ${gold}; font-weight: bold;">${match}</span>`;
-                                        });
-                                      });
-                                      
-                                      return (
-                                        <div 
-                                          dangerouslySetInnerHTML={{ __html: highlightedContent.replace(/\n/g, '<br>') }}
-                                          onClick={(e) => {
-                                            const target = e.target as HTMLElement;
-                                            if (target.dataset.law && target.dataset.article && canAccessLegislationDetails()) {
-                                              fetchLegislationDetail(target.dataset.law, target.dataset.article);
-                                            }
-                                          }}
-                                        />
-                                      );
-                                    })()}
-                                  </div>
-                                  
-                                  {/* Kilitli İçerik Overlay - Free/Basic için */}
-                                  {!canViewDetailed && (
-                                  <div style={{
-                                    position: 'absolute',
-                                    top: '50%',
-                                    left: '50%',
-                                    transform: 'translate(-50%, -50%)',
-                                    background: 'rgba(24, 35, 50, 0.95)',
-                                    border: `2px solid ${gold}`,
-                                    borderRadius: '15px',
-                                    padding: '40px',
-                                    textAlign: 'center',
-                                    zIndex: 10,
-                                    maxWidth: '500px',
-                                    width: '90%',
-                                    boxShadow: `0 8px 24px rgba(0,0,0,0.5)`,
-                                    backdropFilter: 'blur(10px)'
-                                  }}>
-                                    <div style={{ fontSize: '48px', marginBottom: '20px' }}>🔒</div>
-                                    <h3 style={{ color: gold, fontSize: '1.5rem', marginBottom: '15px', fontWeight: 'bold' }}>
-                                      {language === 'TR' ? 'Ayrıntılı Risk Raporu' : 'Detailed Risk Report'}
-                                    </h3>
-                                    <p style={{ color: lightText, fontSize: '1rem', lineHeight: '1.6', marginBottom: '30px' }}>
-                                      {language === 'TR' 
-                                        ? 'Ayrıntılı risk analizi ve madde incelemeleri için Professional pakete geçin.'
-                                        : 'Upgrade to Professional package for detailed risk analysis and article reviews.'
-                                      }
-                                    </p>
-                                    <Link href="/#pricing" style={{ textDecoration: 'none' }}>
-                                      <button
-                                        style={{
-                                          padding: '15px 35px',
-                                          background: gold,
-                                          color: darkBlue,
-                                          border: 'none',
-                                          borderRadius: '50px',
-                                          fontWeight: 'bold',
-                                          fontSize: '16px',
-                                          cursor: 'pointer',
-                                          transition: 'all 0.3s',
-                                          boxShadow: `0 4px 12px rgba(199, 176, 121, 0.4)`
-                                        }}
-                                        onMouseEnter={(e) => {
-                                          e.currentTarget.style.transform = 'scale(1.05)';
-                                          e.currentTarget.style.boxShadow = `0 6px 16px rgba(199, 176, 121, 0.6)`;
-                                        }}
-                                        onMouseLeave={(e) => {
-                                          e.currentTarget.style.transform = 'scale(1)';
-                                          e.currentTarget.style.boxShadow = `0 4px 12px rgba(199, 176, 121, 0.4)`;
-                                        }}
-                                      >
-                                        {language === 'TR' ? 'Paketi Yükselt' : 'Upgrade Plan'}
-                                      </button>
-                                    </Link>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* İndirme Butonları - Her iki sekmede de görünür */}
-                          <div style={{ 
-                            display: 'flex', 
-                            gap: '15px', 
-                            marginTop: '25px',
-                            flexWrap: 'wrap'
-                          }}>
-                          <button 
-                            onClick={canDownload() ? handleDownloadPDF : () => setShowLimitModal(true)}
-                            disabled={!canDownload()}
-                            style={{ 
-                              background: canDownload() ? '#dc3545' : '#666666', 
-                              color: '#ffffff', 
-                              padding: '12px 25px', 
-                              borderRadius: '10px', 
-                              border: 'none', 
-                              fontWeight: 'bold', 
-                              cursor: canDownload() ? 'pointer' : 'not-allowed',
-                              flex: '1',
-                              minWidth: '150px',
-                              opacity: canDownload() ? 1 : 0.6
-                            }}
-                            onMouseEnter={(e) => {
-                              if (canDownload()) {
-                                e.currentTarget.style.background = '#c82333';
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              if (canDownload()) {
-                                e.currentTarget.style.background = '#dc3545';
-                              }
-                            }}
-                            title={!canDownload() ? (language === 'TR' ? 'İndirme özelliği için Professional veya Enterprise paketi gereklidir' : 'Download feature requires Professional or Enterprise package') : ''}
-                          >
-                            <span style={{ color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                              {!canDownload() && <span>🔒</span>}
-                              {ui[language].download}
-                            </span>
-                          </button>
-                          <button 
-                            onClick={canDownload() ? handleDownloadWord : () => setShowLimitModal(true)}
-                            disabled={!canDownload()}
-                            style={{ 
-                              background: canDownload() ? '#2b579a' : '#666666', 
-                              color: '#ffffff', 
-                              padding: '12px 25px', 
-                              borderRadius: '10px', 
-                              border: 'none', 
-                              fontWeight: 'bold', 
-                              cursor: canDownload() ? 'pointer' : 'not-allowed',
-                              flex: '1',
-                              minWidth: '150px',
-                              opacity: canDownload() ? 1 : 0.6
-                            }}
-                            onMouseEnter={(e) => {
-                              if (canDownload()) {
-                                e.currentTarget.style.background = '#1e3f6f';
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              if (canDownload()) {
-                                e.currentTarget.style.background = '#2b579a';
-                              }
-                            }}
-                            title={!canDownload() ? (language === 'TR' ? 'İndirme özelliği için Professional veya Enterprise paketi gereklidir' : 'Download feature requires Professional or Enterprise package') : ''}
-                          >
-                            <span style={{ color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                              {!canDownload() && <span>🔒</span>}
-                              {ui[language].downloadWord || 'Word İndir'}
-                            </span>
-                          </button>
-      </div>
-      
-      {/* Mevzuat Detay Modal (Enterprise) */}
-      {showLegislationModal && selectedLegislation && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0,0,0,0.7)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 10000,
-          padding: '20px'
-        }}
-        onClick={() => setShowLegislationModal(false)}
-        >
-          <div style={{
-            background: midBlue,
-            border: `2px solid ${gold}`,
-            borderRadius: '15px',
-            padding: '30px',
-            maxWidth: '700px',
-            width: '100%',
-            maxHeight: '80vh',
-            overflowY: 'auto',
-            boxShadow: `0 8px 24px rgba(0,0,0,0.5)`
-          }}
-          onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h3 style={{ color: gold, fontSize: '1.5rem', fontWeight: 'bold', margin: 0 }}>
-                {selectedLegislation.title}
-              </h3>
-              <button
-                onClick={() => setShowLegislationModal(false)}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: lightText,
-                  fontSize: '24px',
-                  cursor: 'pointer',
-                  padding: '0',
-                  width: '30px',
-                  height: '30px'
-                }}
-              >
-                ×
-              </button>
-            </div>
-            <div style={{
-              color: lightText,
-              lineHeight: '1.8',
-              whiteSpace: 'pre-wrap',
-              fontSize: '14px'
-            }}>
-              {selectedLegislation.content}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-})()}
-                    
-                    {/* AI Chat - Dosyaya Soru Sor (Professional/Enterprise) */}
-                    {result && (effectivePackage === 'professional' || effectivePackage === 'enterprise') && (
-                      <div style={{
-                        marginTop: '30px',
-                        background: midBlue,
-                        padding: '25px',
-                        borderRadius: '15px',
-                        border: `1px solid ${gold}44`
-                      }}>
-                        <h4 style={{ color: gold, fontSize: '1.2rem', marginBottom: '20px', fontWeight: 'bold' }}>
-                          {language === 'TR' ? '💬 Dosyaya Soru Sor' : '💬 Ask About Document'}
-                        </h4>
-                        
-                        {/* Chat Mesajları */}
-                        <div style={{
-                          maxHeight: '300px',
-                          overflowY: 'auto',
-                          marginBottom: '15px',
-                          padding: '15px',
-                          background: darkBlue,
-                          borderRadius: '10px',
-                          minHeight: '150px'
-                        }}>
-                          {chatMessages.length === 0 ? (
-                            <div style={{ color: lightText, opacity: 0.7, textAlign: 'center', padding: '20px' }}>
-                              {language === 'TR' 
-                                ? 'Dosya hakkında soru sorun...'
-                                : 'Ask a question about the document...'}
-                            </div>
-                          ) : (
-                            chatMessages.map((msg, idx) => (
-                              <div
-                                key={idx}
-                                style={{
-                                  marginBottom: '15px',
-                                  padding: '12px',
-                                  background: msg.role === 'user' ? `rgba(199, 176, 121, 0.2)` : 'transparent',
-                                  borderRadius: '8px',
-                                  textAlign: msg.role === 'user' ? 'right' : 'left'
-                                }}
-                              >
-                                <div style={{
-                                  color: msg.role === 'user' ? gold : lightText,
-                                  fontSize: '14px',
-                                  whiteSpace: 'pre-wrap',
-                                  lineHeight: '1.6'
-                                }}>
-                                  {msg.content}
-                                </div>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                        
-                        {/* Chat Input */}
-                        <div style={{ display: 'flex', gap: '10px' }}>
-                          <input
-                            type="text"
-                            value={chatInput}
-                            onChange={(e) => setChatInput(e.target.value)}
-                            onKeyPress={(e) => {
-                              if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault();
-                                handleChatSend();
-                              }
-                            }}
-                            placeholder={language === 'TR' ? 'Sorunuzu yazın...' : 'Type your question...'}
-                            style={{
-                              flex: 1,
-                              padding: '12px 15px',
-                              background: darkBlue,
-                              border: `1px solid ${gold}44`,
-                              borderRadius: '8px',
-                              color: lightText,
-                              fontSize: '14px'
-                            }}
-                            disabled={chatLoading}
-                          />
-                          <button
-                            onClick={handleChatSend}
-                            disabled={chatLoading || !chatInput.trim()}
-                            style={{
-                              padding: '12px 25px',
-                              background: chatLoading || !chatInput.trim() ? '#666666' : gold,
-                              color: darkBlue,
-                              border: 'none',
-                              borderRadius: '8px',
-                              fontWeight: 'bold',
-                              cursor: chatLoading || !chatInput.trim() ? 'not-allowed' : 'pointer',
-                              opacity: chatLoading || !chatInput.trim() ? 0.6 : 1
-                            }}
-                          >
-                            {chatLoading ? '...' : '→'}
-                          </button>
-                        </div>
-                      </div>
+                    {result && (
+                      <AnalysisResult
+                        result={result}
+                        gold={gold}
+                        darkBlue={darkBlue}
+                        midBlue={midBlue}
+                        lightText={lightText}
+                        language={language}
+                        activeResultTab={activeResultTab}
+                        setActiveResultTab={setActiveResultTab}
+                        effectivePackage={effectivePackage}
+                        parseAnalysisResult={parseAnalysisResult}
+                        extractRiskScore={extractRiskScore}
+                        getRiskColor={getRiskColor}
+                        getRiskLevel={getRiskLevel}
+                        canViewDetailedAnalysis={canViewDetailedAnalysis}
+                        canDownload={canDownload}
+                        canAccessLegislationDetails={canAccessLegislationDetails}
+                        handleDownloadPDF={handleDownloadPDF}
+                        handleDownloadWord={handleDownloadWord}
+                        setShowLimitModal={setShowLimitModal}
+                        detectLegislationReferences={detectLegislationReferences}
+                        fetchLegislationDetail={fetchLegislationDetail}
+                        showLegislationModal={showLegislationModal}
+                        setShowLegislationModal={setShowLegislationModal}
+                        selectedLegislation={selectedLegislation}
+                        chatMessages={chatMessages}
+                        chatInput={chatInput}
+                        setChatInput={setChatInput}
+                        chatLoading={chatLoading}
+                        handleChatSend={handleChatSend}
+                        ui={ui}
+                      />
                     )}
                   </div>
                 </>

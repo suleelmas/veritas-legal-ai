@@ -7,13 +7,14 @@ import { fetchSCOTUS } from '@/lib/fetchSCOTUS';
 import { fetchCourtListener } from '@/lib/fetchCourtListener';
 import { fetchOpenJurist } from '@/lib/fetchOpenJurist';
 import { upsertDocument } from '@/lib/upsertDocument';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/server';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // 5 dakika timeout
 
 async function syncCourtDecisions() {
   try {
+    const supabase = await createClient();
     let yargitayOk = 0, yargitayFail = 0, yargitayNew = 0;
     let danistayOk = 0, danistayFail = 0, danistayNew = 0;
     let anayasaOk = 0, anayasaFail = 0, anayasaNew = 0;
@@ -44,7 +45,7 @@ async function syncCourtDecisions() {
               date: decision.date || new Date().toISOString().split('T')[0],
               updated: new Date().toISOString(),
               type: 'karar'
-            });
+            }, supabase);
             yargitayNew++;
           }
           yargitayOk++;
@@ -78,7 +79,7 @@ async function syncCourtDecisions() {
               date: decision.date || new Date().toISOString().split('T')[0],
               updated: new Date().toISOString(),
               type: 'karar'
-            });
+            }, supabase);
             danistayNew++;
           }
           danistayOk++;
@@ -112,7 +113,7 @@ async function syncCourtDecisions() {
               date: decision.date || new Date().toISOString().split('T')[0],
               updated: new Date().toISOString(),
               type: 'karar'
-            });
+            }, supabase);
             anayasaNew++;
           }
           anayasaOk++;
@@ -146,7 +147,7 @@ async function syncCourtDecisions() {
               date: decision.date || new Date().toISOString().split('T')[0],
               updated: new Date().toISOString(),
               type: 'karar'
-            });
+            }, supabase);
             kvkkNew++;
           }
           kvkkOk++;
@@ -181,7 +182,7 @@ async function syncCourtDecisions() {
               updated: new Date().toISOString(),
               type: 'federal_legislation',
               country: 'US'
-            });
+            }, supabase);
             congressNew++;
           }
           congressOk++;
@@ -216,7 +217,7 @@ async function syncCourtDecisions() {
               updated: new Date().toISOString(),
               type: 'supreme_court_decision',
               country: 'US'
-            });
+            }, supabase);
             scotusNew++;
           }
           scotusOk++;
@@ -251,7 +252,7 @@ async function syncCourtDecisions() {
               updated: new Date().toISOString(),
               type: 'court_decision',
               country: 'US'
-            });
+            }, supabase);
             courtlistenerNew++;
           }
           courtlistenerOk++;
@@ -286,7 +287,7 @@ async function syncCourtDecisions() {
               updated: new Date().toISOString(),
               type: 'court_decision',
               country: 'US'
-            });
+            }, supabase);
             openjuristNew++;
           }
           openjuristOk++;

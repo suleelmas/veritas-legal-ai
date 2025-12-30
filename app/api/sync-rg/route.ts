@@ -1,12 +1,13 @@
 import { fetchResmiGazeteHeadlines } from '@/lib/fetchResmiGazeteHeadlines';
 import { upsertDocument } from '@/lib/upsertDocument';
-import { supabase } from '@/lib/supabase';
+import { createClient } from '@/utils/supabase/server';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // 5 dakika timeout
 
 async function syncResmiGazete() {
   try {
+    const supabase = await createClient();
     const headlines = await fetchResmiGazeteHeadlines();
     let ok = 0, fail = 0, newCount = 0, updatedCount = 0;
 
@@ -26,7 +27,7 @@ async function syncResmiGazete() {
             source: 'resmigazete',
             date: new Date().toISOString().split('T')[0],
             updated: new Date().toISOString()
-          });
+          }, supabase);
           newCount++;
         } else {
           // Mevcut başlık, güncelleme tarihini güncelle

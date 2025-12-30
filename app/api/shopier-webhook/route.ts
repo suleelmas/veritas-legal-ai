@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/utils/supabase/server";
 
 function isValidShopierRequest(req: Request) {
   const user = req.headers.get("shopier-osb-user");
@@ -12,6 +12,7 @@ function isValidShopierRequest(req: Request) {
 
 export async function POST(req: Request) {
   try {
+    const supabase = await createClient();
     if (!isValidShopierRequest(req)) {
       console.log("Shopier güvenlik kontrolü başarısız!");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

@@ -87,31 +87,30 @@ export default function ProfilePage() {
   };
 
   const getPackageLimit = (pkg: UserPackage): number => {
-    const limits: Record<UserPackage, number> = {
+    if (!pkg) return 1;
+    const limits: Record<Exclude<UserPackage, null>, number> = {
       'free': 1,
       'basic': 10,
       'professional': 50,
-      'enterprise': Infinity,
-      null: 1
+      'enterprise': Infinity
     };
     return limits[pkg || 'free'] || 1;
   };
 
   const getPackageName = (pkg: UserPackage, lang: 'TR' | 'EN' = 'EN'): string => {
-    const names: Record<string, Record<UserPackage, string>> = {
+    if (!pkg) return lang === 'TR' ? 'Ücretsiz' : 'Free';
+    const names: Record<string, Record<Exclude<UserPackage, null>, string>> = {
       TR: {
         'free': 'Ücretsiz',
         'basic': 'Basic',
         'professional': 'Professional',
-        'enterprise': 'Enterprise',
-        null: 'Ücretsiz'
+        'enterprise': 'Enterprise'
       },
       EN: {
         'free': 'Free',
         'basic': 'Basic',
         'professional': 'Professional',
-        'enterprise': 'Enterprise',
-        null: 'Free'
+        'enterprise': 'Enterprise'
       }
     };
     return names[lang][pkg || 'free'] || 'Free';
@@ -149,7 +148,8 @@ export default function ProfilePage() {
   };
 
   const getPackageFeatures = (pkg: UserPackage): string[] => {
-    const features: Record<UserPackage, string[]> = {
+    if (!pkg) return [];
+    const features: Record<Exclude<UserPackage, null>, string[]> = {
       'free': [
         '1 Analysis per month',
         'Basic AI Analysis',
@@ -175,11 +175,6 @@ export default function ProfilePage() {
         'File Management',
         'Highest Priority',
         'Corporate Support'
-      ],
-      null: [
-        '1 Analysis per month',
-        'Basic AI Analysis',
-        'Web Access'
       ]
     };
     return features[pkg || 'free'] || [];

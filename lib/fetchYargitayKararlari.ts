@@ -55,3 +55,4 @@ export async function fetchYargitayKararlari(): Promise<Array<{ title: string; c
 
 
 
+
