@@ -1,8 +1,29 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createClient } from "@/utils/supabase/server";
+import { fetchYargitayKararlari } from '@/lib/fetchYargitayKararlari';
+import { fetchDanistayKararlari } from '@/lib/fetchDanistayKararlari';
+import { fetchAnayasaMahkemesiKararlari } from '@/lib/fetchAnayasaMahkemesiKararlari';
+import { fetchKVKKKararlari } from '@/lib/fetchKVKKKararlari';
+import { fetchCongressGov } from '@/lib/fetchCongressGov';
+import { fetchSCOTUS } from '@/lib/fetchSCOTUS';
+import { fetchCourtListener } from '@/lib/fetchCourtListener';
+import { fetchOpenJurist } from '@/lib/fetchOpenJurist';
+import { upsertDocument } from '@/lib/upsertDocument';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+// Kritik anahtar kelimeler - bunlar için canlı veri çekilecek
+const CRITICAL_KEYWORDS_TR = [
+  'KVKK', 'TBK', 'HMK', 'İİK', 'AYM', 'Yargıtay', 'Danıştay', 
+  'Anayasa', 'Kanun', 'Yönetmelik', 'Tüzük', 'Tebliğ', 'Karar',
+  '2024', '2025', 'son karar', 'güncel', 'yeni mevzuat'
+];
+
+const CRITICAL_KEYWORDS_EN = [
+  'SCOTUS', 'Supreme Court', 'Congress', 'Federal', 'Act', 'Law',
+  '2024', '2025', 'recent', 'latest', 'current legislation', 'case law'
+];
 
 function getUserKey(req: Request) {
   const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "";
@@ -10,9 +31,158 @@ function getUserKey(req: Request) {
   return `${ip}_${ua}`;
 }
 
-async function getRelevantDocuments(pdfText: string, targetLang: string = 'TR', limit: number = 5) {
+// Kritik anahtar kelime kontrolü
+function hasCriticalKeywords(text: string, targetLang: string): boolean {
+  const keywords = targetLang === 'TR' || targetLang === 'Turkish' 
+    ? CRITICAL_KEYWORDS_TR 
+    : CRITICAL_KEYWORDS_EN;
+  const upperText = text.toUpperCase();
+  return keywords.some(keyword => upperText.includes(keyword.toUpperCase()));
+}
+
+// Veritabanındaki en son güncelleme tarihini kontrol et
+async function isDatabaseStale(supabase: any, days: number = 1): Promise<boolean> {
+  try {
+    const { data } = await supabase
+      .from('documents')
+      .select('metadata')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    
+    if (!data) return true;
+    
+    const lastUpdate = data.metadata?.updated || data.metadata?.date;
+    if (!lastUpdate) return true;
+    
+    const lastUpdateDate = new Date(lastUpdate);
+    const daysSinceUpdate = (Date.now() - lastUpdateDate.getTime()) / (1000 * 60 * 60 * 24);
+    return daysSinceUpdate > days;
+  } catch {
+    return true;
+  }
+}
+
+// Canlı veri çekme (sadece kritik durumlarda)
+async function fetchLiveData(
+  pdfText: string, 
+  targetLang: string, 
+  supabase: any
+): Promise<Array<{ content: string; metadata: any }>> {
+  const liveDocs: Array<{ content: string; metadata: any }> = [];
+  
+  try {
+    if (targetLang === 'TR' || targetLang === 'Turkish') {
+      // Türkçe kaynaklar
+      if (pdfText.toUpperCase().includes('YARGITAY') || pdfText.toUpperCase().includes('YARGI')) {
+        const decisions = await fetchYargitayKararlari();
+        for (const decision of decisions.slice(0, 2)) {
+          const content = `${decision.title}${decision.content ? '\n' + decision.content : ''}`;
+          liveDocs.push({
+            content,
+            metadata: { source: 'yargitay', date: decision.date, live: true }
+          });
+          // Hemen kaydet
+          await upsertDocument(content, {
+            source: 'yargitay',
+            date: decision.date || new Date().toISOString().split('T')[0],
+            updated: new Date().toISOString(),
+            type: 'karar'
+          }, supabase);
+        }
+      }
+      
+      if (pdfText.toUpperCase().includes('DANIŞTAY') || pdfText.toUpperCase().includes('İDARİ')) {
+        const decisions = await fetchDanistayKararlari();
+        for (const decision of decisions.slice(0, 2)) {
+          const content = `${decision.title}${decision.content ? '\n' + decision.content : ''}`;
+          liveDocs.push({
+            content,
+            metadata: { source: 'danistay', date: decision.date, live: true }
+          });
+          await upsertDocument(content, {
+            source: 'danistay',
+            date: decision.date || new Date().toISOString().split('T')[0],
+            updated: new Date().toISOString(),
+            type: 'karar'
+          }, supabase);
+        }
+      }
+      
+      if (pdfText.toUpperCase().includes('KVKK') || pdfText.toUpperCase().includes('KİŞİSEL VERİ')) {
+        const decisions = await fetchKVKKKararlari();
+        for (const decision of decisions.slice(0, 2)) {
+          const content = `${decision.title}${decision.content ? '\n' + decision.content : ''}`;
+          liveDocs.push({
+            content,
+            metadata: { source: 'kvkk', date: decision.date, live: true }
+          });
+          await upsertDocument(content, {
+            source: 'kvkk',
+            date: decision.date || new Date().toISOString().split('T')[0],
+            updated: new Date().toISOString(),
+            type: 'karar'
+          }, supabase);
+        }
+      }
+    } else {
+      // İngilizce kaynaklar
+      if (pdfText.toUpperCase().includes('SCOTUS') || pdfText.toUpperCase().includes('SUPREME COURT')) {
+        const decisions = await fetchSCOTUS();
+        for (const decision of decisions.slice(0, 2)) {
+          const content = `${decision.title}${decision.content ? '\n' + decision.content : ''}`;
+          liveDocs.push({
+            content,
+            metadata: { source: 'scotus', date: decision.date, live: true }
+          });
+          await upsertDocument(content, {
+            source: 'scotus',
+            date: decision.date || new Date().toISOString().split('T')[0],
+            updated: new Date().toISOString(),
+            type: 'supreme_court_decision',
+            country: 'US'
+          }, supabase);
+        }
+      }
+      
+      if (pdfText.toUpperCase().includes('CONGRESS') || pdfText.toUpperCase().includes('FEDERAL')) {
+        const bills = await fetchCongressGov();
+        for (const bill of bills.slice(0, 2)) {
+          const content = `${bill.title}${bill.content ? '\n' + bill.content : ''}`;
+          liveDocs.push({
+            content,
+            metadata: { source: 'congress', date: bill.date, live: true }
+          });
+          await upsertDocument(content, {
+            source: 'congress',
+            date: bill.date || new Date().toISOString().split('T')[0],
+            updated: new Date().toISOString(),
+            type: 'federal_legislation',
+            country: 'US'
+          }, supabase);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Live fetch error:', error);
+  }
+  
+  return liveDocs;
+}
+
+async function getRelevantDocuments(
+  pdfText: string, 
+  targetLang: string = 'TR', 
+  limit: number = 5,
+  onStatusUpdate?: (status: string) => void
+): Promise<{ documents: Array<any>, usedLiveFetch: boolean }> {
   try {
     const supabase = await createClient();
+    let usedLiveFetch = false;
+    
+    // Adım A: Vector Search - Önce veritabanından ara
+    onStatusUpdate?.('Güncel mevzuat veritabanı taranıyor...');
+    
     // PDF metninden embedding oluştur
     const embeddingResp = await fetch('https://api.openai.com/v1/embeddings', {
       method: 'POST',
@@ -26,11 +196,14 @@ async function getRelevantDocuments(pdfText: string, targetLang: string = 'TR', 
       })
     });
     const embeddingData = await embeddingResp.json();
-    if (!embeddingResp.ok || !embeddingData.data) return [];
+    if (!embeddingResp.ok || !embeddingData.data) {
+      return { documents: [], usedLiveFetch: false };
+    }
     const queryEmbedding = embeddingData.data[0].embedding;
 
+    let dbDocuments: any[] = [];
+    
     // Supabase'de benzer belgeleri bul
-    // Önce RPC fonksiyonunu dene, yoksa direkt sorgu yap
     try {
       const { data: documents } = await supabase.rpc('match_documents', {
         query_embedding: queryEmbedding,
@@ -38,43 +211,69 @@ async function getRelevantDocuments(pdfText: string, targetLang: string = 'TR', 
         match_count: limit
       });
       if (documents) {
-        // Eğer İngilizce analiz yapılıyorsa Congress.gov, SCOTUS, CourtListener ve OpenJurist'i de dahil et
         if (targetLang === 'EN' || targetLang === 'English') {
-          return documents;
+          dbDocuments = documents;
+        } else {
+          dbDocuments = documents.filter((doc: any) => 
+            doc.metadata?.source !== 'congress' && 
+            doc.metadata?.source !== 'scotus' &&
+            doc.metadata?.source !== 'courtlistener' &&
+            doc.metadata?.source !== 'openjurist'
+          );
         }
-        // Türkçe analizlerde ABD kaynaklarını filtrele
-        return documents.filter((doc: any) => 
-          doc.metadata?.source !== 'congress' && 
-          doc.metadata?.source !== 'scotus' &&
-          doc.metadata?.source !== 'courtlistener' &&
-          doc.metadata?.source !== 'openjurist'
-        );
       }
     } catch (rpcError) {
       console.log('RPC function not found, using direct query');
+      const sources = ['resmigazete', 'yargitay', 'danistay', 'anayasa', 'kvkk'];
+      if (targetLang === 'EN' || targetLang === 'English') {
+        sources.push('congress', 'scotus', 'courtlistener', 'openjurist');
+      }
+      
+      const { data: recentDocs } = await supabase
+        .from('documents')
+        .select('content, metadata')
+        .in('metadata->>source', sources)
+        .order('created_at', { ascending: false })
+        .limit(limit * 2);
+      
+      dbDocuments = recentDocs || [];
     }
 
-    // Alternatif: İlgili belgeleri kaynak türüne göre al
-    // Türkçe analizler için: Resmi gazete, Yargıtay, Danıştay, Anayasa Mahkemesi ve KVKK
-    // İngilizce analizler için: Congress.gov, SCOTUS, CourtListener ve OpenJurist de dahil
-    const sources = ['resmigazete', 'yargitay', 'danistay', 'anayasa', 'kvkk'];
-    if (targetLang === 'EN' || targetLang === 'English') {
-      sources.push('congress', 'scotus', 'courtlistener', 'openjurist');
-    }
+    // Adım B: Real-time Fetch - Kritik durumlarda canlı veri çek
+    const needsLiveFetch = hasCriticalKeywords(pdfText, targetLang) || await isDatabaseStale(supabase, 1);
     
-    const { data: recentDocs } = await supabase
-      .from('documents')
-      .select('content, metadata')
-      .in('metadata->>source', sources)
-      .order('created_at', { ascending: false })
-      .limit(limit * 2); // Daha fazla sonuç al, sonra filtrele
+    let liveDocuments: any[] = [];
+    if (needsLiveFetch) {
+      onStatusUpdate?.('Dış kaynaklardan canlı doğrulama yapılıyor...');
+      usedLiveFetch = true;
+      liveDocuments = await fetchLiveData(pdfText, targetLang, supabase);
+    }
 
-    // Embedding benzerliğine göre sırala (basit yaklaşım)
-    // Gerçek implementasyonda cosine similarity hesaplanmalı
-    return recentDocs || [];
+    // Adım C: Context Merger - Veritabanı ve canlı verileri birleştir
+    const allDocuments = [...liveDocuments, ...dbDocuments];
+    
+    // Duplicate'leri temizle (content'e göre)
+    const uniqueDocuments = Array.from(
+      new Map(allDocuments.map(doc => [doc.content?.substring(0, 100), doc])).values()
+    );
+    
+    // En güncel ve en ilgili olanları seç
+    const finalDocuments = uniqueDocuments
+      .sort((a, b) => {
+        // Live fetch edilenler öncelikli
+        if (a.metadata?.live && !b.metadata?.live) return -1;
+        if (!a.metadata?.live && b.metadata?.live) return 1;
+        // Tarihe göre sırala
+        const dateA = new Date(a.metadata?.date || a.metadata?.updated || 0);
+        const dateB = new Date(b.metadata?.date || b.metadata?.updated || 0);
+        return dateB.getTime() - dateA.getTime();
+      })
+      .slice(0, limit);
+
+    return { documents: finalDocuments, usedLiveFetch };
   } catch (err) {
     console.error('Document search error:', err);
-    return [];
+    return { documents: [], usedLiveFetch: false };
   }
 }
 
@@ -87,9 +286,13 @@ export async function POST(req: Request) {
     }
     const userKey = getUserKey(req);
     
-    // İlgili belgeleri bul (Resmi Gazete, Yargıtay kararları vb.)
-    // İngilizce analizlerde Congress.gov da dahil edilir
-    const relevantDocs = await getRelevantDocuments(pdfText, targetLang);
+    // Hibrit veri çekme - Vector DB + Live Fetch
+    const { documents: relevantDocs, usedLiveFetch } = await getRelevantDocuments(
+      pdfText, 
+      targetLang,
+      5
+    );
+    
     let contextText = '';
     if (relevantDocs.length > 0) {
       const langPrefix = (targetLang === 'EN' || targetLang === 'English') 
@@ -98,7 +301,8 @@ export async function POST(req: Request) {
       contextText = `\n\n${langPrefix}\n`;
       relevantDocs.forEach((doc: any, idx: number) => {
         const source = doc.metadata?.source || 'bilinmeyen';
-        contextText += `${idx + 1}. [${source}] ${doc.content.substring(0, 500)}...\n`;
+        const liveTag = doc.metadata?.live ? ' [LIVE]' : '';
+        contextText += `${idx + 1}. [${source}${liveTag}] ${doc.content.substring(0, 500)}...\n`;
       });
     }
 

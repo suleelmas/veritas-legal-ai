@@ -23,6 +23,7 @@ export default function ProfilePage() {
   const [userEmail, setUserEmail] = useState("");
   const [updating, setUpdating] = useState(false);
   const [language, setLanguage] = useState<'TR' | 'EN'>('EN');
+  const [isEarlyBird, setIsEarlyBird] = useState(false);
 
   const gold = "#c7b079";
   const darkBlue = "#182332";
@@ -49,13 +50,14 @@ export default function ProfilePage() {
       try {
         const { data: profile, error } = await supabase
           .from('profiles')
-          .select('package_type, analysis_count')
+          .select('package_type, analysis_count, is_early_bird')
           .eq('id', session.user.id)
           .single();
 
         if (!error && profile) {
           setUserPackage(profile.package_type as UserPackage);
           setAnalysisCount(profile.analysis_count || 0);
+          setIsEarlyBird(profile.is_early_bird || false);
         }
       } catch (err) {
         console.error('Profile fetch error:', err);
@@ -271,6 +273,28 @@ export default function ProfilePage() {
             <div style={{ textAlign: 'center', color: gold, fontWeight: 'bold', fontSize: '18px' }}>
               {userName || userEmail.split('@')[0]}
             </div>
+            {isEarlyBird && (
+              <div style={{
+                textAlign: 'center',
+                marginTop: '8px',
+                marginBottom: '5px'
+              }}>
+                <span style={{
+                  display: 'inline-block',
+                  background: `linear-gradient(135deg, ${gold}, #d4c08a)`,
+                  color: darkBlue,
+                  padding: '4px 12px',
+                  borderRadius: '12px',
+                  fontSize: '11px',
+                  fontWeight: '700',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                  boxShadow: `0 2px 8px rgba(199, 176, 121, 0.4)`
+                }}>
+                  🐛 {language === 'TR' ? 'Bug Hunter / Beta Member' : 'Bug Hunter / Beta Member'}
+                </span>
+              </div>
+            )}
             <div style={{ textAlign: 'center', color: lightText, fontSize: '12px', marginTop: '5px', opacity: 0.7 }}>
               {userEmail}
             </div>

@@ -6,6 +6,8 @@ import PricingCard from "./components/PricingCard";
 import Header from "./components/Header";
 import Sidebar from "./components/Sidebar";
 import AnalysisResult from "./components/AnalysisResult";
+import BetaBanner from "./components/BetaBanner";
+import FeedbackModal from "./components/FeedbackModal";
 import { createBrowserClient } from '@supabase/ssr';
 import { jsPDF } from "jspdf";
 import html2canvas from 'html2canvas';
@@ -19,6 +21,7 @@ import html2canvas from 'html2canvas';
     package_type TEXT DEFAULT 'free' CHECK (package_type IN ('free', 'basic', 'professional', 'enterprise')),
     analysis_count INTEGER DEFAULT 0,
     analysis_count_reset_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    is_early_bird BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
   );
@@ -51,12 +54,19 @@ import html2canvas from 'html2canvas';
   CREATE POLICY "Users can insert own analyses" ON analyses
     FOR INSERT WITH CHECK (auth.uid() = user_id);
 
-  -- 4. Trigger: Yeni kullanıcı kaydı olduğunda profile oluştur
+  -- 4. Trigger: Yeni kullanıcı kaydı olduğunda profile oluştur (ilk 50 kullanıcı early bird)
   CREATE OR REPLACE FUNCTION public.handle_new_user()
   RETURNS TRIGGER AS $$
+  DECLARE
+    early_bird_count INTEGER;
+    is_early BOOLEAN := FALSE;
   BEGIN
-    INSERT INTO public.profiles (id, package_type)
-    VALUES (NEW.id, 'free');
+    SELECT COUNT(*) INTO early_bird_count FROM profiles WHERE is_early_bird = TRUE;
+    IF early_bird_count < 50 THEN
+      is_early := TRUE;
+    END IF;
+    INSERT INTO public.profiles (id, package_type, is_early_bird)
+    VALUES (NEW.id, 'free', is_early);
     RETURN NEW;
   END;
   $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -65,9 +75,30 @@ import html2canvas from 'html2canvas';
     AFTER INSERT ON auth.users
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
-  -- 5. Index'ler (performans için)
+  -- 5. Feedbacks tablosu (Beta feedback için)
+  CREATE TABLE IF NOT EXISTS feedbacks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    user_email TEXT,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'reviewed', 'resolved', 'closed')),
+    screenshot TEXT, -- Base64 encoded image
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  );
+
+  -- Feedbacks için RLS
+  ALTER TABLE feedbacks ENABLE ROW LEVEL SECURITY;
+  CREATE POLICY "Users can view own feedbacks" ON feedbacks
+    FOR SELECT USING (auth.uid() = user_id);
+  CREATE POLICY "Anyone can insert feedback" ON feedbacks
+    FOR INSERT WITH CHECK (true);
+
+  -- 6. Index'ler (performans için)
   CREATE INDEX IF NOT EXISTS idx_analyses_user_id ON analyses(user_id);
   CREATE INDEX IF NOT EXISTS idx_analyses_created_at ON analyses(created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_feedbacks_user_id ON feedbacks(user_id);
+  CREATE INDEX IF NOT EXISTS idx_feedbacks_created_at ON feedbacks(created_at DESC);
 */
 
 type Tab = "analyze" | "pricing" | "about" | "history";
@@ -85,6 +116,7 @@ export default function Home() {
   const [analysisHistory, setAnalysisHistory] = useState<Array<{id: string, title: string, date: string, summary: string, fullResult: string, riskScore: number | null}>>([]);
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const [analysisStatus, setAnalysisStatus] = useState<string>('');
   const [result, setResult] = useState("");
   const [language, setLanguage] = useState("EN");
   const [activeTab, setActiveTab] = useState<Tab>("analyze");
@@ -105,6 +137,7 @@ export default function Home() {
   const [riskScore, setRiskScore] = useState<number | null>(null);
   const [selectedLegislation, setSelectedLegislation] = useState<{title: string, content: string} | null>(null);
   const [showLegislationModal, setShowLegislationModal] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
 
   // Admin test modunda adminTestPackage, normal modda userPackage kullan
@@ -1090,6 +1123,7 @@ export default function Home() {
       }
       
       setResult(analysisResult);
+      setAnalysisStatus(''); // Status'u temizle
       
       // Risk skorunu çıkar ve state'e kaydet
       const extractedScore = extractRiskScore(analysisResult);
@@ -1168,9 +1202,12 @@ export default function Home() {
         setAnalysisCount(newCount);
       }
     } catch (err: any) {
-      setResult(err.message || 'Error occurred');
+      console.error("Analiz hatası:", err);
+      setResult(err.message || (language === 'TR' ? "Analiz sırasında bir hata oluştu." : "An error occurred during analysis."));
+      setAnalysisStatus('');
     } finally {
       setLoading(false);
+      setAnalysisStatus('');
     }
   };
 
@@ -1324,8 +1361,37 @@ export default function Home() {
     }
   };
 
+  const handleFeedbackSubmit = async (title: string, description: string, screenshot: File | null) => {
+    try {
+      const formData = new FormData();
+      formData.append('title', title);
+      formData.append('description', description);
+      formData.append('user_id', user?.id || 'anonymous');
+      formData.append('user_email', user?.email || 'anonymous');
+      if (screenshot) {
+        formData.append('screenshot', screenshot);
+      }
+
+      const response = await fetch('/api/feedback', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to submit feedback');
+      }
+    } catch (error) {
+      console.error('Feedback submission error:', error);
+      throw error;
+    }
+  };
+
   return (
     <div style={{ minHeight: '100vh', backgroundColor: darkBlue, color: lightText, fontFamily: 'sans-serif' }}>
+      <BetaBanner 
+        language={language}
+        onReportClick={() => setShowFeedbackModal(true)}
+      />
       <Header
         gold={gold}
         darkBlue={darkBlue}
@@ -1727,6 +1793,26 @@ export default function Home() {
                         {loading ? ui[language].loading : (isLimitReached() ? (language === 'TR' ? 'Limit Doldu' : 'Limit Reached') : ui[language].btn)}
                       </span>
                     </button>
+                    
+                    {/* Analysis Status Indicator */}
+                    {analysisStatus && (
+                      <div style={{
+                        marginTop: '15px',
+                        padding: '12px 16px',
+                        background: `linear-gradient(135deg, ${gold}22, ${gold}11)`,
+                        border: `1px solid ${gold}44`,
+                        borderRadius: '10px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        fontSize: '13px',
+                        color: gold,
+                        fontWeight: '500'
+                      }}>
+                        <span style={{ fontSize: '16px' }}>🔄</span>
+                        <span>{analysisStatus}</span>
+                      </div>
+                    )}
                     {result && (
                       <AnalysisResult
                         result={result}
@@ -1956,7 +2042,20 @@ export default function Home() {
         <p style={{ color: lightText, fontSize: '12px', margin: 0, opacity: 0.8 }}>
           © {new Date().getFullYear()} Veritas Legal AI. Tüm hakları saklıdır.
         </p>
+        <p style={{ color: lightText, fontSize: '11px', margin: '8px 0 0 0', opacity: 0.6 }}>
+          {language === 'TR' ? 'Sürüm: v0.9.1 (Beta)' : 'Version: v0.9.1 (Beta)'}
+        </p>
       </footer>
+
+      <FeedbackModal
+        isOpen={showFeedbackModal}
+        onClose={() => setShowFeedbackModal(false)}
+        onSubmit={handleFeedbackSubmit}
+        language={language}
+        gold={gold}
+        darkBlue={darkBlue}
+        lightText={lightText}
+      />
 
       {/* Test Mode Region Switch Button */}
       <button

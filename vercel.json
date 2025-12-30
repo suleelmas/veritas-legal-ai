@@ -1,12 +1,8 @@
 {
   "crons": [
     {
-      "path": "/api/sync-rg",
+      "path": "/api/sync",
       "schedule": "0 6 * * *"
-    },
-    {
-      "path": "/api/sync-court-decisions",
-      "schedule": "0 7 * * *"
     }
   ]
 }
