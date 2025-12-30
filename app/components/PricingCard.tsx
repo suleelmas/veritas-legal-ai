@@ -21,15 +21,16 @@ type PricingCardProps = {
   lemonSqueezyLink?: string;
   language?: string;
   ui?: any;
+  testMode?: boolean | null;
 };
 
-export default function PricingCard({ gold, plan, priceTR, priceGlobal, features, featuresGlobal, popular, fullName, fullNameGlobal, description, descriptionGlobal, buttonText, buttonTextGlobal, shopierLink, lemonSqueezyLink, language = 'EN', ui }: PricingCardProps) {
+export default function PricingCard({ gold, plan, priceTR, priceGlobal, features, featuresGlobal, popular, fullName, fullNameGlobal, description, descriptionGlobal, buttonText, buttonTextGlobal, shopierLink, lemonSqueezyLink, language = 'EN', ui, testMode }: PricingCardProps) {
   const [showPayment, setShowPayment] = useState(false);
   const [country, setCountry] = useState<string|null>(null);
   const [loading, setLoading] = useState(true);
 
   React.useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && testMode === null) {
       setLoading(true);
       try {
         fetch('https://ipapi.co/json/')
@@ -46,8 +47,11 @@ export default function PricingCard({ gold, plan, priceTR, priceGlobal, features
         setCountry('GLOBAL');
         setLoading(false);
       }
+    } else if (testMode !== null) {
+      setCountry(testMode ? 'TR' : 'GLOBAL');
+      setLoading(false);
     }
-  }, []);
+  }, [testMode]);
 
   const isTurkey = country === 'TR';
   const displayPrice = isTurkey ? priceTR : priceGlobal;
@@ -74,12 +78,12 @@ export default function PricingCard({ gold, plan, priceTR, priceGlobal, features
     }}>
       {popular && <div style={{
         position: 'absolute',
-        top: '-12px',
+        top: '-14px',
         left: '50%',
         transform: 'translateX(-50%)',
         background: '#182332',
         color: gold,
-        padding: '6px 20px',
+        padding: '8px 24px',
         borderRadius: 14,
         fontWeight: 800,
         fontSize: '.98rem',
@@ -87,7 +91,8 @@ export default function PricingCard({ gold, plan, priceTR, priceGlobal, features
         zIndex: 30,
         whiteSpace: 'nowrap',
         border: `2px solid ${gold}`,
-        lineHeight: '1.2'
+        lineHeight: '1.2',
+        marginTop: '2px'
       }}>{ui?.[language]?.popularBadge || (isTurkey ? '★ EN POPÜLER' : '★ MOST POPULAR')}</div>}
       <div style={{ 
         fontSize: 27, 

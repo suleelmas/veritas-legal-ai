@@ -122,7 +122,12 @@ export async function POST(req: Request) {
       ? `Analyze the following text and evaluate it according to current legislation, official gazette publications, Supreme Court precedents, Council of State decisions, Constitutional Court decisions, KVKK (Personal Data Protection Law) decisions, US Federal Legislation (Congress.gov), US Supreme Court (SCOTUS) decisions, CourtListener, and OpenJurist case law databases: ${pdfText.substring(0, 12000)}`
       : `Şu metni analiz et ve güncel mevzuat, resmi gazete yayınları, Yargıtay içtihatları, Danıştay kararları, Anayasa Mahkemesi kararları ve KVKK (Kişisel Verilerin Korunması Kanunu) kararlarına göre değerlendir: ${pdfText.substring(0, 12000)}`;
     
-    const systemPrompt = `Sen profesyonel bir hukuk analistisin. Analizini sadece ${targetLang} dilinde yap. Paragrafları tekrar etme.${contextText ? ' ' + sourcesText : ''}`;
+    // Yerelleştirme talimatı ekle
+    const localizationInstruction = (targetLang === 'EN' || targetLang === 'English')
+      ? ' IMPORTANT: If the output language is English, translate Turkish legal acronyms to their international equivalents. For example: KVKK -> GDPR (Personal Data Protection Law) or KVKK - Personal Data Protection Law, TBK -> TCO (Turkish Code of Obligations), HMK -> Code of Civil Procedure, İİK -> EBL (Enforcement and Bankruptcy Law), AYM -> Constitutional Court. Always provide the full English name alongside the acronym when first mentioned.'
+      : '';
+    
+    const systemPrompt = `Sen profesyonel bir hukuk analistisin. Analizini sadece ${targetLang} dilinde yap. Paragrafları tekrar etme.${contextText ? ' ' + sourcesText : ''}${localizationInstruction}`;
     const userPrompt = userPromptText;
 
     if (creditRow && creditRow.credit > 0) {

@@ -63,3 +63,4 @@ export async function fetchKVKKKararlari(): Promise<Array<{ title: string; conte
 }
 
 
+

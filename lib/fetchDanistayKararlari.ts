@@ -52,3 +52,4 @@ export async function fetchDanistayKararlari(): Promise<Array<{ title: string; c
 }
 
 
+
