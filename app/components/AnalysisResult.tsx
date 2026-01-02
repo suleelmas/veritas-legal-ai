@@ -19,6 +19,8 @@ interface AnalysisResultProps {
   extractRiskScore: (text: string) => number;
   getRiskColor: (score: number) => string;
   getRiskLevel: (score: number) => string;
+  riskScore?: number | null;
+  legalCitations?: Array<{source: string; citation: string; relevance: number}>;
   canViewDetailedAnalysis: () => boolean;
   canDownload: () => boolean;
   canAccessLegislationDetails: () => boolean;
@@ -52,6 +54,8 @@ export default function AnalysisResult({
   extractRiskScore,
   getRiskColor,
   getRiskLevel,
+  riskScore: propRiskScore,
+  legalCitations,
   canViewDetailedAnalysis,
   canDownload,
   canAccessLegislationDetails,
@@ -272,6 +276,98 @@ export default function AnalysisResult({
                     </div>
                   </div>
                 </div>
+
+                {/* Legal Citations Visualization */}
+                {legalCitations && legalCitations.length > 0 && (
+                  <div style={{
+                    marginTop: '30px',
+                    padding: '25px',
+                    background: midBlue,
+                    borderRadius: '15px',
+                    border: `1px solid ${gold}44`
+                  }}>
+                    <h4 style={{ 
+                      color: gold, 
+                      fontSize: '1.2rem', 
+                      marginBottom: '20px',
+                      fontWeight: 'bold'
+                    }}>
+                      {language === 'TR' ? '📚 İlgili Hukuki Kaynaklar' : '📚 Legal Citations'}
+                    </h4>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+                      gap: '15px'
+                    }}>
+                      {legalCitations.slice(0, 6).map((citation, idx) => (
+                        <div
+                          key={idx}
+                          style={{
+                            padding: '15px',
+                            background: darkBlue,
+                            borderRadius: '10px',
+                            border: `1px solid ${gold}33`,
+                            transition: 'all 0.2s'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = gold;
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = gold + '33';
+                            e.currentTarget.style.transform = 'translateY(0)';
+                          }}
+                        >
+                          <div style={{
+                            color: gold,
+                            fontSize: '12px',
+                            fontWeight: 'bold',
+                            marginBottom: '8px',
+                            textTransform: 'uppercase',
+                            opacity: 0.8
+                          }}>
+                            {citation.source}
+                          </div>
+                          <div style={{
+                            color: lightText,
+                            fontSize: '14px',
+                            lineHeight: '1.6'
+                          }}>
+                            {citation.citation}
+                          </div>
+                          <div style={{
+                            marginTop: '10px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px'
+                          }}>
+                            <div style={{
+                              width: '60px',
+                              height: '4px',
+                              background: darkBlue,
+                              borderRadius: '2px',
+                              overflow: 'hidden'
+                            }}>
+                              <div style={{
+                                width: `${citation.relevance * 100}%`,
+                                height: '100%',
+                                background: gold,
+                                transition: 'width 0.3s'
+                              }} />
+                            </div>
+                            <span style={{
+                              color: lightText,
+                              fontSize: '12px',
+                              opacity: 0.7
+                            }}>
+                              {Math.round(citation.relevance * 100)}%
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div style={{ 
                   color: lightText, 

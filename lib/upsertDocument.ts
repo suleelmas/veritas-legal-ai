@@ -14,9 +14,15 @@ const MAX_EMBEDDING_CHARS_SMALL = MAX_EMBEDDING_TOKENS_SMALL * CHARS_PER_TOKEN;
 const MAX_EMBEDDING_CHARS_LARGE = MAX_EMBEDDING_TOKENS_LARGE * CHARS_PER_TOKEN;
 
 // Ülke/region belirleme (metadata'dan)
-function determineCountry(metadata: any): 'US' | 'TR' {
+function determineCountry(metadata: any): 'US' | 'TR' | 'DE' {
   const source = metadata?.source || '';
   const country = metadata?.country || '';
+  
+  // Almanya kaynakları
+  if (country === 'DE' || 
+      ['gesetze_im_internet', 'rechtsprechung_im_internet'].includes(source.toLowerCase())) {
+    return 'DE';
+  }
   
   // ABD kaynakları
   if (country === 'US' || 
@@ -38,6 +44,14 @@ function getEmbeddingConfig(metadata: any): { model: string; maxChars: number; c
       model: EMBEDDING_MODEL_US,
       maxChars: MAX_EMBEDDING_CHARS_LARGE,
       chunkSize: 3000 // ABD hukuk metinleri genelde daha uzun, daha büyük chunk
+    };
+  }
+  
+  if (country === 'DE') {
+    return {
+      model: EMBEDDING_MODEL_TR, // text-embedding-3-small multilingual desteği var
+      maxChars: MAX_EMBEDDING_CHARS_SMALL,
+      chunkSize: 2500 // Almanca için orta-büyük chunk (paragraf yapısını korumak için)
     };
   }
   
@@ -92,9 +106,23 @@ export async function upsertDocument(
     const country = determineCountry(metadata);
     
     // 1. RecursiveCharacterTextSplitter ile metni chunk'lara böl
+    // Almanca için özel separator'lar (paragraf yapısını korumak için)
+    const separators = country === 'DE' ? [
+      '\n\n§',          // Alman paragraf başlangıcı (en önemli - paragrafları bölme!)
+      '\n§',            // Alman paragraf başlangıcı (tek satır)
+      '\n\n',           // Paragraflar
+      '\n',             // Satırlar
+      '. ',             // Cümleler
+      '; ',             // Yan cümleler
+      ', ',             // Virgül
+      ' ',              // Kelimeler
+      ''                // Son çare
+    ] : undefined; // Default separators kullan
+    
     const splitter = new RecursiveCharacterTextSplitter({
       chunkSize: config.chunkSize,
-      chunkOverlap: Math.floor(config.chunkSize * 0.1) // %10 overlap
+      chunkOverlap: Math.floor(config.chunkSize * 0.1), // %10 overlap
+      separators: separators
     });
     
     const chunks = splitter.splitText(content.trim());

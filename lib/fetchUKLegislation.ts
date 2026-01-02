@@ -11,6 +11,8 @@ interface UKLegislation {
   type: 'act' | 'si'; // Act veya Statutory Instrument
   year?: number;
   chapter?: string; // e.g., "c. 45" for Act, "SI 2024/123" for SI
+  jurisdiction?: 'England & Wales' | 'Scotland' | 'Northern Ireland' | 'UK';
+  retained_eu_law?: boolean; // Brexit sonrası Retained EU Law kontrolü
 }
 
 /**
@@ -363,6 +365,53 @@ async function fetchRecentUKSIs(limit: number = 20): Promise<UKLegislation[]> {
 }
 
 /**
+ * Jurisdiction tespiti (England & Wales, Scotland, Northern Ireland)
+ */
+function detectJurisdiction(title: string, content: string): 'England & Wales' | 'Scotland' | 'Northern Ireland' | 'UK' {
+  const combined = (title + ' ' + content).toUpperCase();
+  
+  // Scotland
+  if (combined.includes('SCOTLAND') || combined.includes('SCOTS LAW') || combined.includes('SCOTTISH')) {
+    return 'Scotland';
+  }
+  
+  // Northern Ireland
+  if (combined.includes('NORTHERN IRELAND') || combined.includes('NI ') || combined.includes('NORTHERN IRISH')) {
+    return 'Northern Ireland';
+  }
+  
+  // England & Wales (default for UK-wide legislation unless specified)
+  if (combined.includes('ENGLAND') || combined.includes('WALES') || combined.includes('ENGLISH')) {
+    return 'England & Wales';
+  }
+  
+  // UK-wide (default)
+  return 'UK';
+}
+
+/**
+ * Retained EU Law kontrolü (Brexit sonrası)
+ */
+function checkRetainedEULaw(title: string, content: string): boolean {
+  const combined = (title + ' ' + content).toUpperCase();
+  
+  // Retained EU Law işaretleri
+  const indicators = [
+    'RETAINED EU LAW',
+    'EU RETAINED',
+    'EU EXIT',
+    'BREXIT',
+    'EU (WITHDRAWAL)',
+    'EU WITHDRAWAL ACT',
+    'REGULATION (EU)',
+    'DIRECTIVE',
+    'EUROPEAN UNION'
+  ];
+  
+  return indicators.some(indicator => combined.includes(indicator));
+}
+
+/**
  * Ana fonksiyon - UK Legislation çek
  */
 export async function fetchUKLegislation(limit: number = 20): Promise<Array<{ title: string; content: string; date?: string }>> {
@@ -377,10 +426,19 @@ export async function fetchUKLegislation(limit: number = 20): Promise<Array<{ ti
     const sis = await fetchRecentUKSIs(Math.floor(limit / 2));
     allLegislation.push(...sis);
     
+    // Her bir item için jurisdiction ve retained EU law kontrolü yap
+    for (const item of allLegislation) {
+      item.jurisdiction = detectJurisdiction(item.title, item.content);
+      item.retained_eu_law = checkRetainedEULaw(item.title, item.content);
+    }
+    
     return allLegislation.map(item => ({
       title: item.title,
       content: item.content,
-      date: item.date
+      date: item.date,
+      // Metadata için ekstra bilgiler (return type genişletilebilir)
+      jurisdiction: item.jurisdiction,
+      retained_eu_law: item.retained_eu_law
     }));
   } catch (err) {
     console.error('UK Legislation fetch error:', err);

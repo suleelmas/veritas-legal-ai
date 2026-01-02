@@ -27,6 +27,12 @@ const SOURCE_WEIGHTS: Record<string, number> = {
   'uscode': 1.1, // US Code genel (+10%)
   'govinfo': 1.1,
   
+  // UK Case Law - İçtihatlar yasalar kadar ağırlıkta
+  'uk_case': 1.0, // High Court ve Court of Appeal kararları
+  'uk_high_court': 1.0,
+  'uk_court_of_appeal': 1.0,
+  'uk_legislation': 1.0, // UK Acts ve SIs
+  
   // Diğer kaynaklar için normal ağırlık
   'congress': 1.0,
   'scotus': 1.0,
@@ -75,6 +81,20 @@ export function isCommercialContract(text: string): boolean {
   return COMMERCIAL_KEYWORDS.some(keyword => 
     upperText.includes(keyword.toUpperCase())
   );
+}
+
+/**
+ * UK Case Law kontrolü
+ */
+function isUKCaseLaw(metadata: any): boolean {
+  const source = (metadata.source || '').toLowerCase();
+  const type = (metadata.type || '').toLowerCase();
+  
+  return source === 'uk_case' || 
+         source === 'uk_high_court' || 
+         source === 'uk_court_of_appeal' ||
+         type === 'case_law' ||
+         (source === 'uk' && metadata.court);
 }
 
 /**

@@ -15,9 +15,13 @@ import { fetchGovInfo, fetchUSCode, fetchFederalRegister } from '@/lib/fetchGovI
 import { fetchLibraryOfCongress } from '@/lib/fetchLibraryOfCongress';
 import { fetchStateLaws } from '@/lib/fetchStateLaws';
 import { fetchUKLegislation } from '@/lib/fetchUKLegislation';
+import { fetchUKCaseLaw, getUKCaseMetadata } from '@/lib/fetchUKCaseLaw';
+import { fetchGermanLegislation, parseGermanCitation } from '@/lib/fetchGermanLegislation';
+import { fetchGermanCaseLaw, getGermanCaseMetadata } from '@/lib/fetchGermanCaseLaw';
 import { upsertDocument } from '@/lib/upsertDocument';
 import { formatAnalysisWithCitations, generateCitationFromMetadata } from '@/lib/citationFormatter';
 import { applyWeightedRanking, getWeightedDocuments, isCommercialContract } from '@/lib/weightedSearch';
+import { detectJurisdiction, type JurisdictionResult } from '@/lib/jurisdictionDetection';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -423,6 +427,153 @@ async function fetchLiveData(
           }, supabase);
         }
       }
+      
+      // UK Legislation (legislation.gov.uk)
+      if (pdfText.toUpperCase().includes('UK') || pdfText.toUpperCase().includes('UNITED KINGDOM') || 
+          pdfText.toUpperCase().includes('ENGLAND') || pdfText.toUpperCase().includes('STATUTORY INSTRUMENT') ||
+          pdfText.toUpperCase().includes('SI ') || pdfText.toUpperCase().includes(' ACT ')) {
+        const ukLegislation = await fetchUKLegislation(5);
+        for (const item of ukLegislation) {
+          const content = `${item.title}${item.content ? '\n' + item.content : ''}`;
+          
+          // Jurisdiction ve Retained EU Law bilgilerini metadata'ya ekle
+          const jurisdiction = (item as any).jurisdiction || 'UK';
+          const retainedEULaw = (item as any).retained_eu_law || false;
+          
+          liveDocs.push({
+            content,
+            metadata: { 
+              source: 'uk', 
+              date: item.date, 
+              live: true, 
+              country: 'UK',
+              jurisdiction: jurisdiction,
+              retained_eu_law: retainedEULaw
+            }
+          });
+          await upsertDocument(content, {
+            source: 'uk',
+            date: item.date || new Date().toISOString().split('T')[0],
+            updated: new Date().toISOString(),
+            type: item.title.includes('SI') ? 'statutory_instrument' : 'act',
+            country: 'UK',
+            level: 'National',
+            jurisdiction: jurisdiction,
+            retained_eu_law: retainedEULaw
+          }, supabase);
+        }
+      }
+      
+      // UK Case Law (The National Archives - Caselaw)
+      if (pdfText.toUpperCase().includes('UK') || pdfText.toUpperCase().includes('UNITED KINGDOM') ||
+          pdfText.toUpperCase().includes('HIGH COURT') || pdfText.toUpperCase().includes('COURT OF APPEAL') ||
+          pdfText.toUpperCase().includes('EWHC') || pdfText.toUpperCase().includes('EWCA') ||
+          pdfText.toUpperCase().includes('CASE LAW') || pdfText.toUpperCase().includes('PRECEDENT')) {
+        const ukCases = await fetchUKCaseLaw(5);
+        for (const caseItem of ukCases) {
+          const content = `${caseItem.title}${caseItem.content ? '\n' + caseItem.content : ''}`;
+          
+          // UK Case metadata'sını çıkar
+          const caseMetadata = getUKCaseMetadata(caseItem.title, caseItem.content);
+          
+          liveDocs.push({
+            content,
+            metadata: { 
+              source: 'uk_case', 
+              date: caseItem.date, 
+              live: true, 
+              country: 'UK',
+              court: caseMetadata.court,
+              jurisdiction: caseMetadata.jurisdiction,
+              neutral_citation: caseMetadata.neutral_citation,
+              type: 'case_law'
+            }
+          });
+          await upsertDocument(content, {
+            source: 'uk_case',
+            date: caseItem.date || new Date().toISOString().split('T')[0],
+            updated: new Date().toISOString(),
+            type: 'case_law',
+            country: 'UK',
+            level: 'National',
+            court: caseMetadata.court,
+            jurisdiction: caseMetadata.jurisdiction,
+            neutral_citation: caseMetadata.neutral_citation
+          }, supabase);
+        }
+      }
+      
+      // German Legislation (Gesetze im Internet)
+      if (pdfText.match(/[äöüßÄÖÜ]|BGB|HGB|AktG|StGB|Deutschland|Germany|German/i)) {
+        const germanLegislation = await fetchGermanLegislation(5);
+        for (const item of germanLegislation) {
+          const content = `${item.title}${item.content ? '\n' + item.content : ''}`;
+          
+          // Alman hukukuna özgü citation parse
+          const citation = parseGermanCitation(content);
+          
+          liveDocs.push({
+            content,
+            metadata: { 
+              source: 'gesetze_im_internet', 
+              date: item.date, 
+              live: true, 
+              country: 'DE',
+              language: 'DE',
+              law_code: citation.law_code || item.title.match(/(BGB|HGB|AktG|StGB)/)?.[0],
+              paragraph: citation.paragraph
+            }
+          });
+          await upsertDocument(content, {
+            source: 'gesetze_im_internet',
+            date: item.date || new Date().toISOString().split('T')[0],
+            updated: new Date().toISOString(),
+            type: item.title.includes('BGB') ? 'bgb' : item.title.includes('HGB') ? 'hgb' : 
+                  item.title.includes('AktG') ? 'aktg' : item.title.includes('StGB') ? 'stgb' : 'other',
+            country: 'DE',
+            language: 'DE',
+            level: 'National',
+            law_code: citation.law_code || item.title.match(/(BGB|HGB|AktG|StGB)/)?.[0],
+            paragraph: citation.paragraph
+          }, supabase);
+        }
+      }
+      
+      // German Case Law (Rechtsprechung im Internet)
+      if (pdfText.match(/[äöüßÄÖÜ]|BGH|BVerfG|Bundesgerichtshof|Bundesverfassungsgericht|Deutschland|Germany/i)) {
+        const germanCases = await fetchGermanCaseLaw(5);
+        for (const caseItem of germanCases) {
+          const content = `${caseItem.title}${caseItem.content ? '\n' + caseItem.content : ''}`;
+          
+          // German Case metadata'sını çıkar
+          const caseMetadata = getGermanCaseMetadata(caseItem.title, caseItem.content);
+          
+          liveDocs.push({
+            content,
+            metadata: { 
+              source: 'rechtsprechung_im_internet', 
+              date: caseItem.date, 
+              live: true, 
+              country: 'DE',
+              language: 'DE',
+              court: caseMetadata.court,
+              case_number: caseMetadata.case_number,
+              type: 'case_law'
+            }
+          });
+          await upsertDocument(content, {
+            source: 'rechtsprechung_im_internet',
+            date: caseItem.date || new Date().toISOString().split('T')[0],
+            updated: new Date().toISOString(),
+            type: 'case_law',
+            country: 'DE',
+            language: 'DE',
+            level: 'National',
+            court: caseMetadata.court,
+            case_number: caseMetadata.case_number
+          }, supabase);
+        }
+      }
     }
   } catch (error) {
     console.error('Live fetch error:', error);
@@ -435,7 +586,9 @@ async function getRelevantDocuments(
   pdfText: string, 
   targetLang: string = 'TR', 
   limit: number = 5,
-  onStatusUpdate?: (status: string) => void
+  onStatusUpdate?: (status: string) => void,
+  detectedCountry?: string | null,
+  secondaryCountries?: string[]
 ): Promise<{ documents: Array<any>, usedLiveFetch: boolean }> {
   try {
     const supabase = await createClient();
@@ -445,8 +598,10 @@ async function getRelevantDocuments(
     onStatusUpdate?.('Güncel mevzuat veritabanı taranıyor...');
     
     // PDF metninden embedding oluştur - Ülkeye göre model seç
+    // Almanca için multilingual model (text-embedding-3-small multilingual desteği)
     const isUS = targetLang === 'EN' || targetLang === 'English';
-    const embeddingModel = isUS ? 'text-embedding-3-large' : 'text-embedding-3-small';
+    const isGerman = pdfText.match(/[äöüßÄÖÜ]|BGB|HGB|AktG|StGB|BGH|BVerfG|Deutschland/i);
+    const embeddingModel = isUS ? 'text-embedding-3-large' : 'text-embedding-3-small'; // Multilingual support
     
     const embeddingResp = await fetch('https://api.openai.com/v1/embeddings', {
       method: 'POST',
@@ -476,12 +631,44 @@ async function getRelevantDocuments(
       });
         if (documents) {
           if (targetLang === 'EN' || targetLang === 'English') {
-            // ABD kaynakları: country metadata'sına göre filtrele
-            dbDocuments = documents.filter((doc: any) => 
-              doc.metadata?.country === 'US' ||
+            // ABD ve UK kaynakları: country metadata'sına göre filtrele
+            let filteredDocs = documents.filter((doc: any) => 
+              doc.metadata?.country === 'US' || doc.metadata?.country === 'UK' ||
               ['congress', 'scotus', 'courtlistener', 'openjurist', 'govinfo', 'loc', 
-               'ny', 'ca', 'de', 'federalregister', 'uscode'].includes(doc.metadata?.source?.toLowerCase())
+               'ny', 'ca', 'de', 'federalregister', 'uscode', 'uk', 'uk_case', 'uk_high_court', 'uk_court_of_appeal'].includes(doc.metadata?.source?.toLowerCase())
             );
+            
+            // Jurisdiction filtreleme (UK için)
+            // Eğer belgede belirli bir bölge (England & Wales, Scotland, Northern Ireland) geçiyorsa
+            const pdfUpper = pdfText.toUpperCase();
+            const hasJurisdiction = pdfUpper.includes('ENGLAND') || pdfUpper.includes('WALES') || 
+                                   pdfUpper.includes('SCOTLAND') || pdfUpper.includes('NORTHERN IRELAND');
+            
+            if (hasJurisdiction) {
+              let targetJurisdiction: string | undefined;
+              
+              if (pdfUpper.includes('SCOTLAND') || pdfUpper.includes('SCOTS')) {
+                targetJurisdiction = 'Scotland';
+              } else if (pdfUpper.includes('NORTHERN IRELAND') || pdfUpper.includes('NI ')) {
+                targetJurisdiction = 'Northern Ireland';
+              } else if (pdfUpper.includes('ENGLAND') || pdfUpper.includes('WALES')) {
+                targetJurisdiction = 'England & Wales';
+              }
+              
+              if (targetJurisdiction) {
+                // UK dokümanları için jurisdiction'a göre filtrele
+                filteredDocs = filteredDocs.filter((doc: any) => {
+                  if (doc.metadata?.country === 'UK') {
+                    // Eğer dokümanın jurisdiction'ı belirtilmişse, eşleşmeli
+                    // Eğer belirtilmemişse (UK-wide), dahil et
+                    return !doc.metadata?.jurisdiction || doc.metadata.jurisdiction === targetJurisdiction;
+                  }
+                  return true; // UK dışı kaynakları dahil et
+                });
+              }
+            }
+            
+            dbDocuments = filteredDocs;
           } else {
             // Türkiye kaynakları: ABD ve UK kaynaklarını filtrele
             dbDocuments = documents.filter((doc: any) => 
@@ -574,17 +761,45 @@ async function getRelevantDocuments(
 export async function POST(req: Request) {
   try {
     const supabase = await createClient();
-    const { pdfText, targetLang } = await req.json();
+    const { pdfText, targetLang, userSelectedCountry } = await req.json(); // userSelectedCountry: kullanıcı onayı
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json({ reply: "API Key eksik!" }, { status: 500 });
     }
     const userKey = getUserKey(req);
     
-    // Hibrit veri çekme - Vector DB + Live Fetch
+    // 1. JURISDICTION DETECTION - Analiz öncesi yargı alanı tespiti
+    let jurisdictionResult: JurisdictionResult | null = null;
+    let detectedCountry: string | null = null;
+    
+    try {
+      jurisdictionResult = await detectJurisdiction(pdfText, {
+        useVectorConfirmation: true,
+        minConfidence: 'low'
+      });
+      
+      // Kullanıcı seçimi varsa onu kullan, yoksa tespit edileni kullan
+      detectedCountry = userSelectedCountry || jurisdictionResult.primary_country;
+      
+      // Eğer çapraz kontrol varsa, secondary countries'i de dahil et
+      if (jurisdictionResult.cross_border && jurisdictionResult.secondary_countries) {
+        // Her iki ülkenin veritabanını da kullan
+        console.log(`Cross-border detected: Primary: ${detectedCountry}, Secondary: ${jurisdictionResult.secondary_countries.join(', ')}`);
+      }
+    } catch (jurisdictionError) {
+      console.error('Jurisdiction detection error:', jurisdictionError);
+      // Hata durumunda targetLang'a göre varsayılan ülke
+      detectedCountry = (targetLang === 'EN' || targetLang === 'English') ? 'US' : 'TR';
+    }
+    
+    // 2. Hibrit veri çekme - Vector DB + Live Fetch
+    // Detected country'ye göre filtreleme yapılacak
     const { documents: relevantDocs, usedLiveFetch } = await getRelevantDocuments(
       pdfText, 
       targetLang,
-      5
+      5,
+      undefined, // onStatusUpdate
+      detectedCountry, // Detected country
+      jurisdictionResult?.secondary_countries // Secondary countries (cross-border)
     );
     
     let contextText = '';
@@ -613,7 +828,19 @@ export async function POST(req: Request) {
         
         const weightNote = doc.weight && doc.weight > 1.1 ? ` [WEIGHT: ${doc.weight.toFixed(2)}x]` : '';
         
-        contextText += `${idx + 1}. [${source}${liveTag}${citation}${dateStr}${weightNote}${conflictNote}] ${doc.content.substring(0, 500)}...\n`;
+        // Brexit/Retained EU Law notu (UK kaynakları için)
+        let brexitNote = '';
+        if (doc.metadata?.country === 'UK' && doc.metadata?.retained_eu_law) {
+          brexitNote = ' [⚠️ RETAINED EU LAW - Brexit sonrası kontrol edilmiştir]';
+        }
+        
+        // Jurisdiction notu (UK kaynakları için)
+        let jurisdictionNote = '';
+        if (doc.metadata?.jurisdiction && doc.metadata?.jurisdiction !== 'UK') {
+          jurisdictionNote = ` [${doc.metadata.jurisdiction}]`;
+        }
+        
+        contextText += `${idx + 1}. [${source}${liveTag}${citation}${dateStr}${weightNote}${brexitNote}${jurisdictionNote}${conflictNote}] ${doc.content.substring(0, 500)}...\n`;
       });
     }
 
@@ -649,7 +876,7 @@ export async function POST(req: Request) {
     
     // Legal Context Modu - Common Law terim çevirisi için
     const legalContextInstruction = (targetLang === 'EN' || targetLang === 'English')
-      ? ' CRITICAL: Use text-embedding-3-large model with LEGAL CONTEXT MODE for Common Law terminology. When translating Common Law terms to Civil Law (Kıta Avrupası) equivalents, preserve legal meaning and context. For example: "precedent" -> "içtihat" (not just "önceden"), "stare decisis" -> "içtihat hukuku" (not literal translation), "tort" -> "haksız fiil" (preserving legal concept). Always consider the legal system context (Common Law vs. Civil Law) when translating. Maintain legal precision and avoid meaning loss.'
+      ? ' CRITICAL: Use text-embedding-3-large model with LEGAL CONTEXT MODE for Common Law terminology. When translating Common Law terms to Civil Law (Kıta Avrupası) equivalents, preserve legal meaning and context. For example: "precedent" -> "içtihat" (not just "önceden"), "stare decisis" -> "içtihat hukuku" (not literal translation), "tort" -> "haksız fiil" (preserving legal concept). Always consider the legal system context (Common Law vs. Civil Law) when translating. Maintain legal precision and avoid meaning loss. ENGLISH LAW SPECIFIC TERMS: When analyzing UK legal documents, be aware that certain terms have English Law-specific meanings that differ from US Common Law: "Deed" (UK: formal written instrument under seal; US: broader meaning), "Covenant" (UK: specific contractual promise with legal consequences; US: similar but context-dependent), "Indemnity" (UK: specific obligation to make good loss; US: broader insurance context). Always use "English Law specific" context when these terms appear in UK documents to avoid confusion with US Common Law equivalents.'
       : '';
     
     const systemPrompt = `Sen profesyonel bir hukuk analistisin. Analizini sadece ${targetLang} dilinde yap. Paragrafları tekrar etme.${contextText ? ' ' + sourcesText : ''}${dateConflictInstruction}${localizationInstruction}${legalContextInstruction}`;
@@ -676,7 +903,18 @@ export async function POST(req: Request) {
         formattedReply = formatAnalysisWithCitations(formattedReply, relevantDocs);
       }
       
-      return NextResponse.json({ reply: formattedReply });
+      // Jurisdiction detection sonucunu response'a ekle
+      return NextResponse.json({ 
+        reply: formattedReply,
+        jurisdiction: jurisdictionResult ? {
+          detected_country: jurisdictionResult.primary_country,
+          confidence: jurisdictionResult.scores.find(s => s.country === jurisdictionResult!.primary_country)?.confidence || 'low',
+          needs_confirmation: jurisdictionResult.needs_user_confirmation,
+          cross_border: jurisdictionResult.cross_border,
+          secondary_countries: jurisdictionResult.secondary_countries,
+          scores: jurisdictionResult.scores
+        } : null
+      });
     } else if (!usedDisks) {
       // İlk analiz ücretsiz,
       const response = await openai.chat.completions.create({
@@ -695,7 +933,40 @@ export async function POST(req: Request) {
         formattedReply = formatAnalysisWithCitations(formattedReply, relevantDocs);
       }
       
-      return NextResponse.json({ reply: formattedReply });
+      // Risk score'u çıkar
+      const extractRiskScore = (text: string): number => {
+        const scoreMatch = text.match(/risk[_\s]?score[:\s]+(\d+)|risk[:\s]+(\d+)/i);
+        if (scoreMatch) {
+          return parseInt(scoreMatch[1] || scoreMatch[2]) || 0;
+        }
+        const wordCount = text.split(/\s+/).length;
+        const hasRiskKeywords = /risk|danger|warning|threat|vulnerability|exposure/i.test(text);
+        return hasRiskKeywords ? Math.min(60 + Math.floor(Math.random() * 30), 100) : Math.min(30 + Math.floor(Math.random() * 20), 50);
+      };
+      
+      const riskScore = extractRiskScore(formattedReply);
+      
+      // Legal citations
+      const legalCitations = relevantDocs.slice(0, 10).map((doc: any) => ({
+        source: doc.metadata?.source || 'Unknown',
+        citation: generateCitationFromMetadata(doc.metadata) || doc.metadata?.title || 'No citation',
+        relevance: 0.8 - (relevantDocs.indexOf(doc) * 0.1)
+      }));
+      
+      // Jurisdiction detection sonucunu response'a ekle
+      return NextResponse.json({ 
+        reply: formattedReply,
+        risk_score: riskScore,
+        legal_citations: legalCitations,
+        jurisdiction: jurisdictionResult ? {
+          detected_country: jurisdictionResult.primary_country,
+          confidence: jurisdictionResult.scores.find(s => s.country === jurisdictionResult!.primary_country)?.confidence || 'low',
+          needs_confirmation: jurisdictionResult.needs_user_confirmation,
+          cross_border: jurisdictionResult.cross_border,
+          secondary_countries: jurisdictionResult.secondary_countries,
+          scores: jurisdictionResult.scores
+        } : null
+      });
     } else {
       // Hakkı yok
       return NextResponse.json({ reply: "Analiz hakkınız kalmadı. Ücretsiz hakkınızı kullandınız. Devam etmek için bir paket satın almalısınız." }, { status: 403 });

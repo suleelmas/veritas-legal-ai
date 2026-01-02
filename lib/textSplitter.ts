@@ -17,7 +17,10 @@ export class RecursiveCharacterTextSplitter {
     this.chunkOverlap = options.chunkOverlap || 200;
     
     // Hukuki metinler için özel ayırıcılar (öncelik sırasına göre)
+    // Almanca için § paragraf işaretleri öncelikli
     this.separators = options.separators || [
+      '\n\n§',          // Alman paragraf başlangıcı (en önemli - paragrafları bölme!)
+      '\n§',            // Alman paragraf başlangıcı (tek satır)
       '\n\n',           // Paragraflar (en büyük birim)
       '\n',             // Satırlar
       '. ',             // Cümleler (nokta + boşluk)
@@ -56,7 +59,36 @@ export class RecursiveCharacterTextSplitter {
     const remainingSeparators = separators.slice(1);
 
     // Separator ile metni böl
-    const splits = separator ? text.split(separator) : [text];
+    // Özel durum: § işareti için separator'ı korumak gerekir
+    let splits: string[] = [];
+    if (separator) {
+      if (separator.includes('§')) {
+        // § işareti için özel işlem: § işaretini koru
+        // Örnek: '\n\n§' separator'ı için, § işaretini bir sonraki split ile birleştir
+        const escapedSeparator = separator.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const parts = text.split(new RegExp(`(${escapedSeparator})`, 'g'));
+        // Separator'ları bir sonraki part ile birleştir
+        const merged: string[] = [];
+        for (let i = 0; i < parts.length; i++) {
+          if (parts[i] === separator) {
+            // Separator'ı bir sonraki part ile birleştir
+            if (i + 1 < parts.length) {
+              merged.push(separator + parts[i + 1]);
+              i++; // Skip next
+            } else {
+              merged.push(separator);
+            }
+          } else if (parts[i].trim().length > 0) {
+            merged.push(parts[i]);
+          }
+        }
+        splits = merged;
+      } else {
+        splits = text.split(separator);
+      }
+    } else {
+      splits = [text];
+    }
 
     let currentChunk = '';
     let lastChunkEnd = '';

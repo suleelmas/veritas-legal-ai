@@ -1,6 +1,15 @@
 // Akıllı metin temizleme fonksiyonu - Hukuki metinleri saf hale getirir
+// ÖNEMLİ: Almanca Umlaut karakterleri (ä, ö, ü, ß) korunur - UTF-8 encoding korunur
 export function cleanLegalText(text: string): string {
   if (!text) return '';
+  
+  // UTF-8 encoding kontrolü - Buffer kullanarak doğrula
+  try {
+    const buffer = Buffer.from(text, 'utf8');
+    text = buffer.toString('utf8');
+  } catch (err) {
+    console.warn('UTF-8 encoding issue in cleanLegalText, attempting fix');
+  }
   
   let cleaned = text;
   
@@ -124,10 +133,20 @@ export function cleanLegalText(text: string): string {
 }
 
 // Madde numaralarını ve yapısal öğeleri koruyarak temizleme
+// ÖNEMLİ: Almanca Umlaut karakterleri (ä, ö, ü, ß) ve § paragraf işaretleri korunur
 export function cleanLegalTextPreserveStructure(text: string): string {
+  // UTF-8 encoding kontrolü - Umlaut karakterlerini korumak için
+  try {
+    const buffer = Buffer.from(text, 'utf8');
+    text = buffer.toString('utf8');
+  } catch (err) {
+    console.warn('UTF-8 encoding issue in cleanLegalTextPreserveStructure, attempting fix');
+  }
+  
   let cleaned = cleanLegalText(text);
   
   // Madde, fıkra, bent gibi yapısal öğeleri koru
+  // Alman paragraf işaretleri (§) ve Umlaut karakterleri korunur
   const structurePatterns = [
     /Madde\s+\d+/gi,
     /Article\s+\d+/gi,
@@ -137,6 +156,7 @@ export function cleanLegalTextPreserveStructure(text: string): string {
     /Item\s+[a-z]/gi,
     /\([a-z]\)/gi, // Alt bentler: (a), (b), (c)
     /\(\d+\)/gi, // Numaralı parantezler: (1), (2)
+    /§+\s*\d+/g, // Alman paragraf işaretleri (§ 433, §§ 433-449)
   ];
   
   // Bu pattern'lerin çevresindeki boşlukları normalize et

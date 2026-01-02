@@ -12,6 +12,9 @@ import { fetchGovInfo, fetchUSCode, fetchFederalRegister } from '@/lib/fetchGovI
 import { fetchLibraryOfCongress } from '@/lib/fetchLibraryOfCongress';
 import { fetchStateLaws } from '@/lib/fetchStateLaws';
 import { fetchUKLegislation } from '@/lib/fetchUKLegislation';
+import { fetchUKCaseLaw, getUKCaseMetadata } from '@/lib/fetchUKCaseLaw';
+import { fetchGermanLegislation } from '@/lib/fetchGermanLegislation';
+import { fetchGermanCaseLaw } from '@/lib/fetchGermanCaseLaw';
 import { upsertDocument } from '@/lib/upsertDocument';
 import { createClient } from '@/utils/supabase/server';
 
@@ -583,6 +586,120 @@ async function syncCourtDecisions() {
       console.error('UK legislation fetch hatası:', err);
     }
 
+    // UK Case Law (The National Archives - Caselaw)
+    try {
+      const ukCases = await fetchUKCaseLaw(20);
+      for (const caseItem of ukCases) {
+        try {
+          const content = `${caseItem.title}${caseItem.content ? '\n' + caseItem.content : ''}`;
+          
+          // UK Case metadata'sını çıkar
+          const caseMetadata = getUKCaseMetadata(caseItem.title, caseItem.content);
+          
+          const { data: existing } = await supabase
+            .from('documents')
+            .select('id')
+            .eq('content', content)
+            .eq('metadata->>source', 'uk_case')
+            .maybeSingle();
+          
+          if (!existing) {
+            await upsertDocument(content, {
+              source: 'uk_case',
+              date: caseItem.date || new Date().toISOString().split('T')[0],
+              updated: new Date().toISOString(),
+              type: 'case_law',
+              country: 'UK',
+              level: 'National',
+              court: caseMetadata.court,
+              jurisdiction: caseMetadata.jurisdiction,
+              neutral_citation: caseMetadata.neutral_citation
+            }, supabase);
+            ukCaseNew++;
+          }
+          ukCaseOk++;
+        } catch (err) {
+          console.error('UK case law kayıt hatası:', err);
+          ukCaseFail++;
+        }
+      }
+    } catch (err) {
+      console.error('UK case law fetch hatası:', err);
+    }
+
+    // German Legislation (Gesetze im Internet)
+    try {
+      const germanLegislation = await fetchGermanLegislation(10);
+      for (const item of germanLegislation) {
+        try {
+          const content = `${item.title}${item.content ? '\n' + item.content : ''}`;
+          
+          const { data: existing } = await supabase
+            .from('documents')
+            .select('id')
+            .eq('content', content)
+            .eq('metadata->>source', 'gesetze_im_internet')
+            .maybeSingle();
+          
+          if (!existing) {
+            await upsertDocument(content, {
+              source: 'gesetze_im_internet',
+              date: item.date || new Date().toISOString().split('T')[0],
+              updated: new Date().toISOString(),
+              type: item.title.includes('BGB') ? 'bgb' : item.title.includes('HGB') ? 'hgb' : 
+                    item.title.includes('AktG') ? 'aktg' : item.title.includes('StGB') ? 'stgb' : 'other',
+              country: 'DE',
+              language: 'DE',
+              level: 'National'
+            }, supabase);
+            germanLegislationNew++;
+          }
+          germanLegislationOk++;
+        } catch (err) {
+          console.error('German legislation kayıt hatası:', err);
+          germanLegislationFail++;
+        }
+      }
+    } catch (err) {
+      console.error('German legislation fetch hatası:', err);
+    }
+
+    // German Case Law (Rechtsprechung im Internet)
+    try {
+      const germanCases = await fetchGermanCaseLaw(10);
+      for (const caseItem of germanCases) {
+        try {
+          const content = `${caseItem.title}${caseItem.content ? '\n' + caseItem.content : ''}`;
+          
+          const { data: existing } = await supabase
+            .from('documents')
+            .select('id')
+            .eq('content', content)
+            .eq('metadata->>source', 'rechtsprechung_im_internet')
+            .maybeSingle();
+          
+          if (!existing) {
+            await upsertDocument(content, {
+              source: 'rechtsprechung_im_internet',
+              date: caseItem.date || new Date().toISOString().split('T')[0],
+              updated: new Date().toISOString(),
+              type: 'case_law',
+              country: 'DE',
+              language: 'DE',
+              level: 'National'
+            }, supabase);
+            germanCaseNew++;
+          }
+          germanCaseOk++;
+        } catch (err) {
+          console.error('German case law kayıt hatası:', err);
+          germanCaseFail++;
+        }
+      }
+    } catch (err) {
+      console.error('German case law fetch hatası:', err);
+    }
+
     return {
       success: true,
       yargitay: {
@@ -669,7 +786,25 @@ async function syncCourtDecisions() {
         fail: ukFail,
         new: ukNew
       },
-      message: `TR: Yargıtay: ${yargitayOk} (${yargitayNew} yeni) | Danıştay: ${danistayOk} (${danistayNew} yeni) | Anayasa: ${anayasaOk} (${anayasaNew} yeni) | KVKK: ${kvkkOk} (${kvkkNew} yeni) | TBMM: ${tbmmOk} (${tbmmNew} yeni) | MBS: ${mbsOk} (${mbsNew} yeni) | US: Congress.gov: ${congressOk} (${congressNew} yeni) | SCOTUS: ${scotusOk} (${scotusNew} yeni) | CourtListener: ${courtlistenerOk} (${courtlistenerNew} yeni) | OpenJurist: ${openjuristOk} (${openjuristNew} yeni) | GovInfo: ${govinfoOk} (${govinfoNew} yeni) | US Code: ${uscodeOk} (${uscodeNew} yeni) | Federal Register: ${federalregisterOk} (${federalregisterNew} yeni) | LOC: ${locOk} (${locNew} yeni) | State Laws: ${statelawsOk} (${statelawsNew} yeni) | UK: Legislation.gov.uk: ${ukOk} (${ukNew} yeni)`
+      uk_case: {
+        total: ukCaseOk + ukCaseFail,
+        ok: ukCaseOk,
+        fail: ukCaseFail,
+        new: ukCaseNew
+      },
+      german_legislation: {
+        total: germanLegislationOk + germanLegislationFail,
+        ok: germanLegislationOk,
+        fail: germanLegislationFail,
+        new: germanLegislationNew
+      },
+      german_case: {
+        total: germanCaseOk + germanCaseFail,
+        ok: germanCaseOk,
+        fail: germanCaseFail,
+        new: germanCaseNew
+      },
+      message: `TR: Yargıtay: ${yargitayOk} (${yargitayNew} yeni) | Danıştay: ${danistayOk} (${danistayNew} yeni) | Anayasa: ${anayasaOk} (${anayasaNew} yeni) | KVKK: ${kvkkOk} (${kvkkNew} yeni) | TBMM: ${tbmmOk} (${tbmmNew} yeni) | MBS: ${mbsOk} (${mbsNew} yeni) | US: Congress.gov: ${congressOk} (${congressNew} yeni) | SCOTUS: ${scotusOk} (${scotusNew} yeni) | CourtListener: ${courtlistenerOk} (${courtlistenerNew} yeni) | OpenJurist: ${openjuristOk} (${openjuristNew} yeni) | GovInfo: ${govinfoOk} (${govinfoNew} yeni) | US Code: ${uscodeOk} (${uscodeNew} yeni) | Federal Register: ${federalregisterOk} (${federalregisterNew} yeni) | LOC: ${locOk} (${locNew} yeni) | State Laws: ${statelawsOk} (${statelawsNew} yeni) | UK: Legislation.gov.uk: ${ukOk} (${ukNew} yeni) | UK Case Law: ${ukCaseOk} (${ukCaseNew} yeni) | DE: Gesetze im Internet: ${germanLegislationOk} (${germanLegislationNew} yeni) | DE Case Law: ${germanCaseOk} (${germanCaseNew} yeni)`
     };
   } catch (error: any) {
     console.error('Sync error:', error);

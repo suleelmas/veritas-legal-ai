@@ -137,6 +137,16 @@ export default function Home() {
   const [chatLoading, setChatLoading] = useState(false);
   const [pdfText, setPdfText] = useState('');
   const [riskScore, setRiskScore] = useState<number | null>(null);
+  const [jurisdictionConfirmation, setJurisdictionConfirmation] = useState<{
+    detected_country: string;
+    confidence: string;
+    cross_border: boolean;
+    secondary_countries?: string[];
+    scores: Array<{country: string; score: number; confidence: string; indicators: string[]}>;
+    show: boolean;
+  } | null>(null);
+  const [userSelectedCountry, setUserSelectedCountry] = useState<string | null>(null);
+  const [selectedCountryForAnalysis, setSelectedCountryForAnalysis] = useState<'TR' | 'US' | 'UK' | 'DE' | 'AUTO' | null>(null);
   const [selectedLegislation, setSelectedLegislation] = useState<{title: string, content: string} | null>(null);
   const [showLegislationModal, setShowLegislationModal] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -1163,12 +1173,31 @@ export default function Home() {
         },
         body: JSON.stringify({
           pdfText: fullText,
-          targetLang: targetLang
+          targetLang: targetLang,
+          userSelectedCountry: selectedCountryForAnalysis && selectedCountryForAnalysis !== 'AUTO' ? selectedCountryForAnalysis : userSelectedCountry
         })
       });
 
       const data = await res.json();
       let analysisResult = data.reply || data.error || 'Analysis complete';
+      
+      // Jurisdiction detection sonucunu kontrol et
+      if (data.jurisdiction && data.jurisdiction.needs_confirmation) {
+        // Kullanıcı onayı gerekiyor - state'e kaydet
+        setJurisdictionConfirmation({
+          detected_country: data.jurisdiction.detected_country,
+          confidence: data.jurisdiction.confidence,
+          cross_border: data.jurisdiction.cross_border,
+          secondary_countries: data.jurisdiction.secondary_countries,
+          scores: data.jurisdiction.scores,
+          show: true
+        });
+      }
+      
+      // Otomatik tespit edilen ülkeyi göster
+      if (data.jurisdiction && !selectedCountryForAnalysis) {
+        setSelectedCountryForAnalysis(data.jurisdiction.detected_country as 'TR' | 'US' | 'UK' | 'DE');
+      }
       
       // Hukuki kısaltmaları yerelleştir (İngilizce için)
       // testMode === false (Global) veya language === 'EN' durumunda yerelleştir
@@ -1180,9 +1209,19 @@ export default function Home() {
       setResult(analysisResult);
       setAnalysisStatus(''); // Status'u temizle
       
-      // Risk skorunu çıkar ve state'e kaydet
-      const extractedScore = extractRiskScore(analysisResult);
-      setRiskScore(extractedScore);
+      // API'den gelen risk_score ve legal_citations verilerini kullan
+      if (data.risk_score !== undefined) {
+        setRiskScore(data.risk_score);
+      } else {
+        // Fallback: Metinden çıkar
+        const extractedScore = extractRiskScore(analysisResult);
+        setRiskScore(extractedScore);
+      }
+      
+      // Legal citations
+      if (data.legal_citations && Array.isArray(data.legal_citations)) {
+        setLegalCitations(data.legal_citations);
+      }
       
       // Analiz sayısını artır ve Supabase'e kaydet
       const userId = user?.id;
@@ -1905,9 +1944,67 @@ export default function Home() {
                       </div>
                     )}
 
+                    {/* Ülke Seçim Butonları */}
+                    <div style={{
+                      display: 'flex',
+                      gap: '10px',
+                      marginTop: '20px',
+                      marginBottom: '15px',
+                      flexWrap: 'wrap',
+                      alignItems: 'center'
+                    }}>
+                      <span style={{ color: lightText, fontSize: '14px', fontWeight: '500' }}>
+                        {language === 'TR' ? 'Yargı Alanı:' : 'Jurisdiction:'}
+                      </span>
+                      {['TR', 'US', 'UK', 'DE', 'AUTO'].map(country => {
+                        const countryLabels: Record<string, string> = {
+                          'TR': language === 'TR' ? '🇹🇷 Türkiye' : '🇹🇷 Turkey',
+                          'US': language === 'TR' ? '🇺🇸 ABD' : '🇺🇸 United States',
+                          'UK': language === 'TR' ? '🇬🇧 İngiltere' : '🇬🇧 United Kingdom',
+                          'DE': language === 'TR' ? '🇩🇪 Almanya' : '🇩🇪 Germany',
+                          'AUTO': language === 'TR' ? '🔍 Otomatik' : '🔍 Auto'
+                        };
+                        const isSelected = selectedCountryForAnalysis === country || 
+                          (!selectedCountryForAnalysis && country === 'AUTO');
+                        return (
+                          <button
+                            key={country}
+                            onClick={() => setSelectedCountryForAnalysis(country as 'TR' | 'US' | 'UK' | 'DE' | 'AUTO')}
+                            disabled={loading || isAnalyzing}
+                            style={{
+                              padding: '8px 16px',
+                              background: isSelected ? gold : 'transparent',
+                              color: isSelected ? '#000000' : lightText,
+                              border: `2px solid ${isSelected ? gold : gold + '66'}`,
+                              borderRadius: '8px',
+                              cursor: (loading || isAnalyzing) ? 'not-allowed' : 'pointer',
+                              fontWeight: isSelected ? 'bold' : 'normal',
+                              fontSize: '13px',
+                              opacity: (loading || isAnalyzing) ? 0.5 : 1,
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!loading && !isAnalyzing && !isSelected) {
+                                e.currentTarget.style.borderColor = gold;
+                                e.currentTarget.style.opacity = '1';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!loading && !isAnalyzing && !isSelected) {
+                                e.currentTarget.style.borderColor = gold + '66';
+                                e.currentTarget.style.opacity = '1';
+                              }
+                            }}
+                          >
+                            {countryLabels[country]}
+                          </button>
+                        );
+                      })}
+                    </div>
+
                     <button 
                       onClick={handleAnalyze}
-                      disabled={!file || loading || isLimitReached()}
+                      disabled={!file || loading || isAnalyzing || isLimitReached()}
                       style={{ 
                         width: '100%', 
                         padding: '18px', 
@@ -1917,26 +2014,28 @@ export default function Home() {
                         border: 'none', 
                         marginTop: '30px', 
                         fontWeight: '900',
-                        cursor: (file && !loading && !isLimitReached()) ? 'pointer' : 'not-allowed',
-                        opacity: (file && !loading && !isLimitReached()) ? 1 : 0.6,
+                        cursor: (file && !loading && !isAnalyzing && !isLimitReached()) ? 'pointer' : 'not-allowed',
+                        opacity: (file && !loading && !isAnalyzing && !isLimitReached()) ? 1 : 0.6,
                         boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
                         transition: 'all 0.2s ease'
                       }}
                       onMouseEnter={(e) => {
-                        if (file && !loading && !isLimitReached()) {
+                        if (file && !loading && !isAnalyzing && !isLimitReached()) {
                           e.currentTarget.style.backgroundColor = '#f5f5f5';
                           e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
                         }
                       }}
                       onMouseLeave={(e) => {
-                        if (file && !loading && !isLimitReached()) {
+                        if (file && !loading && !isAnalyzing && !isLimitReached()) {
                           e.currentTarget.style.backgroundColor = '#ffffff';
                           e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
                         }
                       }}
                     >
-                      <span style={{ color: loading ? lightText : (isLimitReached() ? lightText : darkBlue) }}>
-                        {isLimitReached() ? (language === 'TR' ? 'Limit Doldu' : 'Limit Reached') : ui[language].btn}
+                      <span style={{ color: (loading || isAnalyzing) ? lightText : (isLimitReached() ? lightText : darkBlue) }}>
+                        {isAnalyzing ? (language === 'TR' ? '🔍 Analiz Ediliyor...' : '🔍 Analyzing...') : 
+                         isLimitReached() ? (language === 'TR' ? 'Limit Doldu' : 'Limit Reached') : 
+                         ui[language].btn}
                       </span>
                     </button>
                     
@@ -2241,7 +2340,90 @@ export default function Home() {
                         <span>{analysisStatus}</span>
                       </div>
                     )}
+                    {/* Jurisdiction Confirmation Modal */}
+                    {jurisdictionConfirmation && jurisdictionConfirmation.show && (
+                      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                        <div className="bg-black border border-[#c7b079] rounded-lg p-6 max-w-md w-full mx-4">
+                          <h3 className="text-xl font-bold text-[#c7b079] mb-4">
+                            {language === 'TR' ? 'Yargı Alanı Tespiti' : 'Jurisdiction Detection'}
+                          </h3>
+                          <p className="text-white mb-4">
+                            {language === 'TR' 
+                              ? `Bu belgenin ${jurisdictionConfirmation.detected_country === 'TR' ? 'Türkiye' : jurisdictionConfirmation.detected_country === 'DE' ? 'Almanya' : jurisdictionConfirmation.detected_country === 'UK' ? 'İngiltere' : 'ABD'} hukukuna ait olduğu tespit edildi.`
+                              : `This document has been detected as ${jurisdictionConfirmation.detected_country === 'TR' ? 'Turkey' : jurisdictionConfirmation.detected_country === 'DE' ? 'Germany' : jurisdictionConfirmation.detected_country === 'UK' ? 'United Kingdom' : 'United States'} law.`}
+                          </p>
+                          {jurisdictionConfirmation.cross_border && jurisdictionConfirmation.secondary_countries && (
+                            <p className="text-yellow-400 mb-4 text-sm">
+                              ⚠️ {language === 'TR' ? 'Çapraz sınır tespit edildi: ' : 'Cross-border detected: '}
+                              {jurisdictionConfirmation.secondary_countries.map(c => 
+                                c === 'TR' ? 'Türkiye' : c === 'DE' ? 'Almanya' : c === 'UK' ? 'İngiltere' : 'ABD'
+                              ).join(', ')}
+                            </p>
+                          )}
+                          <div className="flex gap-3">
+                            <button
+                              onClick={() => {
+                                setJurisdictionConfirmation(null);
+                                setUserSelectedCountry(jurisdictionConfirmation.detected_country);
+                              }}
+                              className="flex-1 bg-[#c7b079] text-black font-bold py-2 px-4 rounded hover:bg-[#b8a068] transition"
+                            >
+                              {language === 'TR' ? 'Onayla' : 'Confirm'}
+                            </button>
+                            <button
+                              onClick={() => {
+                                setJurisdictionConfirmation({...jurisdictionConfirmation, show: false});
+                              }}
+                              className="flex-1 bg-gray-700 text-white py-2 px-4 rounded hover:bg-gray-600 transition"
+                            >
+                              {language === 'TR' ? 'İptal' : 'Cancel'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     {result && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                          <div className="bg-black border border-[#c7b079] rounded-lg p-6 max-w-md w-full mx-4">
+                            <h3 className="text-xl font-bold text-[#c7b079] mb-4">
+                              {language === 'TR' ? 'Yargı Alanı Tespiti' : 'Jurisdiction Detection'}
+                            </h3>
+                            <p className="text-white mb-4">
+                              {language === 'TR' 
+                                ? `Bu belgenin ${jurisdictionConfirmation.detected_country === 'TR' ? 'Türkiye' : jurisdictionConfirmation.detected_country === 'DE' ? 'Almanya' : jurisdictionConfirmation.detected_country === 'UK' ? 'İngiltere' : 'ABD'} hukukuna ait olduğu tespit edildi.`
+                                : `This document has been detected as ${jurisdictionConfirmation.detected_country === 'TR' ? 'Turkey' : jurisdictionConfirmation.detected_country === 'DE' ? 'Germany' : jurisdictionConfirmation.detected_country === 'UK' ? 'United Kingdom' : 'United States'} law.`}
+                            </p>
+                            {jurisdictionConfirmation.cross_border && jurisdictionConfirmation.secondary_countries && (
+                              <p className="text-yellow-400 mb-4 text-sm">
+                                ⚠️ {language === 'TR' ? 'Çapraz sınır tespit edildi: ' : 'Cross-border detected: '}
+                                {jurisdictionConfirmation.secondary_countries.map(c => 
+                                  c === 'TR' ? 'Türkiye' : c === 'DE' ? 'Almanya' : c === 'UK' ? 'İngiltere' : 'ABD'
+                                ).join(', ')}
+                              </p>
+                            )}
+                            <div className="flex gap-3">
+                              <button
+                                onClick={() => {
+                                  setJurisdictionConfirmation(null);
+                                  setUserSelectedCountry(jurisdictionConfirmation.detected_country);
+                                }}
+                                className="flex-1 bg-[#c7b079] text-black font-bold py-2 px-4 rounded hover:bg-[#b8a068] transition"
+                              >
+                                {language === 'TR' ? 'Onayla' : 'Confirm'}
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setJurisdictionConfirmation({...jurisdictionConfirmation, show: false});
+                                }}
+                                className="flex-1 bg-gray-700 text-white py-2 px-4 rounded hover:bg-gray-600 transition"
+                              >
+                                {language === 'TR' ? 'İptal' : 'Cancel'}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
                       <AnalysisResult
                         result={result}
                         gold={gold}
@@ -2256,6 +2438,8 @@ export default function Home() {
                         extractRiskScore={extractRiskScore}
                         getRiskColor={getRiskColor}
                         getRiskLevel={getRiskLevel}
+                        riskScore={riskScore}
+                        legalCitations={legalCitations}
                         canViewDetailedAnalysis={canViewDetailedAnalysis}
                         canDownload={canDownload}
                         canAccessLegislationDetails={canAccessLegislationDetails}
