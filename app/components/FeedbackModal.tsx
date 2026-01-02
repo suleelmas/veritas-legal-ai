@@ -1,5 +1,6 @@
 "use client";
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { AlertCircle } from 'lucide-react';
 
 interface FeedbackModalProps {
   isOpen: boolean;
@@ -27,18 +28,59 @@ export default function FeedbackModal({
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      // Modal açıldığında body scroll'u dondur
+      document.body.style.overflow = 'hidden';
+      
+      if (modalRef.current) {
+        // Modal açıldığında arka planı zorla opak yap
+        modalRef.current.style.setProperty('background', '#000000', 'important');
+        modalRef.current.style.setProperty('background-color', '#000000', 'important');
+        modalRef.current.style.setProperty('opacity', '1', 'important');
+      }
+    } else {
+      // Modal kapandığında body scroll'u geri aç
+      document.body.style.overflow = 'unset';
+    }
+
+    // Cleanup: Component unmount olduğunda veya modal kapandığında
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && file.type.startsWith('image/')) {
+    if (file) {
+      // Dosya boyutu kontrolü (50MB)
+      const maxSize = 50 * 1024 * 1024; // 50MB
+      if (file.size > maxSize) {
+        alert(language === 'TR' 
+          ? `Dosya boyutu çok büyük. Maksimum 50MB olmalıdır. (Mevcut: ${(file.size / 1024 / 1024).toFixed(2)}MB)`
+          : `File size is too large. Maximum 50MB allowed. (Current: ${(file.size / 1024 / 1024).toFixed(2)}MB)`);
+        e.target.value = '';
+        return;
+      }
+      
+      // Herhangi bir dosya türünü kabul et (sadece resim değil)
       setScreenshot(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setScreenshotPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      
+      // Eğer resim ise preview göster
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setScreenshotPreview(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        // Resim değilse preview'i temizle
+        setScreenshotPreview(null);
+      }
     }
   };
 
@@ -56,8 +98,7 @@ export default function FeedbackModal({
     setLoading(true);
     try {
       await onSubmit(title, description, screenshot);
-      setSuccess(true);
-      // Form verilerini temizle ama modal'ı kapatma
+      // Form verilerini temizle
       setTitle('');
       setDescription('');
       setScreenshot(null);
@@ -65,6 +106,8 @@ export default function FeedbackModal({
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+      // Modal'ı kapat - başarı mesajı toast olarak gösterilecek
+      handleClose();
     } catch (error) {
       console.error('Feedback submission error:', error);
       alert(language === 'TR' ? 'Hata bildirimi gönderilirken bir sorun oluştu.' : 'An error occurred while submitting the bug report.');
@@ -93,7 +136,9 @@ export default function FeedbackModal({
         left: 0,
         right: 0,
         bottom: 0,
-        background: 'rgba(0, 0, 0, 0.7)',
+        background: 'rgba(0, 0, 0, 0.6)',
+        backdropFilter: 'blur(4px)',
+        WebkitBackdropFilter: 'blur(4px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -103,14 +148,25 @@ export default function FeedbackModal({
       onClick={onClose}
     >
       <div
+        ref={modalRef}
         style={{
-          background: darkBlue,
+          background: '#000000',
+          backgroundColor: '#000000',
+          opacity: 1,
           borderRadius: '15px',
           padding: '30px',
           maxWidth: '600px',
           width: '100%',
+          maxHeight: '90vh',
           border: `2px solid ${gold}`,
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)'
+          boxShadow: `0 8px 32px rgba(0, 0, 0, 0.9), 0 0 0 1px ${gold}44`,
+          position: 'relative',
+          backdropFilter: 'none',
+          WebkitBackdropFilter: 'none',
+          display: 'flex',
+          flexDirection: 'column',
+          overflowY: 'auto',
+          overflowX: 'hidden'
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -144,11 +200,11 @@ export default function FeedbackModal({
               </button>
             </div>
             <div style={{ 
-              padding: '20px', 
-              background: '#232d3c', 
+              padding: '24px', 
+              background: '#1a1a1a', 
               borderRadius: '12px',
-              border: `1px solid ${gold}44`,
-              marginBottom: '20px'
+              border: `2px solid ${gold}66`,
+              marginBottom: '24px'
             }}>
               <p style={{ 
                 color: lightText, 
@@ -219,37 +275,59 @@ export default function FeedbackModal({
           </div>
         ) : (
           <>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h2 style={{ color: gold, margin: 0, fontSize: '1.5rem' }}>
-                {language === 'TR' ? 'Hata Bildir' : 'Report Bug'}
-              </h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  background: `linear-gradient(135deg, ${gold}22, ${gold}11)`,
+                  border: `2px solid ${gold}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  <AlertCircle size={20} color={gold} strokeWidth={2.5} />
+                </div>
+                <h2 style={{ color: gold, margin: 0, fontSize: '1.5rem', fontWeight: 'bold' }}>
+                  {language === 'TR' ? 'Hata Bildir' : 'Report Bug'}
+                </h2>
+              </div>
               <button
                 onClick={handleClose}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              color: lightText,
-              fontSize: '24px',
-              cursor: 'pointer',
-              padding: '0',
-              width: '30px',
-              height: '30px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              opacity: 0.7,
-              transition: 'opacity 0.2s'
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
-            onMouseLeave={(e) => e.currentTarget.style.opacity = '0.7'}
-          >
-            ×
-          </button>
-        </div>
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: lightText,
+                  fontSize: '28px',
+                  cursor: 'pointer',
+                  padding: '0',
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: 0.7,
+                  transition: 'all 0.2s',
+                  borderRadius: '6px'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.opacity = '1';
+                  e.currentTarget.style.background = `${gold}22`;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.opacity = '0.7';
+                  e.currentTarget.style.background = 'transparent';
+                }}
+              >
+                ×
+              </button>
+            </div>
 
-        <form onSubmit={handleSubmit}>
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', color: lightText, marginBottom: '8px', fontWeight: '500' }}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: '1', minHeight: 0 }}>
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', color: lightText, marginBottom: '10px', fontWeight: '600', fontSize: '14px' }}>
               {language === 'TR' ? 'Hata Başlığı *' : 'Bug Title *'}
             </label>
             <input
@@ -260,18 +338,28 @@ export default function FeedbackModal({
               required
               style={{
                 width: '100%',
-                padding: '12px',
-                background: '#232d3c',
-                border: `1px solid ${gold}44`,
-                borderRadius: '8px',
+                padding: '14px',
+                background: '#1a1a1a',
+                border: `2px solid ${gold}66`,
+                borderRadius: '10px',
                 color: lightText,
-                fontSize: '14px',
-                fontFamily: 'inherit'
+                fontSize: '15px',
+                fontFamily: 'inherit',
+                transition: 'all 0.2s',
+                boxSizing: 'border-box'
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = gold;
+                e.currentTarget.style.boxShadow = `0 0 0 3px ${gold}22`;
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = `${gold}66`;
+                e.currentTarget.style.boxShadow = 'none';
               }}
             />
           </div>
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', color: lightText, marginBottom: '8px', fontWeight: '500' }}>
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', color: lightText, marginBottom: '10px', fontWeight: '600', fontSize: '14px' }}>
               {language === 'TR' ? 'Hata Açıklaması *' : 'Bug Description *'}
             </label>
             <textarea
@@ -281,51 +369,84 @@ export default function FeedbackModal({
               required
               style={{
                 width: '100%',
-                minHeight: '120px',
-                padding: '12px',
-                background: '#232d3c',
-                border: `1px solid ${gold}44`,
-                borderRadius: '8px',
+                minHeight: '140px',
+                padding: '14px',
+                background: '#1a1a1a',
+                border: `2px solid ${gold}66`,
+                borderRadius: '10px',
                 color: lightText,
-                fontSize: '14px',
+                fontSize: '15px',
                 fontFamily: 'inherit',
-                resize: 'vertical'
+                resize: 'vertical',
+                transition: 'all 0.2s',
+                boxSizing: 'border-box'
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = gold;
+                e.currentTarget.style.boxShadow = `0 0 0 3px ${gold}22`;
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = `${gold}66`;
+                e.currentTarget.style.boxShadow = 'none';
               }}
             />
           </div>
 
-          <div style={{ marginBottom: '25px' }}>
-            <label style={{ display: 'block', color: lightText, marginBottom: '8px', fontWeight: '500' }}>
-              {language === 'TR' ? 'Ekran Görüntüsü (Opsiyonel)' : 'Screenshot (Optional)'}
+          <div style={{ marginBottom: '16px' }}>
+            <label style={{ display: 'block', color: lightText, marginBottom: '10px', fontWeight: '600', fontSize: '14px' }}>
+              {language === 'TR' ? 'Dosya Eki (Opsiyonel - Maks. 50MB)' : 'File Attachment (Optional - Max 50MB)'}
             </label>
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="*/*"
               onChange={handleFileChange}
               style={{
                 width: '100%',
-                padding: '10px',
-                background: '#232d3c',
-                border: `1px solid ${gold}44`,
-                borderRadius: '8px',
+                padding: '12px',
+                background: '#1a1a1a',
+                border: `2px solid ${gold}44`,
+                borderRadius: '10px',
                 color: lightText,
                 fontSize: '14px',
-                cursor: 'pointer'
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                boxSizing: 'border-box'
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = gold;
+                e.currentTarget.style.boxShadow = `0 0 0 3px ${gold}22`;
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = `${gold}44`;
+                e.currentTarget.style.boxShadow = 'none';
               }}
             />
-            {screenshotPreview && (
+            {screenshot && (
               <div style={{ marginTop: '12px' }}>
-                <img
-                  src={screenshotPreview}
-                  alt="Preview"
-                  style={{
-                    maxWidth: '100%',
-                    maxHeight: '200px',
+                {screenshotPreview ? (
+                  <img
+                    src={screenshotPreview}
+                    alt="Preview"
+                    style={{
+                      maxWidth: '100%',
+                      maxHeight: '200px',
+                      borderRadius: '8px',
+                      border: `1px solid ${gold}44`
+                    }}
+                  />
+                ) : (
+                  <div style={{
+                    padding: '12px',
+                    background: '#1a1a1a',
                     borderRadius: '8px',
-                    border: `1px solid ${gold}44`
-                  }}
-                />
+                    border: `1px solid ${gold}44`,
+                    color: lightText,
+                    fontSize: '14px'
+                  }}>
+                    📎 {screenshot.name} ({(screenshot.size / 1024 / 1024).toFixed(2)} MB)
+                  </div>
+                )}
                 <button
                   type="button"
                   onClick={() => {
@@ -351,19 +472,19 @@ export default function FeedbackModal({
             )}
           </div>
 
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end', marginTop: '20px', flexShrink: 0 }}>
             <button
               type="button"
               onClick={onClose}
               style={{
-                padding: '10px 20px',
+                padding: '12px 24px',
                 background: 'transparent',
-                border: `1px solid ${gold}44`,
-                borderRadius: '8px',
+                border: `2px solid ${gold}44`,
+                borderRadius: '10px',
                 color: lightText,
                 cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: '500',
+                fontSize: '15px',
+                fontWeight: '600',
                 transition: 'all 0.2s'
               }}
               onMouseEnter={(e) => {
@@ -381,33 +502,40 @@ export default function FeedbackModal({
               type="submit"
               disabled={loading}
               style={{
-                padding: '10px 20px',
+                padding: '14px 32px',
                 background: gold,
                 border: 'none',
-                borderRadius: '8px',
-                color: darkBlue,
+                borderRadius: '10px',
+                color: lightText,
                 cursor: loading ? 'not-allowed' : 'pointer',
-                fontSize: '14px',
-                fontWeight: '700',
-                transition: 'all 0.2s',
-                opacity: loading ? 0.6 : 1
+                fontSize: '16px',
+                fontWeight: 'bold',
+                transition: 'all 0.3s',
+                opacity: loading ? 0.6 : 1,
+                boxShadow: `0 4px 20px ${gold}44`,
+                position: 'relative',
+                overflow: 'hidden'
               }}
               onMouseEnter={(e) => {
                 if (!loading) {
                   e.currentTarget.style.background = '#d4c08a';
-                  e.currentTarget.style.transform = 'scale(1.05)';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = `0 6px 25px ${gold}66`;
                 }
               }}
               onMouseLeave={(e) => {
                 if (!loading) {
                   e.currentTarget.style.background = gold;
-                  e.currentTarget.style.transform = 'scale(1)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = `0 4px 20px ${gold}44`;
                 }
               }}
             >
               {loading 
-                ? (language === 'TR' ? 'Gönderiliyor...' : 'Submitting...')
-                : (language === 'TR' ? 'Gönder' : 'Submit')
+                ? (language === 'TR' 
+                    ? (screenshot ? 'Dosya Yükleniyor...' : 'Gönderiliyor...')
+                    : (screenshot ? 'Uploading File...' : 'Submitting...'))
+                : (language === 'TR' ? 'Gönder' : 'Send')
               }
             </button>
           </div>

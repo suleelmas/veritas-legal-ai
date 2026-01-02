@@ -14,8 +14,9 @@ export default function AuthCallbackPage() {
         new URL(window.location.href).searchParams.get('code') || ''
       );
       
-      // Zorla ana sayfaya gönder ve çerezleri yenilet
-      window.location.assign('/');
+      // Dinamik olarak ana sayfaya gönder (base URL kullanarak)
+      const baseUrl = window.location.origin;
+      window.location.assign(`${baseUrl}/`);
     };
 
     handleCallback();

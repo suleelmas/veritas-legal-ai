@@ -255,7 +255,7 @@ export default function Home() {
 
   const ui: any = {
     TR: { 
-      title: "VERITAS Q-AI", 
+      title: "Veritas Q-AI", 
       sub: "YÜKSEK HUKUK ANALİTİĞİ", 
       aboutBtn: "Veritas Q-AI Nedir?", 
       aboutTitle: "Hukukun Geleceği: Veritas Q-AI ile Tanışın",
@@ -299,7 +299,7 @@ export default function Home() {
       closeGuide: "Kapat"
     },
     EN: { 
-      title: "VERITAS Q-AI", 
+      title: "Veritas Q-AI", 
       sub: "SUPREME LEGAL ANALYTICS", 
       aboutBtn: "What is Veritas Q-AI?", 
       aboutTitle: "The Future of Law: Meet Veritas Q-AI",
@@ -1013,6 +1013,17 @@ export default function Home() {
   };
 
   useEffect(() => {
+    // Buton stilini zorla uygula
+    const button = document.getElementById('selectFileButton');
+    if (button) {
+      button.style.setProperty('background-color', '#ffffff', 'important');
+      button.style.setProperty('background', '#ffffff', 'important');
+      button.style.setProperty('color', '#000000', 'important');
+      button.style.setProperty('border-color', '#ffffff', 'important');
+    }
+  }, []);
+
+  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
       if (languageMenuOpen && !target.closest('[data-language-menu]')) {
@@ -1057,9 +1068,14 @@ export default function Home() {
   }, [loading, language]);
 
   const handleAuth = async () => {
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+    const redirectUrl = `${baseUrl}/auth/callback`;
+    
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/auth/callback` }
+      options: { 
+        redirectTo: redirectUrl
+      }
     });
   };
 
@@ -1400,27 +1416,52 @@ export default function Home() {
     }
   };
 
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+
+  const showToastNotification = (message: string) => {
+    setToastMessage(message);
+    setShowToast(true);
+    setTimeout(() => {
+      setShowToast(false);
+    }, 4000);
+  };
+
   const handleFeedbackSubmit = async (title: string, description: string, screenshot: File | null) => {
     try {
+      // FormData oluştur
       const formData = new FormData();
       formData.append('title', title);
       formData.append('description', description);
-      formData.append('user_id', user?.id || 'anonymous');
-      formData.append('user_email', user?.email || 'anonymous');
+      formData.append('email', user?.email || 'Anonim');
+      
+      // Dosya varsa ekle
       if (screenshot) {
-        formData.append('screenshot', screenshot);
+        formData.append('file', screenshot);
       }
 
-      const response = await fetch('/api/feedback', {
+      // Telegram API'ye gönder
+      const response = await fetch('/api/report-bug', {
         method: 'POST',
         body: formData
       });
 
+      const result = await response.json();
+
       if (!response.ok) {
-        throw new Error('Failed to submit feedback');
+        throw new Error(result.error || 'Failed to submit bug report');
       }
-    } catch (error) {
+
+      // Başarılı gönderim sonrası toast göster
+      showToastNotification(language === 'TR' 
+        ? 'Raporunuz Kuantum Hattı Üzerinden İletildi ⚛️' 
+        : 'Your report has been sent via Quantum Channel ⚛️');
+    } catch (error: any) {
       console.error('Feedback submission error:', error);
+      // Hata mesajını kullanıcıya göster
+      alert(error.message || (language === 'TR' 
+        ? 'Hata bildirimi gönderilirken bir sorun oluştu.' 
+        : 'An error occurred while submitting the bug report.'));
       throw error;
     }
   };
@@ -1639,6 +1680,7 @@ export default function Home() {
                       onChange={(e) => setFile(e.target.files?.[0] || null)} 
                     />
                     <button
+                      id="selectFileButton"
                       onClick={() => document.getElementById('pdfInputFinal')?.click()} 
                       style={{ 
                         backgroundColor: '#ffffff',
@@ -1647,7 +1689,7 @@ export default function Home() {
                         borderRadius: '50px', 
                         padding: '15px 40px', 
                         fontWeight: 'bold',
-                        border: `2px solid #ffffff`,
+                        border: '2px solid #ffffff',
                         cursor: 'pointer',
                         marginBottom: '20px',
                         display: 'flex',
@@ -1655,21 +1697,23 @@ export default function Home() {
                         justifyContent: 'center',
                         width: 'fit-content',
                         margin: '0 auto 20px auto',
-                        boxShadow: `0 4px 20px rgba(255, 255, 255, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.2)`,
+                        boxShadow: '0 4px 20px rgba(255, 255, 255, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.2)',
                         transition: 'all 0.3s ease',
                         fontSize: '16px'
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.setProperty('background-color', '#f5f5f5', 'important');
                         e.currentTarget.style.setProperty('background', '#f5f5f5', 'important');
+                        e.currentTarget.style.setProperty('color', '#000000', 'important');
                         e.currentTarget.style.transform = 'translateY(-2px)';
-                        e.currentTarget.style.boxShadow = `0 6px 25px rgba(255, 255, 255, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.4)`;
+                        e.currentTarget.style.boxShadow = '0 6px 25px rgba(255, 255, 255, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.4)';
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.setProperty('background-color', '#ffffff', 'important');
                         e.currentTarget.style.setProperty('background', '#ffffff', 'important');
+                        e.currentTarget.style.setProperty('color', '#000000', 'important');
                         e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = `0 4px 20px rgba(255, 255, 255, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.2)`;
+                        e.currentTarget.style.boxShadow = '0 4px 20px rgba(255, 255, 255, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.2)';
                       }}
                     >
                       <span style={{ color: '#000000', fontWeight: 'bold' }}>{ui[language].selectFileForAnalysis || 'Analiz İçin Dosya Seçin'}</span>
@@ -2433,13 +2477,51 @@ export default function Home() {
 
       <FeedbackModal
         isOpen={showFeedbackModal}
-        onClose={() => setShowFeedbackModal(false)}
-        onSubmit={handleFeedbackSubmit}
+        onClose={() => {
+          setShowFeedbackModal(false);
+        }}
+        onSubmit={async (title, description, screenshot) => {
+          await handleFeedbackSubmit(title, description, screenshot);
+          setShowFeedbackModal(false);
+        }}
         language={language}
         gold={gold}
         darkBlue={darkBlue}
         lightText={lightText}
       />
+
+      {/* Toast Notification */}
+      {showToast && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '30px',
+            right: '30px',
+            background: '#000000',
+            border: `2px solid ${gold}`,
+            borderRadius: '12px',
+            padding: '20px 30px',
+            boxShadow: `0 8px 32px rgba(0, 0, 0, 0.8), 0 0 0 1px ${gold}44`,
+            zIndex: 10001,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            animation: 'slideInRight 0.3s ease-out',
+            maxWidth: '400px'
+          }}
+        >
+          <span style={{ fontSize: '24px' }}>⚛️</span>
+          <p style={{ 
+            color: gold, 
+            margin: 0, 
+            fontSize: '16px', 
+            fontWeight: '600',
+            lineHeight: '1.4'
+          }}>
+            {toastMessage}
+          </p>
+        </div>
+      )}
 
       {/* Test Mode Region Switch Button */}
       <button

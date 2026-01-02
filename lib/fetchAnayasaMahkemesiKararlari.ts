@@ -46,14 +46,76 @@ export async function fetchAnayasaMahkemesiKararlari(): Promise<Array<{ title: s
       }
     }
 
-    // Son 20 kararı al
-    titles.slice(0, 20).forEach((title, idx) => {
-      decisions.push({
-        title: `Anayasa Mahkemesi: ${title}`,
-        content: title, // Gerçek implementasyonda karar içeriği de çekilmeli
-        date: dates[idx] || new Date().toISOString().split('T')[0]
-      });
-    });
+    // Her karar linkinden tam metni çek
+    let linkCount = 0;
+    for (const link of links.slice(0, 20)) {
+      if (linkCount >= 20) break;
+      
+      try {
+        const detailResponse = await fetch(link, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          }
+        });
+        
+        if (detailResponse.ok) {
+          const detailHtml = await detailResponse.text();
+          
+          // Karar metnini çek
+          const contentMatches = [
+            detailHtml.match(/<main[^>]*>([\s\S]*?)<\/main>/i),
+            detailHtml.match(/<article[^>]*>([\s\S]*?)<\/article>/i),
+            detailHtml.match(/<div[^>]*class=["'][^"']*content[^"']*["'][^>]*>([\s\S]*?)<\/div>/i),
+            detailHtml.match(/<div[^>]*id=["'][^"']*karar[^"']*["'][^>]*>([\s\S]*?)<\/div>/i),
+            detailHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i)
+          ].filter(m => m !== null);
+          
+          let fullContent = '';
+          if (contentMatches.length > 0) {
+            fullContent = contentMatches[0]![1];
+            fullContent = fullContent
+              .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+              .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+              .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '')
+              .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '')
+              .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '')
+              .replace(/<[^>]+>/g, ' ')
+              .replace(/\s+/g, ' ')
+              .trim();
+            
+            if (fullContent.length < 300) {
+              fullContent = detailHtml
+                .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+                .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+                .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '')
+                .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '')
+                .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '')
+                .replace(/<[^>]+>/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+            }
+          }
+          
+          const title = titles[linkCount] || `Anayasa Mahkemesi Kararı ${linkCount + 1}`;
+          decisions.push({
+            title: `Anayasa Mahkemesi: ${title}`,
+            content: fullContent || title,
+            date: dates[linkCount] || new Date().toISOString().split('T')[0]
+          });
+          
+          linkCount++;
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      } catch (detailErr) {
+        const title = titles[linkCount] || `Anayasa Mahkemesi Kararı ${linkCount + 1}`;
+        decisions.push({
+          title: `Anayasa Mahkemesi: ${title}`,
+          content: title,
+          date: dates[linkCount] || new Date().toISOString().split('T')[0]
+        });
+        linkCount++;
+      }
+    }
 
     return decisions;
   } catch (err) {

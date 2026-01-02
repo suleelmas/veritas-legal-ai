@@ -27,3 +27,33 @@ html, body, main, #__next, [data-radix-popper-content-wrapper] {
   background-color: #182332 !important;
   color: white !important;
 }
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Modal scrollbar styling */
+div[style*="overflowY"]::-webkit-scrollbar {
+  width: 8px;
+}
+
+div[style*="overflowY"]::-webkit-scrollbar-track {
+  background: #1a1a1a;
+  border-radius: 4px;
+}
+
+div[style*="overflowY"]::-webkit-scrollbar-thumb {
+  background: #c7b079;
+  border-radius: 4px;
+}
+
+div[style*="overflowY"]::-webkit-scrollbar-thumb:hover {
+  background: #d4c08a;
+}

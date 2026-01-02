@@ -2,10 +2,16 @@ import { fetchYargitayKararlari } from '@/lib/fetchYargitayKararlari';
 import { fetchDanistayKararlari } from '@/lib/fetchDanistayKararlari';
 import { fetchAnayasaMahkemesiKararlari } from '@/lib/fetchAnayasaMahkemesiKararlari';
 import { fetchKVKKKararlari } from '@/lib/fetchKVKKKararlari';
+import { fetchTBMM } from '@/lib/fetchTBMM';
+import { fetchMBS } from '@/lib/fetchMBS';
 import { fetchCongressGov } from '@/lib/fetchCongressGov';
 import { fetchSCOTUS } from '@/lib/fetchSCOTUS';
 import { fetchCourtListener } from '@/lib/fetchCourtListener';
 import { fetchOpenJurist } from '@/lib/fetchOpenJurist';
+import { fetchGovInfo, fetchUSCode, fetchFederalRegister } from '@/lib/fetchGovInfo';
+import { fetchLibraryOfCongress } from '@/lib/fetchLibraryOfCongress';
+import { fetchStateLaws } from '@/lib/fetchStateLaws';
+import { fetchUKLegislation } from '@/lib/fetchUKLegislation';
 import { upsertDocument } from '@/lib/upsertDocument';
 import { createClient } from '@/utils/supabase/server';
 
@@ -19,6 +25,8 @@ async function syncCourtDecisions() {
     let danistayOk = 0, danistayFail = 0, danistayNew = 0;
     let anayasaOk = 0, anayasaFail = 0, anayasaNew = 0;
     let kvkkOk = 0, kvkkFail = 0, kvkkNew = 0;
+    let tbmmOk = 0, tbmmFail = 0, tbmmNew = 0;
+    let mbsOk = 0, mbsFail = 0, mbsNew = 0;
     let congressOk = 0, congressFail = 0, congressNew = 0;
     let scotusOk = 0, scotusFail = 0, scotusNew = 0;
     let courtlistenerOk = 0, courtlistenerFail = 0, courtlistenerNew = 0;
@@ -160,6 +168,74 @@ async function syncCourtDecisions() {
       console.error('KVKK fetch hatası:', err);
     }
 
+    // TBMM kanun ve tasarılarını çek ve kaydet
+    try {
+      const tbmmLaws = await fetchTBMM();
+      for (const law of tbmmLaws) {
+        try {
+          const content = `${law.title}${law.content ? '\n' + law.content : ''}`;
+          
+          // Daha önce kaydedilmiş mi kontrol et
+          const { data: existing } = await supabase
+            .from('documents')
+            .select('id')
+            .eq('content', content)
+            .eq('metadata->>source', 'tbmm')
+            .maybeSingle();
+
+          if (!existing) {
+            await upsertDocument(content, {
+              source: 'tbmm',
+              date: law.date || new Date().toISOString().split('T')[0],
+              updated: new Date().toISOString(),
+              type: law.title.includes('Tasarı') ? 'tasarı' : 'kanun'
+            }, supabase);
+            tbmmNew++;
+          }
+          tbmmOk++;
+        } catch (err) {
+          console.error('TBMM kanun/tasarı kayıt hatası:', err);
+          tbmmFail++;
+        }
+      }
+    } catch (err) {
+      console.error('TBMM fetch hatası:', err);
+    }
+
+    // MBS (Mevzuat Bilgi Sistemi) mevzuatlarını çek ve kaydet
+    try {
+      const mbsRegulations = await fetchMBS();
+      for (const regulation of mbsRegulations) {
+        try {
+          const content = `${regulation.title}${regulation.content ? '\n' + regulation.content : ''}`;
+          
+          // Daha önce kaydedilmiş mi kontrol et
+          const { data: existing } = await supabase
+            .from('documents')
+            .select('id')
+            .eq('content', content)
+            .eq('metadata->>source', 'mbs')
+            .maybeSingle();
+
+          if (!existing) {
+            await upsertDocument(content, {
+              source: 'mbs',
+              date: regulation.date || new Date().toISOString().split('T')[0],
+              updated: new Date().toISOString(),
+              type: 'mevzuat'
+            }, supabase);
+            mbsNew++;
+          }
+          mbsOk++;
+        } catch (err) {
+          console.error('MBS mevzuat kayıt hatası:', err);
+          mbsFail++;
+        }
+      }
+    } catch (err) {
+      console.error('MBS fetch hatası:', err);
+    }
+
     // Congress.gov federal mevzuatını çek ve kaydet
     try {
       const congressBills = await fetchCongressGov();
@@ -181,7 +257,8 @@ async function syncCourtDecisions() {
               date: bill.date || new Date().toISOString().split('T')[0],
               updated: new Date().toISOString(),
               type: 'federal_legislation',
-              country: 'US'
+              country: 'US',
+              level: 'Federal'
             }, supabase);
             congressNew++;
           }
@@ -216,7 +293,9 @@ async function syncCourtDecisions() {
               date: decision.date || new Date().toISOString().split('T')[0],
               updated: new Date().toISOString(),
               type: 'supreme_court_decision',
-              country: 'US'
+              country: 'US',
+              level: 'Federal',
+              court: 'U.S. Supreme Court'
             }, supabase);
             scotusNew++;
           }
@@ -251,7 +330,8 @@ async function syncCourtDecisions() {
               date: decision.date || new Date().toISOString().split('T')[0],
               updated: new Date().toISOString(),
               type: 'court_decision',
-              country: 'US'
+              country: 'US',
+              level: 'Federal' // CourtListener genelde federal mahkemeler
             }, supabase);
             courtlistenerNew++;
           }
@@ -286,7 +366,8 @@ async function syncCourtDecisions() {
               date: decision.date || new Date().toISOString().split('T')[0],
               updated: new Date().toISOString(),
               type: 'court_decision',
-              country: 'US'
+              country: 'US',
+              level: 'Federal' // OpenJurist genelde federal mahkemeler
             }, supabase);
             openjuristNew++;
           }
@@ -298,6 +379,208 @@ async function syncCourtDecisions() {
       }
     } catch (err) {
       console.error('OpenJurist fetch hatası:', err);
+    }
+
+    // GovInfo - Bills
+    try {
+      const govinfoBills = await fetchGovInfo('bills');
+      for (const bill of govinfoBills) {
+        try {
+          const content = `${bill.title}${bill.content ? '\n' + bill.content : ''}`;
+          const { data: existing } = await supabase
+            .from('documents')
+            .select('id')
+            .eq('content', content)
+            .eq('metadata->>source', 'govinfo')
+            .maybeSingle();
+          if (!existing) {
+            await upsertDocument(content, {
+              source: 'govinfo',
+              date: bill.date || new Date().toISOString().split('T')[0],
+              updated: new Date().toISOString(),
+              type: 'federal_legislation',
+              country: 'US',
+              level: 'Federal'
+            }, supabase);
+            govinfoNew++;
+          }
+          govinfoOk++;
+        } catch (err) {
+          console.error('GovInfo bill kayıt hatası:', err);
+          govinfoFail++;
+        }
+      }
+    } catch (err) {
+      console.error('GovInfo fetch hatası:', err);
+    }
+
+    // US Code
+    try {
+      const usCodeDocs = await fetchUSCode();
+      for (const doc of usCodeDocs) {
+        try {
+          const content = `${doc.title}${doc.content ? '\n' + doc.content : ''}`;
+          const { data: existing } = await supabase
+            .from('documents')
+            .select('id')
+            .eq('content', content)
+            .eq('metadata->>source', 'uscode')
+            .maybeSingle();
+          if (!existing) {
+            await upsertDocument(content, {
+              source: 'uscode',
+              date: doc.date || new Date().toISOString().split('T')[0],
+              updated: new Date().toISOString(),
+              type: 'federal_code',
+              country: 'US',
+              level: 'Federal'
+            }, supabase);
+            uscodeNew++;
+          }
+          uscodeOk++;
+        } catch (err) {
+          console.error('US Code kayıt hatası:', err);
+          uscodeFail++;
+        }
+      }
+    } catch (err) {
+      console.error('US Code fetch hatası:', err);
+    }
+
+    // Federal Register
+    try {
+      const frDocs = await fetchFederalRegister();
+      for (const doc of frDocs) {
+        try {
+          const content = `${doc.title}${doc.content ? '\n' + doc.content : ''}`;
+          const { data: existing } = await supabase
+            .from('documents')
+            .select('id')
+            .eq('content', content)
+            .eq('metadata->>source', 'federalregister')
+            .maybeSingle();
+          if (!existing) {
+            await upsertDocument(content, {
+              source: 'federalregister',
+              date: doc.date || new Date().toISOString().split('T')[0],
+              updated: new Date().toISOString(),
+              type: 'federal_register',
+              country: 'US',
+              level: 'Federal'
+            }, supabase);
+            federalregisterNew++;
+          }
+          federalregisterOk++;
+        } catch (err) {
+          console.error('Federal Register kayıt hatası:', err);
+          federalregisterFail++;
+        }
+      }
+    } catch (err) {
+      console.error('Federal Register fetch hatası:', err);
+    }
+
+    // Library of Congress
+    try {
+      const locDocs = await fetchLibraryOfCongress();
+      for (const doc of locDocs) {
+        try {
+          const content = `${doc.title}${doc.content ? '\n' + doc.content : ''}`;
+          const { data: existing } = await supabase
+            .from('documents')
+            .select('id')
+            .eq('content', content)
+            .eq('metadata->>source', 'loc')
+            .maybeSingle();
+          if (!existing) {
+            await upsertDocument(content, {
+              source: 'loc',
+              date: doc.date || new Date().toISOString().split('T')[0],
+              updated: new Date().toISOString(),
+              type: 'federal_legislation',
+              country: 'US',
+              level: 'Federal'
+            }, supabase);
+            locNew++;
+          }
+          locOk++;
+        } catch (err) {
+          console.error('LOC kayıt hatası:', err);
+          locFail++;
+        }
+      }
+    } catch (err) {
+      console.error('LOC fetch hatası:', err);
+    }
+
+    // State Laws (NY, CA, DE)
+    try {
+      const stateLaws = await fetchStateLaws(['ny', 'ca', 'de']);
+      for (const law of stateLaws) {
+        try {
+          const content = `${law.title}${law.content ? '\n' + law.content : ''}`;
+          const state = law.title.includes('NY') ? 'ny' : law.title.includes('CA') ? 'ca' : 'de';
+          const { data: existing } = await supabase
+            .from('documents')
+            .select('id')
+            .eq('content', content)
+            .eq('metadata->>source', state)
+            .maybeSingle();
+          if (!existing) {
+            await upsertDocument(content, {
+              source: state,
+              date: law.date || new Date().toISOString().split('T')[0],
+              updated: new Date().toISOString(),
+              type: 'state_legislation',
+              country: 'US',
+              state: state.toUpperCase(), // 'NY', 'CA', 'DE'
+              level: 'State' // Eyalet seviyesi
+            }, supabase);
+            statelawsNew++;
+          }
+          statelawsOk++;
+        } catch (err) {
+          console.error('State law kayıt hatası:', err);
+          statelawsFail++;
+        }
+      }
+    } catch (err) {
+      console.error('State laws fetch hatası:', err);
+    }
+
+    // UK Legislation (legislation.gov.uk)
+    try {
+      const ukLegislation = await fetchUKLegislation(20);
+      for (const item of ukLegislation) {
+        try {
+          const content = `${item.title}${item.content ? '\n' + item.content : ''}`;
+          
+          const { data: existing } = await supabase
+            .from('documents')
+            .select('id')
+            .eq('content', content)
+            .eq('metadata->>source', 'uk')
+            .maybeSingle();
+          
+          if (!existing) {
+            await upsertDocument(content, {
+              source: 'uk',
+              date: item.date || new Date().toISOString().split('T')[0],
+              updated: new Date().toISOString(),
+              type: item.title.includes('SI') ? 'statutory_instrument' : 'act',
+              country: 'UK',
+              level: 'National' // UK national legislation
+            }, supabase);
+            ukNew++;
+          }
+          ukOk++;
+        } catch (err) {
+          console.error('UK legislation kayıt hatası:', err);
+          ukFail++;
+        }
+      }
+    } catch (err) {
+      console.error('UK legislation fetch hatası:', err);
     }
 
     return {
@@ -350,7 +633,43 @@ async function syncCourtDecisions() {
         fail: openjuristFail,
         new: openjuristNew
       },
-      message: `Yargıtay: ${yargitayOk} başarılı (${yargitayNew} yeni), ${yargitayFail} hatalı | Danıştay: ${danistayOk} başarılı (${danistayNew} yeni), ${danistayFail} hatalı | Anayasa: ${anayasaOk} başarılı (${anayasaNew} yeni), ${anayasaFail} hatalı | KVKK: ${kvkkOk} başarılı (${kvkkNew} yeni), ${kvkkFail} hatalı | Congress.gov: ${congressOk} başarılı (${congressNew} yeni), ${congressFail} hatalı | SCOTUS: ${scotusOk} başarılı (${scotusNew} yeni), ${scotusFail} hatalı | CourtListener: ${courtlistenerOk} başarılı (${courtlistenerNew} yeni), ${courtlistenerFail} hatalı | OpenJurist: ${openjuristOk} başarılı (${openjuristNew} yeni), ${openjuristFail} hatalı`
+      govinfo: {
+        total: govinfoOk + govinfoFail,
+        ok: govinfoOk,
+        fail: govinfoFail,
+        new: govinfoNew
+      },
+      uscode: {
+        total: uscodeOk + uscodeFail,
+        ok: uscodeOk,
+        fail: uscodeFail,
+        new: uscodeNew
+      },
+      federalregister: {
+        total: federalregisterOk + federalregisterFail,
+        ok: federalregisterOk,
+        fail: federalregisterFail,
+        new: federalregisterNew
+      },
+      loc: {
+        total: locOk + locFail,
+        ok: locOk,
+        fail: locFail,
+        new: locNew
+      },
+      statelaws: {
+        total: statelawsOk + statelawsFail,
+        ok: statelawsOk,
+        fail: statelawsFail,
+        new: statelawsNew
+      },
+      uk: {
+        total: ukOk + ukFail,
+        ok: ukOk,
+        fail: ukFail,
+        new: ukNew
+      },
+      message: `TR: Yargıtay: ${yargitayOk} (${yargitayNew} yeni) | Danıştay: ${danistayOk} (${danistayNew} yeni) | Anayasa: ${anayasaOk} (${anayasaNew} yeni) | KVKK: ${kvkkOk} (${kvkkNew} yeni) | TBMM: ${tbmmOk} (${tbmmNew} yeni) | MBS: ${mbsOk} (${mbsNew} yeni) | US: Congress.gov: ${congressOk} (${congressNew} yeni) | SCOTUS: ${scotusOk} (${scotusNew} yeni) | CourtListener: ${courtlistenerOk} (${courtlistenerNew} yeni) | OpenJurist: ${openjuristOk} (${openjuristNew} yeni) | GovInfo: ${govinfoOk} (${govinfoNew} yeni) | US Code: ${uscodeOk} (${uscodeNew} yeni) | Federal Register: ${federalregisterOk} (${federalregisterNew} yeni) | LOC: ${locOk} (${locNew} yeni) | State Laws: ${statelawsOk} (${statelawsNew} yeni) | UK: Legislation.gov.uk: ${ukOk} (${ukNew} yeni)`
     };
   } catch (error: any) {
     console.error('Sync error:', error);
