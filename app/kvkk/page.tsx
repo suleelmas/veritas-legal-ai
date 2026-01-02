@@ -5,9 +5,9 @@ const KVKK_TR = (
   <div style={{maxWidth:750,margin:'60px auto',background:'#171c2d',borderRadius:22,padding:36,color:'#ffe18d',boxShadow:'0 10px 30px #0007'}}>
     <h1 style={{fontWeight:800,fontSize:'2.1rem',marginBottom:18}}>KVKK Aydınlatma Metni</h1>
     <div style={{color:'#eaeaea',fontWeight:600,marginBottom:28, fontSize:'1.07rem'}}>
-      <p><b>VERITAS AI KİŞİSEL VERİLERİN İŞLENMESİNE İLİŞKİN AYDINLATMA METNİ</b></p>
+      <p><b>VERITAS Q-AI KİŞİSEL VERİLERİN İŞLENMESİNE İLİŞKİN AYDINLATMA METNİ</b></p>
       <ol style={{ marginLeft: 18 }}>
-        <li><b>Veri Sorumlusu:</b> 6698 sayılı Kişisel Verilerin Korunması Kanunu (“KVKK”) uyarınca, Veritas AI (Bundan sonra “Platform” olarak anılacaktır), kişisel verilerinizi hukuka ve dürüstlük kurallarına uygun, belirli, açık ve meşru amaçlar doğrultusunda işlemektedir.</li>
+        <li><b>Veri Sorumlusu:</b> 6698 sayılı Kişisel Verilerin Korunması Kanunu (“KVKK”) uyarınca, Veritas Q-AI (Bundan sonra “Platform” olarak anılacaktır), kişisel verilerinizi hukuka ve dürüstlük kurallarına uygun, belirli, açık ve meşru amaçlar doğrultusunda işlemektedir.</li>
         <li><b>İşlenen Kişisel Verileriniz ve İşleme Amaçları:</b> Kimlik bilgileriniz (ad-soyad), iletişim bilgileriniz (e-posta), finansal bilgileriniz (fatura adresi) ve kullanım verileriniz (IP adresi, log kayıtları);
           <ul>
             <li>Hizmet sözleşmesinin kurulması ve ifası,</li>
@@ -32,9 +32,9 @@ const KVKK_EN = (
   <div style={{maxWidth:750,margin:'60px auto',background:'#171c2d',borderRadius:22,padding:36,color:'#ffe18d',boxShadow:'0 10px 30px #0007'}}>
     <h1 style={{fontWeight:800,fontSize:'2.1rem',marginBottom:18}}>GDPR / Data Privacy Notice</h1>
     <div style={{color:'#eaeaea',fontWeight:600,marginBottom:28, fontSize:'1.07rem'}}>
-      <b>VERITAS AI DATA PROCESSING NOTICE</b>
+      <b>VERITAS Q-AI DATA PROCESSING NOTICE</b>
       <ol style={{ marginLeft: 18 }}>
-        <li><b>Controller:</b> Pursuant to Law No.6698 on Protection of Personal Data ("KVKK"), Veritas AI (hereinafter referred to as the "Platform") processes your personal data in accordance with legal and ethical rules for specific, clear and legitimate purposes.</li>
+        <li><b>Controller:</b> Pursuant to Law No.6698 on Protection of Personal Data ("KVKK"), Veritas Q-AI (hereinafter referred to as the "Platform") processes your personal data in accordance with legal and ethical rules for specific, clear and legitimate purposes.</li>
         <li><b>Processed Data and Purposes:</b> Your identity information (name-surname), contact details (email), financial information (billing address), and usage data (IP address, logs) are processed for the following purposes:
           <ul>
             <li>Conclusion and execution of the service agreement,</li>

@@ -13,7 +13,7 @@ const MESAFE_TR = (
           E-posta: suleelmas13@gmail.com<br/>
           Web Sitesi: veritasai.com<br/>
           1.2. ALICI (Tüketici):<br/>
-          Veritas AI (veritasai.com) platformuna üye olan ve hizmet satın alan kişidir. Alıcının üye olurken kullandığı iletişim bilgileri esas alınır.
+          Veritas Q-AI (veritasai.com) platformuna üye olan ve hizmet satın alan kişidir. Alıcının üye olurken kullandığı iletişim bilgileri esas alınır.
         </li>
         <li><b>SÖZLEŞMENİN KONUSU</b><br/>
           Bu Sözleşme’nin konusu, Alıcı’nın Satıcı’ya ait veritasai.com web sitesi üzerinden elektronik ortamda siparişini verdiği, nitelikleri ve satış fiyatı web sitesinde belirtilen Yapay Zeka Tabanlı Hukuki Analiz Hizmeti’nin satışı ve teslimi ile ilgili tarafların hak ve yükümlülüklerinin belirlenmesidir.
@@ -28,13 +28,13 @@ const MESAFE_TR = (
         </li>
         <li><b>CAYMA HAKKI VE İSTİSNALARI</b><br/>
           <b>ÖNEMLİ:</b> Mesafeli Sözleşmeler Yönetmeliği m. 15/ğ’ye göre "Elektronik ortamda anında ifa edilen hizmetlerde" cayma hakkı bulunmaz.<br/>
-          Veritas AI’dan alınan paketler, anında ifa/dijital içerik kapsamında olduğundan, üye olduktan/ödeme yaptıktan sonra cayma hakkı ve ücret iadesi yoktur. Ödeme ile bu koşullar kabul edilmiş sayılır.
+          Veritas Q-AI’dan alınan paketler, anında ifa/dijital içerik kapsamında olduğundan, üye olduktan/ödeme yaptıktan sonra cayma hakkı ve ücret iadesi yoktur. Ödeme ile bu koşullar kabul edilmiş sayılır.
         </li>
         <li><b>GENEL HÜKÜMLER</b><br/>
           <ul>
             <li>Alıcı, hizmetin niteliklerini, fiyatını ve ödeme/teslimat esaslarını öğrendiğini önceden kabul eder.</li>
             <li>Satıcı, teknik arızalar/aksaklıklarda Alıcı’nın hakkını korumakla yükümlüdür.</li>
-            <li>Veritas AI raporları bir avukatlık hizmeti değildir; kullanıcı, raporların kesin hukuki görüş olmadığını onaylar.</li>
+            <li>Veritas Q-AI raporları bir avukatlık hizmeti değildir; kullanıcı, raporların kesin hukuki görüş olmadığını onaylar.</li>
           </ul>
         </li>
         <li><b>YETKİLİ MAHKEME</b><br/>
@@ -75,13 +75,13 @@ const MESAFE_EN = (
         </li>
         <li><b>RIGHT OF WITHDRAWAL & EXCLUSIONS</b><br/>
           <b>IMPORTANT:</b> According to Distance Contracts Regulation Art. 15/ğ; no right of withdrawal is available for instantly performed digital services.<br/>
-          Any package purchased on Veritas AI is a digital/instantly delivered service, so no right of withdrawal or refund is provided after access is granted. Buyer is deemed to have accepted these terms at payment.
+          Any package purchased on Veritas Q-AI is a digital/instantly delivered service, so no right of withdrawal or refund is provided after access is granted. Buyer is deemed to have accepted these terms at payment.
         </li>
         <li><b>GENERAL TERMS</b><br/>
           <ul>
             <li>Buyer acknowledges the package details, price, payment, and delivery principles in advance.</li>
             <li>Seller is obliged to safeguard Buyer’s rights in case of technical failures.</li>
-            <li>Veritas AI reports are not a definitive legal/professional advice; Buyer accepts this.</li>
+            <li>Veritas Q-AI reports are not a definitive legal/professional advice; Buyer accepts this.</li>
           </ul>
         </li>
         <li><b>JURISDICTION</b><br/>
@@ -103,6 +103,9 @@ export default function DistanceAgreement() {
   }, []);
   return lang === 'TR' ? MESAFE_TR : MESAFE_EN;
 }
+
+
+
 
 
 

@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 
 const SHOPIER_LOGO = "https://shopier.com/static/images/logo/shopier_logo_200x50_white_bg.png";
-const LEMON_LOGO = "https://assets-global.website-files.com/5f7fff4cf6f1503b8ad6b195/6170076096672015c22b8e97_lemon%20squeezy%20logo%20horizontal%20svg.svg";
 
 type PricingCardProps = {
   gold: string;
@@ -25,7 +24,6 @@ type PricingCardProps = {
 };
 
 export default function PricingCard({ gold, plan, priceTR, priceGlobal, features, featuresGlobal, popular, fullName, fullNameGlobal, description, descriptionGlobal, buttonText, buttonTextGlobal, shopierLink, lemonSqueezyLink, language = 'EN', ui, testMode }: PricingCardProps) {
-  const [showPayment, setShowPayment] = useState(false);
   const [country, setCountry] = useState<string|null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -58,48 +56,65 @@ export default function PricingCard({ gold, plan, priceTR, priceGlobal, features
   const displayFullName = isTurkey ? (fullName || plan) : (fullNameGlobal || plan);
   const displayDescription = isTurkey ? description : (descriptionGlobal || description);
   const displayFeatures = isTurkey ? features : (featuresGlobal || features);
-  const displayButtonText = isTurkey ? (buttonText || 'Satın Al / Buy') : (buttonTextGlobal || 'Buy Now');
+  const displayButtonText = isTurkey ? 'Satın Al' : 'Get Started';
+  const buttonLink = isTurkey ? shopierLink : lemonSqueezyLink;
   
   return (
     <div style={{
-      background: popular ? `linear-gradient(135deg, ${gold}22 0%, #313950 100%)` : `rgba(23,28,45,0.7)`,
-      border: popular ? `3px solid ${gold}` : `1.5px solid #414564`,
-      color: '#f8fafc',
-      borderRadius: 18,
-      padding: '36px 36px 36px 36px',
-      paddingTop: popular ? '50px' : '36px',
-      boxShadow: popular ? `0 10px 36px ${gold}44` : 'none',
-      minWidth: 280,
-      flex: '0 0 300px',
-      maxWidth: 320,
       position: 'relative',
       overflow: 'visible',
-      zIndex: 1
+      display: 'flex',
+      flexDirection: 'column',
+      height: '100%',
+      flex: '1 1 0',
+      paddingTop: '50px'
     }}>
-      {popular && <div style={{
-        position: 'absolute',
-        top: '-14px',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        background: '#182332',
-        color: gold,
-        padding: '8px 24px',
-        borderRadius: 14,
-        fontWeight: 800,
-        fontSize: '.98rem',
-        boxShadow: `0 2px 9px ${gold}22`,
-        zIndex: 30,
-        whiteSpace: 'nowrap',
-        border: `2px solid ${gold}`,
-        lineHeight: '1.2',
-        marginTop: '2px'
-      }}>{ui?.[language]?.popularBadge || (isTurkey ? '★ EN POPÜLER' : '★ MOST POPULAR')}</div>}
+      {popular && (
+        <div style={{
+          position: 'absolute',
+          top: '0',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: '#182332',
+          color: gold,
+          padding: '10px 26px',
+          borderRadius: 14,
+          fontWeight: 800,
+          fontSize: '.98rem',
+          boxShadow: `0 2px 9px ${gold}22, 0 0 0 4px #182332`,
+          zIndex: 30,
+          whiteSpace: 'nowrap',
+          border: `2px solid ${gold}`,
+          lineHeight: '1.2',
+          marginTop: '0'
+        }}>
+          {ui?.[language]?.popularBadge || (isTurkey ? '★ EN POPÜLER' : '★ MOST POPULAR')}
+        </div>
+      )}
+      <div style={{
+        background: popular ? `linear-gradient(135deg, ${gold}22 0%, #313950 100%)` : `rgba(23,28,45,0.7)`,
+        border: popular ? `3px solid ${gold}` : `1.5px solid #414564`,
+        color: '#f8fafc',
+        borderRadius: 18,
+        padding: '36px',
+        boxShadow: popular ? `0 10px 36px ${gold}44` : 'none',
+        minWidth: 280,
+        maxWidth: 'none',
+        position: 'relative',
+        overflow: 'visible',
+        zIndex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        flex: '1 1 auto',
+        minHeight: '600px'
+      }}>
       <div style={{ 
         fontSize: 27, 
         fontWeight: 900, 
         color: gold, 
         marginBottom: 10,
-        paddingTop: popular ? '8px' : '0',
+        paddingTop: '0',
         zIndex: 1,
         position: 'relative'
       }}>{displayFullName}</div>
@@ -126,7 +141,8 @@ export default function PricingCard({ gold, plan, priceTR, priceGlobal, features
         listStyle: 'none', 
         marginBottom: 18,
         zIndex: 1,
-        position: 'relative'
+        position: 'relative',
+        flex: '1 1 auto'
       }}>
         {displayFeatures.map((f, idx) => <li key={idx} style={{ 
           marginBottom: 7, 
@@ -135,78 +151,65 @@ export default function PricingCard({ gold, plan, priceTR, priceGlobal, features
           paddingLeft: '4px'
         }}>&#10003; {f}</li>)}
       </ul>
-      <button
-        style={{ width: '100%', padding: '13px 0', background: `rgba(199, 176, 121, 0.25)`, color: gold, fontWeight: 800, fontSize: '1rem', border: `1px solid ${gold}`, borderRadius: 15, cursor: 'pointer', marginTop: 12 }}
-        onClick={() => setShowPayment(s => !s)}
-      >
-        {displayButtonText}
-      </button>
-      {showPayment && country && !loading && (
-        <div style={{ marginTop: 18, background: '#23243a', borderRadius: 12, padding: 18, textAlign: 'center', boxShadow: `0 2px 18px ${gold}22` }}>
-          {country === 'TR' ? (
-            <>
-              <div style={{ display:'flex', flexDirection:'column', alignItems:'center' }}>
-                <div style={{ fontSize: '1.08rem', fontWeight: 800, color: gold, marginBottom: 8 }}>{ui?.[language]?.shopierSecurePayment || 'Shopier ile Güvenli Ödeme'}</div>
-                <a 
-                  href={shopierLink || "#"} 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  style={{ 
-                    display:'flex', 
-                    alignItems:'center', 
-                    gap:8, 
-                    padding: '9px 24px', 
-                    background: `rgba(199, 176, 121, 0.25)`, 
-                    color: 'rgba(255, 255, 255, 0.9)', 
-                    fontWeight: 800, 
-                    border: `1px solid ${gold}`, 
-                    borderRadius: 12, 
-                    fontSize: '.99rem', 
-                    cursor: 'pointer', 
-                    textDecoration: 'none' 
-                  }}
-                >
-                  <svg width="60" height="22" viewBox="0 0 120 42" fill="none" xmlns="http://www.w3.org/2000/svg" style={{marginRight:3}}>
-                    <rect width="120" height="42" rx="8" fill="white"/>
-                    <text x="50%" y="54%" textAnchor="middle" fontFamily="Arial, Helvetica, sans-serif" fontWeight="bold" fontSize="14" fill="#6926A8" dy=".3em">Shopier</text>
-                  </svg>
-                  <span style={{ color: 'rgba(255, 255, 255, 0.9)' }}>{ui?.[language]?.shopierBuy || 'Shopier ile Satın Al'}</span>
-                </a>
-              </div>
-            </>
-          ) : (
-            <>
-              <div style={{ display:'flex', flexDirection:'column', alignItems:'center' }}>
-                <div style={{ fontSize: '1.08rem', fontWeight: 800, color: gold, marginBottom: 8 }}>{ui?.[language]?.lemonSqueezyCheckout || 'Lemon Squeezy ile Secure Checkout'}</div>
-                <a
-                  href={lemonSqueezyLink || "#"}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ 
-                    display:'flex', 
-                    alignItems:'center', 
-                    gap:10, 
-                    padding: '9px 24px', 
-                    background: `rgba(199, 176, 121, 0.25)`, 
-                    color: gold, 
-                    fontWeight: 800, 
-                    border: `1px solid ${gold}`, 
-                    borderRadius: 12, 
-                    fontSize: '.99rem', 
-                    cursor: 'pointer',
-                    textDecoration: 'none',
-                    width: '100%',
-                    justifyContent: 'center'
-                  }}
-                >
-                  <img src={LEMON_LOGO} alt="Lemon Squeezy" style={{height:23, background:'white', borderRadius:7, padding:'2px 6px'}} />
-                  <span style={{ color: gold }}>{ui?.[language]?.buyWithLemonSqueezy || 'Buy with Lemon Squeezy'}</span>
-                </a>
-              </div>
-            </>
-          )}
-        </div>
-      )}
+      <div style={{ marginTop: 'auto', width: '100%' }}>
+        {!loading && buttonLink ? (
+          <a
+            href={buttonLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'block',
+              width: '100%',
+              padding: '15px 0',
+              background: '#c7b079',
+              backgroundColor: '#c7b079',
+              color: '#000000',
+              fontWeight: 'bold',
+              fontSize: '1rem',
+              border: 'none',
+              borderRadius: 15,
+              cursor: 'pointer',
+              textDecoration: 'none',
+              textAlign: 'center',
+              transition: 'all 0.3s ease',
+              boxShadow: `0 4px 12px rgba(199, 176, 121, 0.3)`
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.setProperty('background-color', '#b8a269', 'important');
+              e.currentTarget.style.setProperty('background', '#b8a269', 'important');
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = `0 6px 20px rgba(199, 176, 121, 0.5)`;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.setProperty('background-color', '#c7b079', 'important');
+              e.currentTarget.style.setProperty('background', '#c7b079', 'important');
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = `0 4px 12px rgba(199, 176, 121, 0.3)`;
+            }}
+          >
+            {displayButtonText}
+          </a>
+        ) : (
+          <button
+            disabled
+            style={{
+              width: '100%',
+              padding: '15px 0',
+              background: '#666666',
+              color: '#ffffff',
+              fontWeight: 'bold',
+              fontSize: '1rem',
+              border: 'none',
+              borderRadius: 15,
+              cursor: 'not-allowed',
+              opacity: 0.6
+            }}
+          >
+            {loading ? '...' : displayButtonText}
+          </button>
+        )}
+      </div>
+      </div>
     </div>
   );
 }

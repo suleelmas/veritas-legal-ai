@@ -40,6 +40,136 @@ function hasCriticalKeywords(text: string, targetLang: string): boolean {
   return keywords.some(keyword => upperText.includes(keyword.toUpperCase()));
 }
 
+// Tarih parse fonksiyonu - farklı formatları handle eder
+function parseDate(dateStr: string | undefined | null): Date | null {
+  if (!dateStr) return null;
+  
+  try {
+    // ISO format (2024-01-15)
+    if (dateStr.match(/^\d{4}-\d{2}-\d{2}/)) {
+      return new Date(dateStr);
+    }
+    
+    // DD/MM/YYYY veya DD-MM-YYYY
+    if (dateStr.match(/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/)) {
+      const parts = dateStr.split(/[\/\-]/);
+      if (parts.length === 3) {
+        const day = parseInt(parts[0]);
+        const month = parseInt(parts[1]) - 1;
+        const year = parseInt(parts[2].length === 2 ? '20' + parts[2] : parts[2]);
+        return new Date(year, month, day);
+      }
+    }
+    
+    // YYYY/MM/DD
+    if (dateStr.match(/^\d{4}[\/\-]\d{2}[\/\-]\d{2}/)) {
+      return new Date(dateStr.replace(/\//g, '-'));
+    }
+    
+    // Default Date constructor
+    const parsed = new Date(dateStr);
+    if (!isNaN(parsed.getTime())) {
+      return parsed;
+    }
+  } catch {
+    // Parse hatası durumunda null döndür
+  }
+  
+  return null;
+}
+
+// Belge tarihini al (metadata'dan veya created_at'ten)
+function getDocumentDate(doc: any): Date | null {
+  // Önce metadata'daki date veya updated alanını kontrol et
+  const metadataDate = doc.metadata?.date || doc.metadata?.updated;
+  if (metadataDate) {
+    const parsed = parseDate(metadataDate);
+    if (parsed) return parsed;
+  }
+  
+  // Sonra created_at'i kontrol et
+  if (doc.created_at) {
+    const parsed = parseDate(doc.created_at);
+    if (parsed) return parsed;
+  }
+  
+  return null;
+}
+
+// Belge benzerliği kontrolü (aynı konu/başlık için)
+function areDocumentsSimilar(doc1: any, doc2: any): boolean {
+  const content1 = (doc1.content || '').substring(0, 200).toUpperCase();
+  const content2 = (doc2.content || '').substring(0, 200).toUpperCase();
+  
+  // İlk 200 karakterin %70'i benzer ise aynı belge sayılır
+  const similarity = calculateSimilarity(content1, content2);
+  return similarity > 0.7;
+}
+
+// Basit benzerlik hesaplama (Jaccard benzeri)
+function calculateSimilarity(str1: string, str2: string): number {
+  const words1 = new Set(str1.split(/\s+/).filter(w => w.length > 3));
+  const words2 = new Set(str2.split(/\s+/).filter(w => w.length > 3));
+  
+  const intersection = new Set([...words1].filter(w => words2.has(w)));
+  const union = new Set([...words1, ...words2]);
+  
+  return union.size > 0 ? intersection.size / union.size : 0;
+}
+
+// Tarih çelişkisi çözme: Aynı konu için en güncel tarihli olanı seç
+function resolveDateConflicts(documents: Array<any>): Array<any> {
+  const resolved: Array<any> = [];
+  const processed = new Set<number>();
+  
+  for (let i = 0; i < documents.length; i++) {
+    if (processed.has(i)) continue;
+    
+    const doc = documents[i];
+    const similarDocs = [doc];
+    
+    // Benzer belgeleri bul
+    for (let j = i + 1; j < documents.length; j++) {
+      if (processed.has(j)) continue;
+      
+      if (areDocumentsSimilar(doc, documents[j])) {
+        similarDocs.push(documents[j]);
+        processed.add(j);
+      }
+    }
+    
+    // Benzer belgeler arasında en güncel tarihli olanı seç
+    if (similarDocs.length > 1) {
+      similarDocs.sort((a, b) => {
+        const dateA = getDocumentDate(a);
+        const dateB = getDocumentDate(b);
+        
+        if (!dateA && !dateB) return 0;
+        if (!dateA) return 1; // Tarihi olmayan en sona
+        if (!dateB) return -1;
+        
+        return dateB.getTime() - dateA.getTime(); // En güncel önce
+      });
+      
+      // En güncel olanı al ve diğerlerini atla
+      const latest = similarDocs[0];
+      latest.metadata = {
+        ...latest.metadata,
+        resolvedFromConflict: true,
+        conflictCount: similarDocs.length,
+        originalDate: getDocumentDate(latest)?.toISOString()
+      };
+      resolved.push(latest);
+    } else {
+      resolved.push(doc);
+    }
+    
+    processed.add(i);
+  }
+  
+  return resolved;
+}
+
 // Veritabanındaki en son güncelleme tarihini kontrol et
 async function isDatabaseStale(supabase: any, days: number = 1): Promise<boolean> {
   try {
@@ -55,7 +185,9 @@ async function isDatabaseStale(supabase: any, days: number = 1): Promise<boolean
     const lastUpdate = data.metadata?.updated || data.metadata?.date;
     if (!lastUpdate) return true;
     
-    const lastUpdateDate = new Date(lastUpdate);
+    const lastUpdateDate = parseDate(lastUpdate);
+    if (!lastUpdateDate) return true;
+    
     const daysSinceUpdate = (Date.now() - lastUpdateDate.getTime()) / (1000 * 60 * 60 * 24);
     return daysSinceUpdate > days;
   } catch {
@@ -252,20 +384,24 @@ async function getRelevantDocuments(
     // Adım C: Context Merger - Veritabanı ve canlı verileri birleştir
     const allDocuments = [...liveDocuments, ...dbDocuments];
     
-    // Duplicate'leri temizle (content'e göre)
-    const uniqueDocuments = Array.from(
-      new Map(allDocuments.map(doc => [doc.content?.substring(0, 100), doc])).values()
-    );
+    // Tarih çelişkilerini çöz: Aynı konu için en güncel tarihli olanı seç
+    const resolvedDocuments = resolveDateConflicts(allDocuments);
     
     // En güncel ve en ilgili olanları seç
-    const finalDocuments = uniqueDocuments
+    const finalDocuments = resolvedDocuments
       .sort((a, b) => {
         // Live fetch edilenler öncelikli
         if (a.metadata?.live && !b.metadata?.live) return -1;
         if (!a.metadata?.live && b.metadata?.live) return 1;
-        // Tarihe göre sırala
-        const dateA = new Date(a.metadata?.date || a.metadata?.updated || 0);
-        const dateB = new Date(b.metadata?.date || b.metadata?.updated || 0);
+        
+        // Tarihe göre sırala (en güncel önce)
+        const dateA = getDocumentDate(a);
+        const dateB = getDocumentDate(b);
+        
+        if (!dateA && !dateB) return 0;
+        if (!dateA) return 1; // Tarihi olmayan en sona
+        if (!dateB) return -1;
+        
         return dateB.getTime() - dateA.getTime();
       })
       .slice(0, limit);
@@ -296,13 +432,18 @@ export async function POST(req: Request) {
     let contextText = '';
     if (relevantDocs.length > 0) {
       const langPrefix = (targetLang === 'EN' || targetLang === 'English') 
-        ? 'Relevant Current Legislation and Decisions:' 
-        : 'İlgili Güncel Mevzuat ve Kararlar:';
+        ? 'Relevant Current Legislation and Decisions (sorted by date, most recent first):' 
+        : 'İlgili Güncel Mevzuat ve Kararlar (tarihe göre sıralı, en güncel önce):';
       contextText = `\n\n${langPrefix}\n`;
       relevantDocs.forEach((doc: any, idx: number) => {
         const source = doc.metadata?.source || 'bilinmeyen';
         const liveTag = doc.metadata?.live ? ' [LIVE]' : '';
-        contextText += `${idx + 1}. [${source}${liveTag}] ${doc.content.substring(0, 500)}...\n`;
+        const docDate = getDocumentDate(doc);
+        const dateStr = docDate ? ` (${docDate.toISOString().split('T')[0]})` : '';
+        const conflictNote = doc.metadata?.resolvedFromConflict 
+          ? ` [RESOLVED: Selected most recent from ${doc.metadata.conflictCount} conflicting versions]`
+          : '';
+        contextText += `${idx + 1}. [${source}${liveTag}${dateStr}${conflictNote}] ${doc.content.substring(0, 500)}...\n`;
       });
     }
 
@@ -321,19 +462,22 @@ export async function POST(req: Request) {
     
     // İngilizce analizlerde Congress.gov, SCOTUS, CourtListener ve OpenJurist'i de dahil et
     const sourcesText = (targetLang === 'EN' || targetLang === 'English')
-      ? 'Yukarıdaki güncel mevzuat, resmi gazete yayınları, Yargıtay içtihatları, Danıştay kararları, Anayasa Mahkemesi kararları, KVKK kararları, ABD Federal Mevzuatı (Congress.gov), ABD Yüksek Mahkemesi (SCOTUS) kararları, CourtListener ve OpenJurist emsal karar depolarını dikkate alarak analiz yap.'
-      : 'Yukarıdaki güncel mevzuat, resmi gazete yayınları, Yargıtay içtihatları, Danıştay kararları, Anayasa Mahkemesi kararları ve KVKK kararlarını dikkate alarak analiz yap.';
+      ? 'Yukarıdaki güncel mevzuat, resmi gazete yayınları, Yargıtay içtihatları, Danıştay kararları, Anayasa Mahkemesi kararları, KVKK kararları, ABD Federal Mevzuatı (Congress.gov), ABD Yüksek Mahkemesi (SCOTUS) kararları, CourtListener ve OpenJurist emsal karar depolarını dikkate alarak analiz yap. ÖNEMLİ: Eğer aynı konu için farklı tarihli belgeler varsa, EN GÜNCEL TARİHLİ OLANI baz al. Tarih çelişkisi durumunda her zaman en güncel tarihli belgeyi kullan.'
+      : 'Yukarıdaki güncel mevzuat, resmi gazete yayınları, Yargıtay içtihatları, Danıştay kararları, Anayasa Mahkemesi kararları ve KVKK kararlarını dikkate alarak analiz yap. ÖNEMLİ: Eğer aynı konu için farklı tarihli belgeler varsa, EN GÜNCEL TARİHLİ OLANI baz al. Tarih çelişkisi durumunda her zaman en güncel tarihli belgeyi kullan.';
     
     const userPromptText = (targetLang === 'EN' || targetLang === 'English')
-      ? `Analyze the following text and evaluate it according to current legislation, official gazette publications, Supreme Court precedents, Council of State decisions, Constitutional Court decisions, KVKK (Personal Data Protection Law) decisions, US Federal Legislation (Congress.gov), US Supreme Court (SCOTUS) decisions, CourtListener, and OpenJurist case law databases: ${pdfText.substring(0, 12000)}`
-      : `Şu metni analiz et ve güncel mevzuat, resmi gazete yayınları, Yargıtay içtihatları, Danıştay kararları, Anayasa Mahkemesi kararları ve KVKK (Kişisel Verilerin Korunması Kanunu) kararlarına göre değerlendir: ${pdfText.substring(0, 12000)}`;
+      ? `Analyze the following text and evaluate it according to current legislation, official gazette publications, Supreme Court precedents, Council of State decisions, Constitutional Court decisions, KVKK (Personal Data Protection Law) decisions, US Federal Legislation (Congress.gov), US Supreme Court (SCOTUS) decisions, CourtListener, and OpenJurist case law databases. IMPORTANT: If there are conflicting dates for the same topic, always use the MOST RECENT DATE. ${pdfText.substring(0, 12000)}`
+      : `Şu metni analiz et ve güncel mevzuat, resmi gazete yayınları, Yargıtay içtihatları, Danıştay kararları, Anayasa Mahkemesi kararları ve KVKK (Kişisel Verilerin Korunması Kanunu) kararlarına göre değerlendir. ÖNEMLİ: Aynı konu için farklı tarihli belgeler varsa, EN GÜNCEL TARİHLİ OLANI kullan. ${pdfText.substring(0, 12000)}`;
     
     // Yerelleştirme talimatı ekle
     const localizationInstruction = (targetLang === 'EN' || targetLang === 'English')
       ? ' IMPORTANT: If the output language is English, translate Turkish legal acronyms to their international equivalents. For example: KVKK -> GDPR (Personal Data Protection Law) or KVKK - Personal Data Protection Law, TBK -> TCO (Turkish Code of Obligations), HMK -> Code of Civil Procedure, İİK -> EBL (Enforcement and Bankruptcy Law), AYM -> Constitutional Court. Always provide the full English name alongside the acronym when first mentioned.'
       : '';
     
-    const systemPrompt = `Sen profesyonel bir hukuk analistisin. Analizini sadece ${targetLang} dilinde yap. Paragrafları tekrar etme.${contextText ? ' ' + sourcesText : ''}${localizationInstruction}`;
+    // Tarih çelişkisi talimatı
+    const dateConflictInstruction = ' KRİTİK TALİMAT: Verilen belgeler arasında tarih çelişkisi varsa, her zaman EN GÜNCEL TARİHLİ belgeyi baz al. Tarih karşılaştırması yaparken ISO format (YYYY-MM-DD) veya belge metadata\'sındaki tarih bilgisini kullan.';
+    
+    const systemPrompt = `Sen profesyonel bir hukuk analistisin. Analizini sadece ${targetLang} dilinde yap. Paragrafları tekrar etme.${contextText ? ' ' + sourcesText : ''}${dateConflictInstruction}${localizationInstruction}`;
     const userPrompt = userPromptText;
 
     if (creditRow && creditRow.credit > 0) {

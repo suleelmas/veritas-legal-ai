@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
 import PricingCard from "./components/PricingCard";
 import Header from "./components/Header";
 import Sidebar from "./components/Sidebar";
@@ -117,6 +118,7 @@ export default function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [analysisStatus, setAnalysisStatus] = useState<string>('');
+  const [currentLoadingMessageIndex, setCurrentLoadingMessageIndex] = useState(0);
   const [result, setResult] = useState("");
   const [language, setLanguage] = useState("EN");
   const [activeTab, setActiveTab] = useState<Tab>("analyze");
@@ -151,8 +153,8 @@ export default function Home() {
   const packages = [
     {
       name: "Basic",
-      fullName: "Veritas AI Basic Analiz Paketi",
-      fullNameGlobal: "Veritas Legal AI Basic Plan (Starter)",
+      fullName: "Veritas Q-AI Basic Analiz Paketi",
+      fullNameGlobal: "Veritas Q-AI Basic Plan (Starter)",
       priceTR: "49 TL",
       priceGlobal: "$19.00 / month",
       description: "Hukuki süreçlerinize hız kazandırmak için ilk adımı atın! Bireysel kullanıcılar ve küçük ölçekli ofisler için ideal.",
@@ -183,8 +185,8 @@ export default function Home() {
     },
     {
       name: "Professional",
-      fullName: "Veritas AI Professional – Uzman Paketi ★",
-      fullNameGlobal: "Veritas AI Professional Plan (Advocate) ★",
+      fullName: "Veritas Q-AI Professional – Uzman Paketi ★",
+      fullNameGlobal: "Veritas Q-AI Professional Plan (Advocate) ★",
       priceTR: "149 TL",
       priceGlobal: "$49.00 / month",
       description: "İş yükünü hafifletmek isteyen profesyoneller için tasarlandı! En popüler ve verimli çözümümüz.",
@@ -215,8 +217,8 @@ export default function Home() {
     },
     {
       name: "Enterprise",
-      fullName: "Veritas AI Enterprise – Kurumsal Çözüm",
-      fullNameGlobal: "Veritas AI Enterprise – Global Partner",
+      fullName: "Veritas Q-AI Enterprise – Kurumsal Çözüm",
+      fullNameGlobal: "Veritas Q-AI Enterprise – Global Partner",
       priceTR: "399 TL",
       priceGlobal: "$129.00 / month",
       description: "Hukuki operasyonlarınızda sınırları kaldırın! Büyük ofisler ve kurumsal şirketler için limitsiz prestij paketi.",
@@ -253,17 +255,16 @@ export default function Home() {
 
   const ui: any = {
     TR: { 
-      title: "VERITAS LEGAL AI", 
+      title: "VERITAS Q-AI", 
       sub: "YÜKSEK HUKUK ANALİTİĞİ", 
-      aboutBtn: "Veritas AI Nedir?", 
-      aboutTitle: "Hukukun Geleceği: Veritas AI ile Tanışın",
-      aboutText: "Veritas Legal AI, hukuk profesyonellerinin çalışma biçimini dönüştürmek için tasarlanmış ileri seviye bir analiz ekosistemidir. Karmaşık hukuk belgelerini (PDF), güncel mevzuat ve yüksek mahkeme içtihatları ışığında saniyeler içinde tarar.\n\nSadece bir kelime arama motoru değil, metnin hukuki mantığını kavrayan bir yardımcıdır. Sözleşmelerdeki gizli riskleri tespit eder, dava dosyalarındaki eksiklikleri raporlar ve avukatlara stratejik karar alma süreçlerinde veri temelli bir dayanak sunar. Veritas ile manuel dosya inceleme saatlerini saniyelere indirerek, adaletin hızıyla teknolojinin gücünü birleştiriyoruz.",
+      aboutBtn: "Veritas Q-AI Nedir?", 
+      aboutTitle: "Hukukun Geleceği: Veritas Q-AI ile Tanışın",
+      aboutText: "Veritas Q-AI, hukuk profesyonellerinin çalışma biçimini dönüştürmek için tasarlanmış ileri seviye bir analiz ekosistemidir. Karmaşık hukuk belgelerini (PDF), güncel mevzuat ve yüksek mahkeme içtihatları ışığında saniyeler içinde tarar.\n\nSadece bir kelime arama motoru değil, metnin hukuki mantığını kavrayan bir yardımcıdır. Sözleşmelerdeki gizli riskleri tespit eder, dava dosyalarındaki eksiklikleri raporlar ve avukatlara stratejik karar alma süreçlerinde veri temelli bir dayanak sunar. Veritas ile manuel dosya inceleme saatlerini saniyelere indirerek, adaletin hızıyla teknolojinin gücünü birleştiriyoruz.",
       googleBtn: "Google ile Giriş Yap", 
       select: "Dosya Seç", 
       btn: "ANALİZİ BAŞLAT", 
       upload: "PDF Belgesini Seçin", 
       download: "RAPORU İNDİR (.PDF)",
-      loading: "⏳ Analiz Ediliyor...",
       resultTitle: "Analiz Sonucu",
       features: "Özellikler",
       pricing: "Fiyatlandırma",
@@ -298,18 +299,17 @@ export default function Home() {
       closeGuide: "Kapat"
     },
     EN: { 
-      title: "VERITAS LEGAL AI", 
+      title: "VERITAS Q-AI", 
       sub: "SUPREME LEGAL ANALYTICS", 
-      aboutBtn: "What is Veritas AI?", 
-      aboutTitle: "The Future of Law: Meet Veritas AI",
-      aboutText: "Veritas Legal AI is an advanced analytics ecosystem designed to transform how legal professionals work. It scans complex legal documents (PDFs) in seconds, illuminated by current legislation and high court precedents.\n\nIt's not just a word search engine, but an assistant that understands the legal logic of text. It detects hidden risks in contracts, reports deficiencies in case files, and provides lawyers with data-driven support in strategic decision-making processes. With Veritas, we combine the speed of justice with the power of technology by reducing manual file review hours to seconds.",
+      aboutBtn: "What is Veritas Q-AI?", 
+      aboutTitle: "The Future of Law: Meet Veritas Q-AI",
+      aboutText: "Veritas Q-AI is an advanced analytics ecosystem designed to transform how legal professionals work. It scans complex legal documents (PDFs) in seconds, illuminated by current legislation and high court precedents.\n\nIt's not just a word search engine, but an assistant that understands the legal logic of text. It detects hidden risks in contracts, reports deficiencies in case files, and provides lawyers with data-driven support in strategic decision-making processes. With Veritas, we combine the speed of justice with the power of technology by reducing manual file review hours to seconds.",
       googleBtn: "Sign in with Google", 
       select: "Select File", 
       btn: "START ANALYSIS", 
       upload: "Select PDF Document", 
       download: "Download PDF",
       downloadWord: "Download Word",
-      loading: "⏳ Analyzing...",
       resultTitle: "Analysis Result",
       features: "Features",
       pricing: "Pricing",
@@ -344,10 +344,10 @@ export default function Home() {
       closeGuide: "Close"
     },
     FR: { 
-      title: "VERITAS LEGAL AI", 
+      title: "VERITAS Q-AI", 
       sub: "ANALYTIQUE JURIDIQUE SUPÉRIEURE", 
-      aboutBtn: "Qu'est-ce que Veritas AI?", 
-      aboutTitle: "À propos de Veritas Legal AI",
+      aboutBtn: "Qu'est-ce que Veritas Q-AI?", 
+      aboutTitle: "À propos de Veritas Q-AI",
       aboutText: "Veritas est une plateforme d'analyse juridique avancée basée sur l'intelligence artificielle, développée pour les avocats et les professionnels du droit. Elle analyse des documents PDF complexes en quelques secondes, identifie les bases légales et génère des rapports d'évaluation des risques.",
       googleBtn: "Se connecter avec Google", 
       select: "Sélectionner un fichier", 
@@ -355,7 +355,6 @@ export default function Home() {
       upload: "Sélectionner un document PDF", 
       download: "TÉLÉCHARGER LE RAPPORT (.PDF)",
       downloadWord: "TÉLÉCHARGER EN WORD",
-      loading: "⏳ Analyse en cours...",
       resultTitle: "Résultat de l'analyse",
       features: "Caractéristiques",
       pricing: "Tarification",
@@ -370,10 +369,10 @@ export default function Home() {
       feature4: "✓ Support multilingue"
     },
     DE: { 
-      title: "VERITAS LEGAL AI", 
+      title: "VERITAS Q-AI", 
       sub: "HÖCHSTE RECHTSANALYTIK", 
-      aboutBtn: "Was ist Veritas AI?", 
-      aboutTitle: "Über Veritas Legal AI",
+      aboutBtn: "Was ist Veritas Q-AI?", 
+      aboutTitle: "Über Veritas Q-AI",
       aboutText: "Veritas ist eine fortschrittliche KI-gestützte Rechtsanalytik-Plattform, die für Anwälte und Rechtsexperten entwickelt wurde. Sie analysiert komplexe PDF-Dokumente in Sekunden, identifiziert Rechtsgrundlagen und erstellt Risikobewertungen.",
       googleBtn: "Mit Google anmelden", 
       select: "Datei auswählen", 
@@ -381,7 +380,6 @@ export default function Home() {
       upload: "PDF-Dokument auswählen", 
       download: "BERICHT HERUNTERLADEN (.PDF)",
       downloadWord: "ALS WORD HERUNTERLADEN",
-      loading: "⏳ Analyse läuft...",
       resultTitle: "Analyseergebnis",
       features: "Funktionen",
       pricing: "Preise",
@@ -396,10 +394,10 @@ export default function Home() {
       feature4: "✓ Mehrsprachige Unterstützung"
     },
     RU: { 
-      title: "VERITAS LEGAL AI", 
+      title: "VERITAS Q-AI", 
       sub: "ВЫСШАЯ ЮРИДИЧЕСКАЯ АНАЛИТИКА", 
-      aboutBtn: "Что такое Veritas AI?", 
-      aboutTitle: "О Veritas Legal AI",
+      aboutBtn: "Что такое Veritas Q-AI?", 
+      aboutTitle: "О Veritas Q-AI",
       aboutText: "Veritas - это передовая платформа юридической аналитики на основе искусственного интеллекта, разработанная для юристов и правовых специалистов. Она анализирует сложные PDF-документы за секунды, находит правовые основания и создает отчеты об оценке рисков.",
       googleBtn: "Войти через Google", 
       select: "Выбрать файл", 
@@ -407,7 +405,6 @@ export default function Home() {
       upload: "Выберите PDF-документ", 
       download: "СКАЧАТЬ ОТЧЕТ (.PDF)",
       downloadWord: "СКАЧАТЬ В WORD",
-      loading: "⏳ Анализ выполняется...",
       resultTitle: "Результат анализа",
       features: "Функции",
       pricing: "Цены",
@@ -422,10 +419,10 @@ export default function Home() {
       feature4: "✓ Многоязычная поддержка"
     },
     ZH: { 
-      title: "VERITAS LEGAL AI", 
+      title: "VERITAS Q-AI", 
       sub: "最高法律分析", 
-      aboutBtn: "什么是 Veritas AI?", 
-      aboutTitle: "关于 Veritas Legal AI",
+      aboutBtn: "什么是 Veritas Q-AI?", 
+      aboutTitle: "关于 Veritas Q-AI",
       aboutText: "Veritas 是一个为律师和法律专业人士开发的先进人工智能驱动的法律分析平台。它在几秒钟内分析复杂的PDF文档，识别法律依据，并生成风险评估。",
       googleBtn: "使用 Google 登录", 
       select: "选择文件", 
@@ -433,7 +430,6 @@ export default function Home() {
       upload: "选择 PDF 文档", 
       download: "下载报告 (.PDF)",
       downloadWord: "下载 Word 文档",
-      loading: "⏳ 分析中...",
       resultTitle: "分析结果",
       features: "功能",
       pricing: "定价",
@@ -448,10 +444,10 @@ export default function Home() {
       feature4: "✓ 多语言支持"
     },
     AR: { 
-      title: "VERITAS LEGAL AI", 
+      title: "VERITAS Q-AI", 
       sub: "التحليلات القانونية العليا", 
-      aboutBtn: "ما هو Veritas AI?", 
-      aboutTitle: "حول Veritas Legal AI",
+      aboutBtn: "ما هو Veritas Q-AI?", 
+      aboutTitle: "حول Veritas Q-AI",
       aboutText: "Veritas هي منصة تحليلات قانونية متقدمة مدعومة بالذكاء الاصطناعي، تم تطويرها للمحامين والمهنيين القانونيين. تحلل مستندات PDF المعقدة في ثوانٍ، وتحدد الأسس القانونية، وتولد تقارير تقييم المخاطر.",
       googleBtn: "تسجيل الدخول باستخدام Google", 
       select: "اختر الملف", 
@@ -459,7 +455,6 @@ export default function Home() {
       upload: "اختر مستند PDF", 
       download: "تحميل التقرير (.PDF)",
       downloadWord: "تحميل Word",
-      loading: "⏳ جاري التحليل...",
       resultTitle: "نتيجة التحليل",
       features: "الميزات",
       pricing: "التسعير",
@@ -572,6 +567,12 @@ export default function Home() {
   
   // Paket limitlerini kontrol et
   const checkAnalysisLimit = async (): Promise<boolean> => {
+    // Test Modu / Development Modunda sınırsız analiz
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    if (isDevelopment) {
+      return true; // Development modunda her zaman true döndür
+    }
+    
     const pkg = effectivePackage;
     if (!pkg) return false;
     
@@ -681,12 +682,24 @@ export default function Home() {
   };
 
   const shouldShowLimitWarning = (): boolean => {
+    // Test Modu / Development Modunda uyarı gösterme
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    if (isDevelopment) {
+      return false; // Development modunda uyarı gösterme
+    }
+    
     if (limitWarningDismissed) return false;
     const usage = getUsagePercentage();
     return usage >= 80 && usage < 100;
   };
 
   const isLimitReached = (): boolean => {
+    // Test Modu / Development Modunda limit yok
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    if (isDevelopment) {
+      return false; // Development modunda limit dolmamış sayılır
+    }
+    
     return getUsagePercentage() >= 100;
   };
 
@@ -1017,6 +1030,32 @@ export default function Home() {
     };
   }, [languageMenuOpen, userMenuOpen]);
 
+  // Loading mesajlarını sırayla değiştir
+  useEffect(() => {
+    if (!loading) {
+      setCurrentLoadingMessageIndex(0);
+      return;
+    }
+
+    const messages = language === 'TR' 
+      ? [
+          'Qubit Matrisleri Senkronize Ediliyor...',
+          'Kuantum Olasılık Algoritması Çalışıyor...',
+          'Dolanık Veri Setleri Analiz Ediliyor...'
+        ]
+      : [
+          'Synchronizing Qubit Matrices...',
+          'Quantum Probability Algorithm Running...',
+          'Analyzing Entangled Data Sets...'
+        ];
+
+    const interval = setInterval(() => {
+      setCurrentLoadingMessageIndex((prev) => (prev + 1) % messages.length);
+    }, 2500);
+
+    return () => clearInterval(interval);
+  }, [loading, language]);
+
   const handleAuth = async () => {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -1295,7 +1334,7 @@ export default function Home() {
         <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
         <head>
           <meta charset='utf-8'>
-          <title>Veritas Legal AI - Analiz Raporu</title>
+          <title>Veritas Q-AI - Analiz Raporu</title>
           <style>
             body {
               font-family: 'Times New Roman', Arial, sans-serif;
@@ -1335,7 +1374,7 @@ export default function Home() {
         </head>
         <body>
           <div class="header">
-            <h1>Veritas Legal AI - Analiz Raporu</h1>
+            <h1>Veritas Q-AI - Analiz Raporu</h1>
             <div class="date">Tarih: ${date}</div>
           </div>
           <h3>${title}</h3>
@@ -1487,7 +1526,7 @@ export default function Home() {
               }}>
                 <img 
                   src="/mockup.png" 
-                  alt="Veritas AI Mockup" 
+                  alt="Veritas Q-AI Mockup" 
                   style={{ 
                     width: '100%', 
                     height: 'auto', 
@@ -1554,9 +1593,9 @@ export default function Home() {
               </div>
 
               {/* Paketler Bölümü - Her zaman görünür */}
-              <div style={{ marginTop: '80px', width: '100%' }}>
-                <h2 style={{ color: gold, fontSize: '2rem', marginBottom: '40px', textAlign: 'center' }}>{ui[language].pricing}</h2>
-                <div style={{ display: 'flex', gap: '25px', justifyContent: 'center', flexWrap: 'wrap' }}>
+              <div id="pricing" style={{ marginTop: '80px', width: '100%' }}>
+                <h2 style={{ color: gold, fontSize: '2rem', marginBottom: '60px', marginTop: '0', textAlign: 'center' }}>{ui[language].pricing.toUpperCase()}</h2>
+                <div style={{ display: 'flex', gap: '25px', justifyContent: 'center', flexWrap: 'nowrap', alignItems: 'stretch', width: '100%', maxWidth: '1200px', margin: '0 auto' }}>
                   {packages.map((pkg) => (
                     <PricingCard 
                       key={pkg.name}
@@ -1602,12 +1641,13 @@ export default function Home() {
                     <button
                       onClick={() => document.getElementById('pdfInputFinal')?.click()} 
                       style={{ 
-                        backgroundColor: '#ffffff !important', 
+                        backgroundColor: '#ffffff',
+                        background: '#ffffff',
                         color: '#000000', 
                         borderRadius: '50px', 
                         padding: '15px 40px', 
                         fontWeight: 'bold',
-                        border: 'none',
+                        border: `2px solid #ffffff`,
                         cursor: 'pointer',
                         marginBottom: '20px',
                         display: 'flex',
@@ -1615,15 +1655,21 @@ export default function Home() {
                         justifyContent: 'center',
                         width: 'fit-content',
                         margin: '0 auto 20px auto',
-                        boxShadow: '0 4px 20px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.1)',
-                        transition: 'background-color 0.3s ease',
+                        boxShadow: `0 4px 20px rgba(255, 255, 255, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.2)`,
+                        transition: 'all 0.3s ease',
                         fontSize: '16px'
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#f5f5f5 !important';
+                        e.currentTarget.style.setProperty('background-color', '#f5f5f5', 'important');
+                        e.currentTarget.style.setProperty('background', '#f5f5f5', 'important');
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = `0 6px 25px rgba(255, 255, 255, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.4)`;
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = '#ffffff !important';
+                        e.currentTarget.style.setProperty('background-color', '#ffffff', 'important');
+                        e.currentTarget.style.setProperty('background', '#ffffff', 'important');
+                        e.currentTarget.style.transform = 'translateY(0)';
+                        e.currentTarget.style.boxShadow = `0 4px 20px rgba(255, 255, 255, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.2)`;
                       }}
                     >
                       <span style={{ color: '#000000', fontWeight: 'bold' }}>{ui[language].selectFileForAnalysis || 'Analiz İçin Dosya Seçin'}</span>
@@ -1666,24 +1712,52 @@ export default function Home() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                           <Link href="/#pricing" style={{ textDecoration: 'none' }}>
                             <button
-                              onClick={() => setLimitWarningDismissed(true)}
-                              style={{
-                                padding: '8px 16px',
-                                background: gold,
-                                color: darkBlue,
-                                border: 'none',
-                                borderRadius: '8px',
-                                fontWeight: 'bold',
-                                fontSize: '13px',
-                                cursor: 'pointer',
-                                whiteSpace: 'nowrap',
-                                transition: 'opacity 0.2s'
+                              onClick={(e) => {
+                                e.preventDefault();
+                                setLimitWarningDismissed(true);
+                                setActiveTab('pricing');
+                                if (window.location.pathname !== '/') {
+                                  router.push('/#pricing');
+                                  setTimeout(() => {
+                                    window.location.href = '/#pricing';
+                                  }, 100);
+                                } else {
+                                  setTimeout(() => {
+                                    const pricingElement = document.getElementById('pricing');
+                                    if (pricingElement) {
+                                      pricingElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                    } else {
+                                      window.location.href = '/#pricing';
+                                    }
+                                  }, 200);
+                                }
                               }}
-                              onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
-                              onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
-                            >
-                              {language === 'TR' ? 'Paketi Yükselt' : 'Upgrade Plan'}
-                            </button>
+                            style={{
+                              padding: '8px 16px',
+                              background: '#c7b079',
+                              backgroundColor: '#c7b079',
+                              color: '#000000',
+                              border: 'none',
+                              borderRadius: '8px',
+                              fontWeight: 'bold',
+                              fontSize: '13px',
+                              cursor: 'pointer',
+                              whiteSpace: 'nowrap',
+                              transition: 'all 0.2s'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.setProperty('background-color', '#b8a269', 'important');
+                              e.currentTarget.style.setProperty('background', '#b8a269', 'important');
+                              e.currentTarget.style.opacity = '1';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.setProperty('background-color', '#c7b079', 'important');
+                              e.currentTarget.style.setProperty('background', '#c7b079', 'important');
+                              e.currentTarget.style.opacity = '1';
+                            }}
+                          >
+                            <span style={{ color: '#000000', fontWeight: 'bold' }}>{language === 'TR' ? 'Paketi Yükselt' : 'Upgrade Plan'}</span>
+                          </button>
                           </Link>
                           <button
                             onClick={() => setLimitWarningDismissed(true)}
@@ -1738,22 +1812,50 @@ export default function Home() {
                         </div>
                         <Link href="/#pricing" style={{ textDecoration: 'none' }}>
                           <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setActiveTab('pricing');
+                              if (window.location.pathname !== '/') {
+                                router.push('/#pricing');
+                                setTimeout(() => {
+                                  window.location.href = '/#pricing';
+                                }, 100);
+                              } else {
+                                setTimeout(() => {
+                                  const pricingElement = document.getElementById('pricing');
+                                  if (pricingElement) {
+                                    pricingElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                  } else {
+                                    window.location.href = '/#pricing';
+                                  }
+                                }, 200);
+                              }
+                            }}
                             style={{
                               padding: '8px 16px',
-                              background: '#ff6b6b',
-                              color: '#ffffff',
+                              background: '#c7b079',
+                              backgroundColor: '#c7b079',
+                              color: '#000000',
                               border: 'none',
                               borderRadius: '8px',
                               fontWeight: 'bold',
                               fontSize: '13px',
                               cursor: 'pointer',
                               whiteSpace: 'nowrap',
-                              transition: 'opacity 0.2s'
+                              transition: 'all 0.2s'
                             }}
-                            onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
-                            onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.setProperty('background-color', '#b8a269', 'important');
+                              e.currentTarget.style.setProperty('background', '#b8a269', 'important');
+                              e.currentTarget.style.opacity = '1';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.setProperty('background-color', '#c7b079', 'important');
+                              e.currentTarget.style.setProperty('background', '#c7b079', 'important');
+                              e.currentTarget.style.opacity = '1';
+                            }}
                           >
-                            {language === 'TR' ? 'Paketi Yükselt' : 'Upgrade Plan'}
+                            <span style={{ color: '#000000', fontWeight: 'bold' }}>{language === 'TR' ? 'Paketi Yükselt' : 'Upgrade Plan'}</span>
                           </button>
                         </Link>
                       </div>
@@ -1790,9 +1892,291 @@ export default function Home() {
                       }}
                     >
                       <span style={{ color: loading ? lightText : (isLimitReached() ? lightText : darkBlue) }}>
-                        {loading ? ui[language].loading : (isLimitReached() ? (language === 'TR' ? 'Limit Doldu' : 'Limit Reached') : ui[language].btn)}
+                        {isLimitReached() ? (language === 'TR' ? 'Limit Doldu' : 'Limit Reached') : ui[language].btn}
                       </span>
                     </button>
+                    
+                    {/* Quantum Simulation Engine */}
+                    {loading && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.9 }}
+                        transition={{ duration: 0.3 }}
+                        style={{
+                          marginTop: '30px',
+                          padding: '50px 30px',
+                          background: `linear-gradient(135deg, ${darkBlue}ee, ${midBlue}dd)`,
+                          border: `2px solid ${gold}44`,
+                          borderRadius: '20px',
+                          position: 'relative',
+                          overflow: 'hidden',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          minHeight: '400px'
+                        }}
+                      >
+                        {/* Starfield Background */}
+                        <motion.div
+                          animate={{
+                            backgroundPosition: ['0% 0%', '100% 100%'],
+                          }}
+                          transition={{
+                            duration: 20,
+                            repeat: Infinity,
+                            repeatType: 'loop',
+                            ease: 'linear'
+                          }}
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            backgroundImage: `radial-gradient(2px 2px at 20% 30%, ${gold}88, transparent),
+                                            radial-gradient(2px 2px at 60% 70%, ${gold}66, transparent),
+                                            radial-gradient(1px 1px at 50% 50%, ${gold}99, transparent),
+                                            radial-gradient(1px 1px at 80% 10%, ${gold}77, transparent),
+                                            radial-gradient(2px 2px at 90% 40%, ${gold}55, transparent),
+                                            radial-gradient(1px 1px at 33% 60%, ${gold}88, transparent),
+                                            radial-gradient(1px 1px at 15% 80%, ${gold}66, transparent)`,
+                            backgroundSize: '200% 200%',
+                            opacity: 0.4
+                          }}
+                        />
+                        
+                        {/* Quantum Orbital Rings Container */}
+                        <div style={{
+                          position: 'relative',
+                          width: '240px',
+                          height: '240px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          marginBottom: '30px'
+                        }}>
+                          {/* Outer Ring */}
+                          <motion.div
+                            animate={{ rotate: 360 }}
+                            transition={{
+                              duration: 3,
+                              repeat: Infinity,
+                              ease: 'linear'
+                            }}
+                            style={{
+                              position: 'absolute',
+                              width: '220px',
+                              height: '220px',
+                              border: `3px solid transparent`,
+                              borderTopColor: gold,
+                              borderRightColor: gold,
+                              borderRadius: '50%',
+                              boxShadow: `0 0 30px ${gold}66, 0 0 60px ${gold}44, inset 0 0 30px ${gold}33`,
+                              filter: 'blur(0.5px)'
+                            }}
+                          />
+                          
+                          {/* Second Outer Ring */}
+                          <motion.div
+                            animate={{ rotate: -360 }}
+                            transition={{
+                              duration: 4,
+                              repeat: Infinity,
+                              ease: 'linear'
+                            }}
+                            style={{
+                              position: 'absolute',
+                              width: '200px',
+                              height: '200px',
+                              border: `2px solid transparent`,
+                              borderBottomColor: gold,
+                              borderLeftColor: gold,
+                              borderRadius: '50%',
+                              boxShadow: `0 0 25px ${gold}55, inset 0 0 25px ${gold}22`
+                            }}
+                          />
+                          
+                          {/* Middle Ring */}
+                          <motion.div
+                            animate={{ rotate: 360 }}
+                            transition={{
+                              duration: 2.5,
+                              repeat: Infinity,
+                              ease: 'linear'
+                            }}
+                            style={{
+                              position: 'absolute',
+                              width: '160px',
+                              height: '160px',
+                              border: `2px solid transparent`,
+                              borderTopColor: gold,
+                              borderBottomColor: gold,
+                              borderRadius: '50%',
+                              boxShadow: `0 0 20px ${gold}77, 0 0 40px ${gold}55, inset 0 0 20px ${gold}44`
+                            }}
+                          />
+                          
+                          {/* Inner Ring */}
+                          <motion.div
+                            animate={{ rotate: -360 }}
+                            transition={{
+                              duration: 2,
+                              repeat: Infinity,
+                              ease: 'linear'
+                            }}
+                            style={{
+                              position: 'absolute',
+                              width: '120px',
+                              height: '120px',
+                              border: `2px solid transparent`,
+                              borderRightColor: gold,
+                              borderLeftColor: gold,
+                              borderRadius: '50%',
+                              boxShadow: `0 0 15px ${gold}88, inset 0 0 15px ${gold}66`
+                            }}
+                          />
+                          
+                          {/* Center Core */}
+                          <motion.div
+                            animate={{
+                              scale: [1, 1.15, 1],
+                              boxShadow: [
+                                `0 0 40px ${gold}, 0 0 80px ${gold}88`,
+                                `0 0 60px ${gold}ff, 0 0 120px ${gold}cc`,
+                                `0 0 40px ${gold}, 0 0 80px ${gold}88`
+                              ]
+                            }}
+                            transition={{
+                              duration: 2,
+                              repeat: Infinity,
+                              ease: 'easeInOut'
+                            }}
+                            style={{
+                              position: 'absolute',
+                              width: '70px',
+                              height: '70px',
+                              background: `radial-gradient(circle, ${gold}ff, ${gold}cc, ${gold}99)`,
+                              borderRadius: '50%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              zIndex: 10
+                            }}
+                          >
+                            <motion.div
+                              animate={{
+                                scale: [1, 1.2, 1],
+                                opacity: [0.8, 1, 0.8]
+                              }}
+                              transition={{
+                                duration: 1.5,
+                                repeat: Infinity,
+                                ease: 'easeInOut'
+                              }}
+                              style={{
+                                width: '25px',
+                                height: '25px',
+                                background: gold,
+                                borderRadius: '50%',
+                                boxShadow: `0 0 20px ${gold}ff, 0 0 40px ${gold}cc`
+                              }}
+                            />
+                          </motion.div>
+                        </div>
+                        
+                        {/* Quantum Terms */}
+                        <motion.div
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: 0.2 }}
+                          style={{
+                            display: 'flex',
+                            flexWrap: 'wrap',
+                            gap: '12px',
+                            justifyContent: 'center',
+                            marginTop: '20px',
+                            maxWidth: '500px'
+                          }}
+                        >
+                          {language === 'TR' 
+                            ? ['Qubit', 'Superposition', 'Entanglement', 'Interference', 'Decoherence'].map((term, i) => (
+                                <motion.div
+                                  key={term}
+                                  initial={{ opacity: 0, scale: 0.8 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  transition={{ delay: 0.3 + i * 0.1 }}
+                                  whileHover={{ scale: 1.1 }}
+                                  style={{
+                                    padding: '8px 16px',
+                                    background: `linear-gradient(135deg, ${gold}22, ${gold}11)`,
+                                    border: `1px solid ${gold}55`,
+                                    borderRadius: '20px',
+                                    color: gold,
+                                    fontSize: '12px',
+                                    fontWeight: '600',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '1px',
+                                    boxShadow: `0 0 10px ${gold}33`,
+                                    cursor: 'default'
+                                  }}
+                                >
+                                  {term}
+                                </motion.div>
+                              ))
+                            : ['Qubit', 'Superposition', 'Entanglement', 'Interference', 'Decoherence'].map((term, i) => (
+                                <motion.div
+                                  key={term}
+                                  initial={{ opacity: 0, scale: 0.8 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  transition={{ delay: 0.3 + i * 0.1 }}
+                                  whileHover={{ scale: 1.1 }}
+                                  style={{
+                                    padding: '8px 16px',
+                                    background: `linear-gradient(135deg, ${gold}22, ${gold}11)`,
+                                    border: `1px solid ${gold}55`,
+                                    borderRadius: '20px',
+                                    color: gold,
+                                    fontSize: '12px',
+                                    fontWeight: '600',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '1px',
+                                    boxShadow: `0 0 10px ${gold}33`,
+                                    cursor: 'default'
+                                  }}
+                                >
+                                  {term}
+                                </motion.div>
+                              ))
+                          }
+                        </motion.div>
+                        
+                        {/* Loading Status Text */}
+                        <motion.div
+                          key={currentLoadingMessageIndex}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          transition={{ duration: 0.3 }}
+                          style={{
+                            marginTop: '30px',
+                            color: gold,
+                            fontSize: '18px',
+                            fontWeight: '700',
+                            textAlign: 'center',
+                            zIndex: 10,
+                            position: 'relative',
+                            textShadow: `0 0 15px ${gold}88, 0 0 30px ${gold}66`
+                          }}
+                        >
+                          {language === 'TR' 
+                            ? ['Qubit Matrisleri Senkronize Ediliyor...', 'Kuantum Olasılık Algoritması Çalışıyor...', 'Dolanık Veri Setleri Analiz Ediliyor...'][currentLoadingMessageIndex]
+                            : ['Synchronizing Qubit Matrices...', 'Quantum Probability Algorithm Running...', 'Analyzing Entangled Data Sets...'][currentLoadingMessageIndex]
+                          }
+                        </motion.div>
+                      </motion.div>
+                    )}
                     
                     {/* Analysis Status Indicator */}
                     {analysisStatus && (
@@ -1852,9 +2236,9 @@ export default function Home() {
               )}
 
               {activeTab === 'pricing' && (
-                <div style={{ marginTop: '40px' }}>
-                  <h2 style={{ color: gold, fontSize: '2rem', marginBottom: '40px', textAlign: 'center' }}>{ui[language].pricing}</h2>
-                  <div style={{ display: 'flex', gap: '25px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                <div id="pricing" style={{ marginTop: '40px' }}>
+                  <h2 style={{ color: gold, fontSize: '2rem', marginBottom: '60px', marginTop: '0', textAlign: 'center' }}>{ui[language].pricing.toUpperCase()}</h2>
+                  <div style={{ display: 'flex', gap: '25px', justifyContent: 'center', flexWrap: 'nowrap', alignItems: 'stretch', width: '100%', maxWidth: '1200px', margin: '0 auto' }}>
                     {packages.map((pkg) => (
                       <PricingCard 
                         key={pkg.name}
@@ -2040,7 +2424,7 @@ export default function Home() {
           </a>
         </div>
         <p style={{ color: lightText, fontSize: '12px', margin: 0, opacity: 0.8 }}>
-          © {new Date().getFullYear()} Veritas Legal AI. Tüm hakları saklıdır.
+          © {new Date().getFullYear()} Veritas Q-AI. Tüm hakları saklıdır.
         </p>
         <p style={{ color: lightText, fontSize: '11px', margin: '8px 0 0 0', opacity: 0.6 }}>
           {language === 'TR' ? 'Sürüm: v0.9.1 (Beta)' : 'Version: v0.9.1 (Beta)'}

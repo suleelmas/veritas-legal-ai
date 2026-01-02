@@ -549,22 +549,51 @@ export default function ProfilePage() {
 
                 {(userPackage === 'free' || userPackage === 'basic') && (
                   <Link href="/#pricing">
-                    <button style={{
-                      width: '100%',
-                      padding: '15px',
-                      background: gold,
-                      color: darkBlue,
-                      border: 'none',
-                      borderRadius: '8px',
-                      fontWeight: 'bold',
-                      cursor: 'pointer',
-                      fontSize: '16px',
-                      transition: 'opacity 0.2s'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
-                    onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+                    <button 
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (window.location.pathname !== '/') {
+                          router.push('/#pricing');
+                          setTimeout(() => {
+                            window.location.href = '/#pricing';
+                          }, 100);
+                        } else {
+                          router.push('/#pricing');
+                          setTimeout(() => {
+                            const pricingElement = document.getElementById('pricing');
+                            if (pricingElement) {
+                              pricingElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            } else {
+                              window.location.href = '/#pricing';
+                            }
+                          }, 200);
+                        }
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '15px',
+                        background: '#c7b079',
+                        backgroundColor: '#c7b079',
+                        color: '#000000',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        fontSize: '16px',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.setProperty('background', '#b8a269', 'important');
+                        e.currentTarget.style.setProperty('backgroundColor', '#b8a269', 'important');
+                        e.currentTarget.style.opacity = '1';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.setProperty('background', '#c7b079', 'important');
+                        e.currentTarget.style.setProperty('backgroundColor', '#c7b079', 'important');
+                        e.currentTarget.style.opacity = '1';
+                      }}
                     >
-                      Upgrade Plan
+                      <span style={{ color: '#000000' }}>Upgrade Plan</span>
                     </button>
                   </Link>
                 )}

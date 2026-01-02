@@ -1,6 +1,7 @@
 "use client";
 import React from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 type Tab = "analyze" | "pricing" | "about" | "history";
 type UserPackage = "free" | "basic" | "professional" | "enterprise" | null;
@@ -50,18 +51,28 @@ export default function Header({
   canAccessHistory,
   getAvatarInitials
 }: HeaderProps) {
+  const router = useRouter();
+
   return (
     <nav style={{ width: '100%', background: '#131b26', padding: '15px 20px', position: 'relative', top: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${gold}33` }}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
         <Link
           href="/"
           onClick={(e) => {
+            e.preventDefault();
             setActiveTab('analyze'); 
             setSidebarOpen(false);
             setFile(null);
             setResult("");
             setLoading(false);
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            if (window.location.pathname !== '/') {
+              router.push('/');
+              setTimeout(() => {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }, 100);
+            } else {
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
           }}
           style={{ 
             background: 'transparent', 
@@ -351,4 +362,7 @@ export default function Header({
     </nav>
   );
 }
+
+
+
 

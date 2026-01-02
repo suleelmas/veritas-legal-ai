@@ -29,15 +29,15 @@ export default function BetaBanner({ language, onReportClick }: BetaBannerProps)
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '15px', flexWrap: 'wrap' }}>
         <span>
           {language === 'TR' 
-            ? 'Veritas AI Beta: Hata bul, bildir ve Professional pakette %50 indirim kazan!'
-            : 'Veritas AI Beta: Find bugs, report them and get 50% off on Professional package!'}
+            ? 'Veritas Q-AI Beta: Hata bul, bildir ve Professional pakette %50 indirim kazan!'
+            : 'Veritas Q-AI Beta: Find bugs, report them and get 50% off on Professional package!'}
         </span>
         <button
           onClick={onReportClick}
           style={{
             background: darkBlue,
-            color: gold,
-            border: 'none',
+            color: '#ffffff',
+            border: `2px solid ${darkBlue}`,
             padding: '6px 16px',
             borderRadius: '6px',
             fontWeight: '700',
@@ -45,14 +45,19 @@ export default function BetaBanner({ language, onReportClick }: BetaBannerProps)
             fontSize: '13px',
             transition: 'all 0.2s',
             textTransform: 'uppercase',
-            letterSpacing: '0.5px'
+            letterSpacing: '0.5px',
+            boxShadow: '0 2px 6px rgba(0, 0, 0, 0.3)'
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.background = '#1a2d42';
+            e.currentTarget.style.borderColor = gold;
+            e.currentTarget.style.color = gold;
             e.currentTarget.style.transform = 'scale(1.05)';
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.background = darkBlue;
+            e.currentTarget.style.borderColor = darkBlue;
+            e.currentTarget.style.color = '#ffffff';
             e.currentTarget.style.transform = 'scale(1)';
           }}
         >
@@ -80,4 +85,7 @@ export default function BetaBanner({ language, onReportClick }: BetaBannerProps)
     </div>
   );
 }
+
+
+
 

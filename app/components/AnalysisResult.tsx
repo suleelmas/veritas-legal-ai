@@ -1,6 +1,7 @@
 "use client";
 import React, { useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 type UserPackage = "free" | "basic" | "professional" | "enterprise" | null;
 
@@ -69,6 +70,7 @@ export default function AnalysisResult({
   handleChatSend,
   ui
 }: AnalysisResultProps) {
+  const router = useRouter();
   const reportRef = useRef<HTMLDivElement>(null);
 
   if (!result) return null;
@@ -342,28 +344,52 @@ export default function AnalysisResult({
                     </p>
                     <Link href="/#pricing" style={{ textDecoration: 'none' }}>
                       <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (window.location.pathname !== '/') {
+                            router.push('/#pricing');
+                            setTimeout(() => {
+                              window.location.href = '/#pricing';
+                            }, 100);
+                          } else {
+                            router.push('/#pricing');
+                            setTimeout(() => {
+                              const pricingElement = document.getElementById('pricing');
+                              if (pricingElement) {
+                                pricingElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                              } else {
+                                window.location.href = '/#pricing';
+                              }
+                            }, 200);
+                          }
+                        }}
                         style={{
                           padding: '15px 35px',
-                          background: gold,
-                          color: darkBlue,
+                          background: '#ffffff',
+                          backgroundColor: '#ffffff',
+                          color: '#000000',
                           border: 'none',
                           borderRadius: '50px',
                           fontWeight: 'bold',
                           fontSize: '16px',
                           cursor: 'pointer',
                           transition: 'all 0.3s',
-                          boxShadow: `0 4px 12px rgba(199, 176, 121, 0.4)`
+                          boxShadow: `0 4px 12px rgba(255, 255, 255, 0.3)`
                         }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.transform = 'scale(1.05)';
-                          e.currentTarget.style.boxShadow = `0 6px 16px rgba(199, 176, 121, 0.6)`;
+                          e.currentTarget.style.setProperty('background-color', '#f5f5f5', 'important');
+                          e.currentTarget.style.setProperty('background', '#f5f5f5', 'important');
+                          e.currentTarget.style.boxShadow = `0 6px 16px rgba(255, 255, 255, 0.5)`;
                         }}
                         onMouseLeave={(e) => {
                           e.currentTarget.style.transform = 'scale(1)';
-                          e.currentTarget.style.boxShadow = `0 4px 12px rgba(199, 176, 121, 0.4)`;
+                          e.currentTarget.style.setProperty('background-color', '#ffffff', 'important');
+                          e.currentTarget.style.setProperty('background', '#ffffff', 'important');
+                          e.currentTarget.style.boxShadow = `0 4px 12px rgba(255, 255, 255, 0.3)`;
                         }}
                       >
-                        {language === 'TR' ? 'Paketi Yükselt' : 'Upgrade Plan'}
+                        <span style={{ color: '#000000', fontWeight: 'bold' }}>{language === 'TR' ? 'Paketi Yükselt' : 'Upgrade Plan'}</span>
                       </button>
                     </Link>
                   </div>
@@ -604,4 +630,7 @@ export default function AnalysisResult({
     </>
   );
 }
+
+
+
 

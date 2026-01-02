@@ -1,5 +1,6 @@
 "use client";
 import React from 'react';
+import { useRouter } from 'next/navigation';
 
 type Tab = "analyze" | "pricing" | "about" | "history";
 
@@ -32,11 +33,13 @@ export default function Sidebar({
   canAccessHistory,
   ui
 }: SidebarProps) {
+  const router = useRouter();
+  
   if (!sidebarOpen) return null;
 
   return (
     <aside style={{ width: '260px', background: '#131b26', height: '100vh', position: 'fixed', left: 0, padding: '20px', borderRight: `1px solid ${gold}44`, zIndex: 1050, display: 'flex', flexDirection: 'column' }}>
-      <h2 style={{ color: gold, textAlign: 'center', marginBottom: '30px' }}>VERITAS AI</h2>
+      <h2 style={{ color: gold, textAlign: 'center', marginBottom: '30px' }}>VERITAS Q-AI</h2>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
         {user ? (
           <button 
@@ -97,7 +100,25 @@ export default function Sidebar({
           </button>
         )}
         <button 
-          onClick={() => {setActiveTab('pricing'); setSidebarOpen(false);}} 
+          onClick={() => {
+            setActiveTab('pricing');
+            setSidebarOpen(false);
+            if (window.location.pathname !== '/') {
+              router.push('/#pricing');
+              setTimeout(() => {
+                window.location.href = '/#pricing';
+              }, 100);
+            } else {
+              setTimeout(() => {
+                const pricingElement = document.getElementById('pricing');
+                if (pricingElement) {
+                  pricingElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                } else {
+                  window.location.href = '/#pricing';
+                }
+              }, 200);
+            }
+          }} 
           style={{ 
             width: '100%', 
             padding: '12px', 
@@ -183,4 +204,7 @@ export default function Sidebar({
     </aside>
   );
 }
+
+
+
 
