@@ -106,6 +106,7 @@ type Tab = "analyze" | "pricing" | "about" | "history";
 type UserPackage = "free" | "basic" | "professional" | "enterprise" | null;
 
 export default function Home() {
+  const router = useRouter();
   const [supabase] = useState(() => createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -117,6 +118,7 @@ export default function Home() {
   const [analysisHistory, setAnalysisHistory] = useState<Array<{id: string, title: string, date: string, summary: string, fullResult: string, riskScore: number | null}>>([]);
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisStatus, setAnalysisStatus] = useState<string>('');
   const [currentLoadingMessageIndex, setCurrentLoadingMessageIndex] = useState(0);
   const [result, setResult] = useState("");
@@ -137,6 +139,7 @@ export default function Home() {
   const [chatLoading, setChatLoading] = useState(false);
   const [pdfText, setPdfText] = useState('');
   const [riskScore, setRiskScore] = useState<number | null>(null);
+  const [legalCitations, setLegalCitations] = useState<Array<{source: string; citation: string; relevance: number}>>([]);
   const [jurisdictionConfirmation, setJurisdictionConfirmation] = useState<{
     detected_country: string;
     confidence: string;
@@ -1255,7 +1258,7 @@ export default function Home() {
                 file_name: file.name,
                 analysis_result: analysisResult,
                 analysis_summary: analysisSummary,
-                risk_score: extractedScore || null
+                risk_score: data.risk_score !== undefined ? data.risk_score : (riskScore || null)
               })
               .select()
               .single();
@@ -2383,47 +2386,6 @@ export default function Home() {
                       </div>
                     )}
                     {result && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-                          <div className="bg-black border border-[#c7b079] rounded-lg p-6 max-w-md w-full mx-4">
-                            <h3 className="text-xl font-bold text-[#c7b079] mb-4">
-                              {language === 'TR' ? 'Yargı Alanı Tespiti' : 'Jurisdiction Detection'}
-                            </h3>
-                            <p className="text-white mb-4">
-                              {language === 'TR' 
-                                ? `Bu belgenin ${jurisdictionConfirmation.detected_country === 'TR' ? 'Türkiye' : jurisdictionConfirmation.detected_country === 'DE' ? 'Almanya' : jurisdictionConfirmation.detected_country === 'UK' ? 'İngiltere' : 'ABD'} hukukuna ait olduğu tespit edildi.`
-                                : `This document has been detected as ${jurisdictionConfirmation.detected_country === 'TR' ? 'Turkey' : jurisdictionConfirmation.detected_country === 'DE' ? 'Germany' : jurisdictionConfirmation.detected_country === 'UK' ? 'United Kingdom' : 'United States'} law.`}
-                            </p>
-                            {jurisdictionConfirmation.cross_border && jurisdictionConfirmation.secondary_countries && (
-                              <p className="text-yellow-400 mb-4 text-sm">
-                                ⚠️ {language === 'TR' ? 'Çapraz sınır tespit edildi: ' : 'Cross-border detected: '}
-                                {jurisdictionConfirmation.secondary_countries.map(c => 
-                                  c === 'TR' ? 'Türkiye' : c === 'DE' ? 'Almanya' : c === 'UK' ? 'İngiltere' : 'ABD'
-                                ).join(', ')}
-                              </p>
-                            )}
-                            <div className="flex gap-3">
-                              <button
-                                onClick={() => {
-                                  setJurisdictionConfirmation(null);
-                                  setUserSelectedCountry(jurisdictionConfirmation.detected_country);
-                                }}
-                                className="flex-1 bg-[#c7b079] text-black font-bold py-2 px-4 rounded hover:bg-[#b8a068] transition"
-                              >
-                                {language === 'TR' ? 'Onayla' : 'Confirm'}
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setJurisdictionConfirmation({...jurisdictionConfirmation, show: false});
-                                }}
-                                className="flex-1 bg-gray-700 text-white py-2 px-4 rounded hover:bg-gray-600 transition"
-                              >
-                                {language === 'TR' ? 'İptal' : 'Cancel'}
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                      
                       <AnalysisResult
                         result={result}
                         gold={gold}

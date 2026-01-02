@@ -119,8 +119,7 @@ function parseGermanLegislationXML(xmlText: string, lawCode: string): string {
   try {
     // Cheerio XML modunda parse et
     const $ = cheerio.load(xmlText, { 
-      xmlMode: true,
-      decodeEntities: true // UTF-8 karakterler için
+      xmlMode: true
     });
     
     let fullText = '';
@@ -191,9 +190,7 @@ function parseGermanLegislationXML(xmlText: string, lawCode: string): string {
  */
 function parseGermanLegislationHTML(htmlText: string): string {
   try {
-    const $ = cheerio.load(htmlText, {
-      decodeEntities: true // UTF-8 için
-    });
+    const $ = cheerio.load(htmlText);
     
     // Gesetze im Internet HTML yapısı genellikle şu şekildedir:
     // <div id="container"> içinde <div class="jnhtml"> içinde içerik

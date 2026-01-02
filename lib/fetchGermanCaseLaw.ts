@@ -38,9 +38,7 @@ async function fetchBGHCases(limit: number = 20): Promise<GermanCase[]> {
     
     if (response.ok) {
       const html = await response.text();
-      const $ = cheerio.load(html, {
-        decodeEntities: true // UTF-8 için
-      });
+      const $ = cheerio.load(html);
       
       // Case links'i bul
       $('a[href*="/jportal/"], a[href*="gericht=BGH"]').each((i, elem) => {
@@ -77,9 +75,7 @@ async function fetchBGHCases(limit: number = 20): Promise<GermanCase[]> {
           
           if (caseResponse.ok) {
             const caseHtml = await caseResponse.text();
-            const $case = cheerio.load(caseHtml, {
-              decodeEntities: true // UTF-8 için
-            });
+            const $case = cheerio.load(caseHtml);
             
             // Leitsatz (Özet) ve Gründe (Gerekçe) bölümlerini bul
             const contentSelectors = [
@@ -177,9 +173,7 @@ async function fetchBVerfGCases(limit: number = 20): Promise<GermanCase[]> {
     
     if (response.ok) {
       const html = await response.text();
-      const $ = cheerio.load(html, {
-        decodeEntities: true
-      });
+      const $ = cheerio.load(html);
       
       $('a[href*="/jportal/"], a[href*="gericht=BVerfG"]').each((i, elem) => {
         if (cases.length >= limit) return false;
@@ -210,9 +204,7 @@ async function fetchBVerfGCases(limit: number = 20): Promise<GermanCase[]> {
           
           if (caseResponse.ok) {
             const caseHtml = await caseResponse.text();
-            const $case = cheerio.load(caseHtml, {
-              decodeEntities: true
-            });
+            const $case = cheerio.load(caseHtml);
             
             let leitsatz = '';
             let gruende = '';

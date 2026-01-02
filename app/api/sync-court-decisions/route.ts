@@ -34,6 +34,15 @@ async function syncCourtDecisions() {
     let scotusOk = 0, scotusFail = 0, scotusNew = 0;
     let courtlistenerOk = 0, courtlistenerFail = 0, courtlistenerNew = 0;
     let openjuristOk = 0, openjuristFail = 0, openjuristNew = 0;
+    let govinfoOk = 0, govinfoFail = 0, govinfoNew = 0;
+    let uscodeOk = 0, uscodeFail = 0, uscodeNew = 0;
+    let federalregisterOk = 0, federalregisterFail = 0, federalregisterNew = 0;
+    let locOk = 0, locFail = 0, locNew = 0;
+    let statelawsOk = 0, statelawsFail = 0, statelawsNew = 0;
+    let ukOk = 0, ukFail = 0, ukNew = 0;
+    let ukCaseOk = 0, ukCaseFail = 0, ukCaseNew = 0;
+    let germanLegislationOk = 0, germanLegislationFail = 0, germanLegislationNew = 0;
+    let germanCaseOk = 0, germanCaseFail = 0, germanCaseNew = 0;
 
     // Yargıtay kararlarını çek ve kaydet
     try {

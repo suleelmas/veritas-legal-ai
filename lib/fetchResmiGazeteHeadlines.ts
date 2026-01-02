@@ -43,7 +43,7 @@ export async function fetchResmiGazeteHeadlines(): Promise<string[]> {
                   try {
                     // PDF içeriğini çek
                     const pdfBuffer = await detailResponse.arrayBuffer();
-                    const pdfData = await pdfParse(Buffer.from(pdfBuffer));
+                    const pdfData = await (pdfParse as any)(Buffer.from(pdfBuffer));
                     
                     // PDF metnini temizle
                     let pdfText = pdfData.text;

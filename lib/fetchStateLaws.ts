@@ -42,11 +42,7 @@ async function fetchNewYorkLaws(): Promise<StateLaw[]> {
             title: `NY State: ${title}`,
             content: title,
             date: new Date().toISOString().split('T')[0],
-            state: 'NY',
-            metadata: {
-              country: 'US',
-              level: 'State'
-            }
+            state: 'ny'
           });
         }
       });
@@ -120,11 +116,7 @@ async function fetchCaliforniaLaws(): Promise<StateLaw[]> {
             title: `CA State: ${title}`,
             content: title,
             date: new Date().toISOString().split('T')[0],
-            state: 'CA',
-            metadata: {
-              country: 'US',
-              level: 'State'
-            }
+            state: 'ca'
           });
         }
       });
@@ -167,11 +159,7 @@ async function fetchDelawareLaws(): Promise<StateLaw[]> {
             title: `DE State: ${title}`,
             content: title,
             date: new Date().toISOString().split('T')[0],
-            state: 'DE',
-            metadata: {
-              country: 'US',
-              level: 'State'
-            }
+            state: 'de'
           });
         }
       });

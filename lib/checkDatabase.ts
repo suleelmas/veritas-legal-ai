@@ -52,7 +52,7 @@ export async function checkUSDatabase(): Promise<DatabaseStats> {
       .or('metadata->>country.eq.TR,metadata->>source.in.(yargitay,danistay,anayasa,kvkk,resmigazete,tbmm,mbs)');
     
     const usDocuments = usDocs || [];
-    const trDocuments = trDocs?.data || [];
+    const trDocuments = trDocs || [];
     const allDocuments = allDocs || [];
     
     // İstatistikler

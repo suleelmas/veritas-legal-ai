@@ -62,11 +62,7 @@ export async function fetchGovInfo(
                     title: `GovInfo Bill: ${detail.title || pkg.packageId}`,
                     content: content || detail.title || '',
                     date: detail.dateIssued || pkg.lastModified || new Date().toISOString().split('T')[0],
-                    type: 'bills',
-                    metadata: {
-                      country: 'US',
-                      level: 'Federal'
-                    }
+                    type: 'bills'
                   });
                 }
               } catch (err) {
@@ -174,15 +170,11 @@ export async function fetchGovInfo(
                     metadata.level = 'Federal';
                   }
                   
-                  if (['ny', 'ca', 'de'].includes(source?.toLowerCase())) {
-                    metadata.state = source.toUpperCase();
-                    metadata.level = 'State';
-                  }
-                  
                   documents.push({
                     title: metadata.title,
                     content: metadata.content,
-                    date: metadata.date
+                    date: metadata.date,
+                    type: type
                   });
               }
             }
