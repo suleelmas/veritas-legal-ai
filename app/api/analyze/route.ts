@@ -1194,6 +1194,50 @@ export async function POST(req: Request) {
         }
       }
       
+      // Risk Assessments parsing (free tier için)
+      let riskAssessmentsFree: Array<{
+        risk: string;
+        severity: number;
+        reference: string;
+        type: 'Standard Risk' | 'Quantum Conflict Detected';
+        countries?: string[];
+      }> = [];
+      
+      if (formattedReply) {
+        // Risk assessment formatı: [Risk Description] | [Severity Score 1-10] | [Legal Reference] [Standard Risk] veya [Quantum Conflict Detected]
+        const riskRegex = /\[([^\]]+)\]\s*\|\s*\[(\d+)\]\s*\|\s*\[([^\]]+)\]\s*\[(Standard Risk|Quantum Conflict Detected)\](?:\s*\[([^\]]+)\])?/gi;
+        let match;
+        while ((match = riskRegex.exec(formattedReply)) !== null) {
+          const risk = match[1] || '';
+          const severity = parseInt(match[2] || '0');
+          const reference = match[3] || '';
+          const type = (match[4] === 'Quantum Conflict Detected' ? 'Quantum Conflict Detected' : 'Standard Risk') as 'Standard Risk' | 'Quantum Conflict Detected';
+          const countries = match[5] ? match[5].split(',').map(c => c.trim()) : undefined;
+          
+          riskAssessmentsFree.push({
+            risk,
+            severity,
+            reference,
+            type,
+            countries
+          });
+        }
+        
+        // Alternatif format: Eğer yukarıdaki regex hiçbir şey bulamazsa, daha esnek bir regex dene
+        if (riskAssessmentsFree.length === 0) {
+          const flexibleRiskRegex = /(?:Risk|Riski?|Risk Assessment)[:\s]*([^\n|]+?)\s*\|\s*Severity[:\s]*(\d+)\s*\|\s*Reference[:\s]*([^\n|]+?)(?:\s*\[(Standard Risk|Quantum Conflict Detected)\])?/gi;
+          let flexMatch;
+          while ((flexMatch = flexibleRiskRegex.exec(formattedReply)) !== null) {
+            riskAssessmentsFree.push({
+              risk: flexMatch[1]?.trim() || '',
+              severity: parseInt(flexMatch[2] || '0'),
+              reference: flexMatch[3]?.trim() || '',
+              type: (flexMatch[4] === 'Quantum Conflict Detected' ? 'Quantum Conflict Detected' : 'Standard Risk') as 'Standard Risk' | 'Quantum Conflict Detected'
+            });
+          }
+        }
+      }
+      
       // Jurisdiction detection sonucunu response'a ekle
       return NextResponse.json({ 
         reply: formattedReply,
