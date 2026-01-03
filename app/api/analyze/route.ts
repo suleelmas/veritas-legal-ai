@@ -810,6 +810,25 @@ export async function POST(req: Request) {
       detectedCountry = (targetLang === 'EN' || targetLang === 'English') ? 'US' : 'TR';
     }
     
+    // 0. ADMIN KONTROLÜ - Session'dan email al ve admin kontrolü yap (getRelevantDocuments'tan ÖNCE)
+    const { data: { session } } = await supabase.auth.getSession();
+    const isAdmin = session?.user?.email && ADMIN_EMAILS.includes(session.user.email);
+    
+    // 0.1. KULLANICI PAKET KONTROLÜ - Global paket kontrolü (getRelevantDocuments'tan ÖNCE)
+    let userPackage = 'free';
+    let isGlobalPackage = false;
+    if (session?.user?.id) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('package_type')
+        .eq('id', session.user.id)
+        .maybeSingle();
+      
+      userPackage = profile?.package_type || 'free';
+      // Global paket kontrolü: 'enterprise' veya 'quantum_global' olabilir
+      isGlobalPackage = (userPackage === 'enterprise' || userPackage === 'quantum_global' || isAdmin) ? true : false;
+    }
+    
     // 2. Hibrit veri çekme - Vector DB + Live Fetch
     // Detected country'ye göre filtreleme yapılacak
     // Global paket için tüm ülkelerden veri çek
@@ -865,25 +884,6 @@ export async function POST(req: Request) {
       });
     }
 
-    // 0. ADMIN KONTROLÜ - Session'dan email al ve admin kontrolü yap
-    const { data: { session } } = await supabase.auth.getSession();
-    const isAdmin = session?.user?.email && ADMIN_EMAILS.includes(session.user.email);
-    
-    // 0.1. KULLANICI PAKET KONTROLÜ - Global paket kontrolü
-    let userPackage = 'free';
-    let isGlobalPackage = false;
-    if (session?.user?.id) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('package_type')
-        .eq('id', session.user.id)
-        .maybeSingle();
-      
-      userPackage = profile?.package_type || 'free';
-      // Global paket kontrolü: 'enterprise' veya 'quantum_global' olabilir
-      isGlobalPackage = userPackage === 'enterprise' || userPackage === 'quantum_global' || isAdmin;
-    }
-    
     // 1. KREDİ KONTROLÜ (Admin değilse)
     let creditRow = null;
     let usedDisks = null;
@@ -989,6 +989,80 @@ export async function POST(req: Request) {
             countryB: match[3]?.split(':')[0] || '',
             countryBRule: match[3]?.split(':').slice(1).join(':') || match[3] || '',
             riskScore: parseInt(match[4] || '0')
+          });
+        }
+      }
+      
+      // Legal References & Bibliography parsing
+      let legalReferences: Array<{
+        country: string;
+        countryFlag: string;
+        lawName: string;
+        article: string;
+        summary: string;
+        isPrecedent: boolean;
+        crossReference?: Array<{
+          country: string;
+          countryFlag: string;
+          lawName: string;
+          article: string;
+        }>;
+      }> = [];
+      
+      if (formattedReply) {
+        const referenceRegex = /([🇹🇷🇺🇸🇬🇧🇩🇪])\s+([^-]+?)\s*-\s*([^\n]+)/g;
+        const matches = formattedReply.matchAll(referenceRegex);
+        
+        const flagToCountry: { [key: string]: string } = {
+          '🇹🇷': 'TR',
+          '🇺🇸': 'US',
+          '🇬🇧': 'UK',
+          '🇩🇪': 'DE'
+        };
+        
+        for (const match of matches) {
+          const flag = match[1];
+          const lawPart = match[2].trim();
+          const summary = match[3].trim();
+          
+          const articleMatch = lawPart.match(/(.+?)\s+(?:Madde|§|Article|s\.|Art\.)\s*(\d+[a-z]?)/i);
+          if (articleMatch) {
+            legalReferences.push({
+              country: flagToCountry[flag] || 'UNKNOWN',
+              countryFlag: flag,
+              lawName: articleMatch[1].trim(),
+              article: articleMatch[2],
+              summary: summary,
+              isPrecedent: /Court|Case|Precedent|İçtihat|Karar/i.test(lawPart)
+            });
+          } else {
+            legalReferences.push({
+              country: flagToCountry[flag] || 'UNKNOWN',
+              countryFlag: flag,
+              lawName: lawPart,
+              article: '',
+              summary: summary,
+              isPrecedent: /Court|Case|Precedent|İçtihat|Karar/i.test(lawPart)
+            });
+          }
+        }
+        
+        if (isGlobalPackage && legalReferences.length > 0) {
+          const groupedRefs = new Map<string, typeof legalReferences>();
+          legalReferences.forEach(ref => {
+            const key = ref.summary.toLowerCase().substring(0, 30);
+            if (!groupedRefs.has(key)) {
+              groupedRefs.set(key, []);
+            }
+            groupedRefs.get(key)!.push(ref);
+          });
+          
+          groupedRefs.forEach((refs, key) => {
+            if (refs.length >= 2) {
+              refs.forEach(ref => {
+                ref.crossReference = refs.filter(r => r.country !== ref.country);
+              });
+            }
           });
         }
       }

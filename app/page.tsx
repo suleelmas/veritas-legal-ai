@@ -105,7 +105,7 @@ import html2canvas from 'html2canvas';
 */
 
 type Tab = "analyze" | "pricing" | "about" | "history";
-type UserPackage = "free" | "basic" | "professional" | "enterprise" | null;
+type UserPackage = "free" | "basic" | "professional" | "enterprise" | "quantum_global" | null;
 
 export default function Home() {
   const router = useRouter();
@@ -667,7 +667,8 @@ export default function Home() {
       'free': 1,
       'basic': 10,
       'professional': 50,
-      'enterprise': Infinity
+      'enterprise': Infinity,
+      'quantum_global': Infinity
     };
     
     const limit = limits[pkg] || 1;
@@ -759,7 +760,8 @@ export default function Home() {
       'free': 1,
       'basic': 10,
       'professional': 50,
-      'enterprise': Infinity
+      'enterprise': Infinity,
+      'quantum_global': Infinity
     };
     
     const limit = limits[pkg] || 1;
@@ -1155,7 +1157,10 @@ export default function Home() {
   }, [loading, language]);
 
   const handleAuth = async () => {
-    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
+    // Dinamik olarak mevcut domain'i kullan (production'da veritasq.ai, development'ta localhost)
+    const baseUrl = typeof window !== 'undefined' 
+      ? window.location.origin 
+      : (process.env.NEXT_PUBLIC_SITE_URL || 'https://veritasq.ai');
     const redirectUrl = `${baseUrl}/auth/callback`;
     
     await supabase.auth.signInWithOAuth({
