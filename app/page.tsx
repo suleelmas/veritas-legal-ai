@@ -758,13 +758,21 @@ export default function Home() {
   };
 
   const canViewDetailedAnalysis = (): boolean => {
+    // Admin email kontrolü - Hardcode ADMIN ve GLOBAL plan
+    if (user?.email === 'elmas7853@gmail.com') {
+      return true; // Admin için her zaman true
+    }
     const pkg = effectivePackage;
-    return pkg === 'professional' || pkg === 'enterprise';
+    return pkg === 'professional' || pkg === 'enterprise' || pkg === 'quantum_global';
   };
 
   const canViewRiskScore = (): boolean => {
+    // Admin email kontrolü - Hardcode ADMIN ve GLOBAL plan
+    if (user?.email === 'elmas7853@gmail.com') {
+      return true; // Admin için her zaman true
+    }
     const pkg = effectivePackage;
-    return pkg === 'professional' || pkg === 'enterprise';
+    return pkg === 'professional' || pkg === 'enterprise' || pkg === 'quantum_global';
   };
 
   const canAccessHistory = (): boolean => {
@@ -1287,19 +1295,71 @@ export default function Home() {
     setLoading(true);
     setResult("");
     try {
-      // PDF'den metin çıkarma
-      const pdfjsLib = await import('pdfjs-dist');
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
-      
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      // PDF'den metin çıkarma - GÜÇLENDİRİLMİŞ HATA YÖNETİMİ
       let fullText = '';
       
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        const pageText = textContent.items.map((item: any) => item.str).join(' ');
-        fullText += pageText + '\n';
+      try {
+        const pdfjsLib = await import('pdfjs-dist');
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+        
+        const arrayBuffer = await file.arrayBuffer();
+        
+        // PDF yapısını kontrol et
+        if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+          throw new Error('PDF dosyası boş veya geçersiz');
+        }
+        
+        // PDF'i yükle - daha esnek ayarlarla
+        const pdf = await pdfjsLib.getDocument({ 
+          data: arrayBuffer,
+          verbosity: 0, // Hata mesajlarını azalt
+          stopAtErrors: false, // Hatalarda durma, devam et
+          maxImageSize: 1024 * 1024, // 1MB
+          isEvalSupported: false,
+          useSystemFonts: true
+        }).promise;
+        
+        // Sayfa sayısını kontrol et
+        if (!pdf || !pdf.numPages || pdf.numPages === 0) {
+          throw new Error('PDF dosyasında sayfa bulunamadı');
+        }
+        
+        // Her sayfadan metin çıkar
+        for (let i = 1; i <= pdf.numPages; i++) {
+          try {
+            const page = await pdf.getPage(i);
+            const textContent = await page.getTextContent();
+            
+            if (textContent && textContent.items && textContent.items.length > 0) {
+              const pageText = textContent.items
+                .map((item: any) => item.str || '')
+                .filter((str: string) => str.trim().length > 0)
+                .join(' ');
+              fullText += pageText + '\n';
+            }
+          } catch (pageError) {
+            console.warn(`Sayfa ${i} okunamadı:`, pageError);
+            // Sayfa hatası olsa bile devam et
+            fullText += `\n[Sayfa ${i} okunamadı - görsel içerik veya korumalı dosya olabilir]\n`;
+          }
+        }
+        
+        // Eğer hiç metin çıkarılamadıysa
+        if (!fullText || fullText.trim().length === 0) {
+          fullText = `[PDF dosyasından metin çıkarılamadı. Dosya görsel tabanlı, korumalı veya bozuk olabilir. Dosya adı: ${file.name}, Boyut: ${(file.size / 1024).toFixed(2)} KB]`;
+        }
+        
+      } catch (pdfError: any) {
+        console.error('PDF okuma hatası:', pdfError);
+        // PDF okunamazsa bile kullanıcıya teknik bir rapor sun
+        fullText = `[PDF OKUMA HATASI] Dosya yapısı karmaşık veya geçersiz olabilir. 
+Dosya Bilgileri:
+- Dosya Adı: ${file.name}
+- Dosya Boyutu: ${(file.size / 1024).toFixed(2)} KB
+- Hata Detayı: ${pdfError.message || 'Bilinmeyen hata'}
+- Öneri: Dosyanın şifre korumalı olmadığından, bozuk olmadığından ve standart PDF formatında olduğundan emin olun.
+
+Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
       }
       
       // PDF metnini state'e kaydet (chat için)

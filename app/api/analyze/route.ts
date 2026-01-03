@@ -980,7 +980,11 @@ IMPORTANT: Provide both the detailed text analysis AND this JSON structure. The 
 5. For cross-jurisdictional analysis (Global package), map each risk to equivalent articles across all 4 jurisdictions (TR, US, UK, DE)
 Example format: "Article 5 of the contract conflicts with TBK Madde 112 (Turkish Code of Obligations) which requires X, while BGB § 433 (German Civil Code) allows Y, and UCC § 2-201 (US Uniform Commercial Code) permits Z. This creates a legal uncertainty because..."`;
     
-    const systemPrompt = `Sen profesyonel bir hukuk analistisin. Analizini sadece ${targetLang} dilinde yap. Paragrafları tekrar etme.${contextText ? ' ' + sourcesText : ''}${dateConflictInstruction}${localizationInstruction}${legalContextInstruction}${crossJurisdictionalInstruction}${riskAssessmentInstruction}${bibliographyInstruction}${deepAnalysisInstruction}${jsonFormatInstruction}`;
+    const systemPrompt = `Sen profesyonel bir hukuk analistisin. Analizini sadece ${targetLang} dilinde yap. Paragrafları tekrar etme.
+
+KRİTİK KURAL: ASLA BOŞ SONUÇ DÖNME! Eğer PDF okunamazsa veya dosya formatıyla ilgili bir sorun varsa bile, kullanıcıya dosyanın formatıyla ilgili teknik bir risk raporu sun. Örnek: "Dosya yapısı analiz edilemedi ancak şu teknik riskler tespit edildi: [dosya boyutu, şifre koruması, format uyumsuzluğu vb.]". Her durumda en az 2-3 risk ve 3-5 hukuki referans döndür.
+
+${contextText ? ' ' + sourcesText : ''}${dateConflictInstruction}${localizationInstruction}${legalContextInstruction}${crossJurisdictionalInstruction}${riskAssessmentInstruction}${bibliographyInstruction}${deepAnalysisInstruction}${jsonFormatInstruction}`;
     const userPrompt = userPromptText;
 
     // Admin ise limit kontrolünü bypass et
@@ -1162,7 +1166,7 @@ Example format: "Article 5 of the contract conflicts with TBK Madde 112 (Turkish
         });
       }
       
-      // Risk Assessments'ı parse et
+      // Risk Assessments'ı parse et - Önce JSON'dan, sonra text'ten
       let riskAssessments: Array<{
         risk: string;
         severity: number;
@@ -1171,7 +1175,21 @@ Example format: "Article 5 of the contract conflicts with TBK Madde 112 (Turkish
         countries?: string[];
       }> = [];
       
-      if (formattedReply) {
+      // Önce JSON'dan risk verilerini çıkar
+      if (parsedJsonData && parsedJsonData.risks && Array.isArray(parsedJsonData.risks)) {
+        parsedJsonData.risks.forEach((riskItem: any) => {
+          riskAssessments.push({
+            risk: riskItem.risk || riskItem.title || riskItem.description || '',
+            severity: parseInt(riskItem.severity || riskItem.level || '0'),
+            reference: riskItem.reference || riskItem.legalReference || '',
+            type: (riskItem.type === 'Quantum Conflict Detected' || riskItem.quantumConflict) ? 'Quantum Conflict Detected' : 'Standard Risk',
+            countries: riskItem.countries || riskItem.affectedCountries
+          });
+        });
+      }
+      
+      // Eğer JSON'dan risk bulunamadıysa, text'ten parse et
+      if (riskAssessments.length === 0 && formattedReply) {
         // Risk assessment formatı: [Risk Description] | [Severity Score 1-10] | [Legal Reference] [Standard Risk] veya [Quantum Conflict Detected]
         const riskRegex = /\[([^\]]+)\]\s*\|\s*\[(\d+)\]\s*\|\s*\[([^\]]+)\]\s*\[(Standard Risk|Quantum Conflict Detected)\](?:\s*\[([^\]]+)\])?/gi;
         let match;
