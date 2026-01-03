@@ -940,7 +940,41 @@ export async function POST(req: Request) {
       ? ` RISK ASSESSMENT MODULE (Quantum Cross-Risk Analysis): Perform a Cross-Jurisdictional Risk Analysis. Compare the document against both ${detectedCountry || 'primary'} and other major jurisdictions (TR, US, UK, DE) simultaneously to detect conflicting risks. For each risk identified, provide: [Risk Description] | [Severity Score 1-10] | [Country/Countries Affected] | [Legal Reference: Law Article]. Format risks in a structured list. Mark cross-jurisdictional conflicts with [Quantum Conflict Detected] tag. Example: [Penalty rate discrepancy] | [8] | [TR, US] | [TBK Madde 112, UCC § 2-201] [Quantum Conflict Detected].`
       : ` RISK ASSESSMENT MODULE (Basic Risk Analysis): Please identify all legal risks in this document and assign each risk a severity score from 1-10 (where 1 is minimal risk and 10 is critical risk). For each risk, provide: [Risk Description] | [Severity Score 1-10] | [Legal Reference: Law Article]. Format risks in a structured list. Mark each risk with [Standard Risk] tag. Focus only on the primary jurisdiction (${detectedCountry || 'detected country'}). Example: [Breach of contract liability] | [7] | [TBK Madde 112] [Standard Risk].`;
     
-    const systemPrompt = `Sen profesyonel bir hukuk analistisin. Analizini sadece ${targetLang} dilinde yap. Paragrafları tekrar etme.${contextText ? ' ' + sourcesText : ''}${dateConflictInstruction}${localizationInstruction}${legalContextInstruction}${crossJurisdictionalInstruction}${riskAssessmentInstruction}${bibliographyInstruction}`;
+    // JSON Format Instruction - AI'dan yapılandırılmış veri iste
+    const jsonFormatInstruction = ` CRITICAL OUTPUT FORMAT: At the end of your analysis, you MUST provide a JSON structure (even if embedded in text) with the following format:
+{
+  "analysis": "Your detailed analysis text here...",
+  "risks": [
+    {
+      "level": "High|Medium|Low",
+      "title": "Risk title",
+      "description": "Detailed risk description",
+      "severity": 8,
+      "reference": "TBK Madde 112",
+      "countries": ["TR"]
+    }
+  ],
+  "references": [
+    {
+      "law": "TBK",
+      "section": "Madde 112",
+      "country": "TR",
+      "summary": "Borcun ifa edilmemesi"
+    }
+  ]
+}
+IMPORTANT: Provide both the detailed text analysis AND this JSON structure. The JSON should be clearly marked with "===JSON_START===" and "===JSON_END===" markers.`;
+    
+    // Deep Analysis Instruction - Çelişkili kanun maddelerini tek tek eşleştir
+    const deepAnalysisInstruction = ` DEEP LEGAL ANALYSIS REQUIREMENT: Do not just summarize. For each identified risk or conflict, you MUST:
+1. Identify the specific conflicting legal articles (e.g., BGB § 433 vs TBK Madde 112 vs UCC § 2-201)
+2. Compare the exact wording and legal implications of each article
+3. Explain how these articles conflict or complement each other in the context of this document
+4. Provide specific examples from the document text that demonstrate the conflict
+5. For cross-jurisdictional analysis (Global package), map each risk to equivalent articles across all 4 jurisdictions (TR, US, UK, DE)
+Example format: "Article 5 of the contract conflicts with TBK Madde 112 (Turkish Code of Obligations) which requires X, while BGB § 433 (German Civil Code) allows Y, and UCC § 2-201 (US Uniform Commercial Code) permits Z. This creates a legal uncertainty because..."`;
+    
+    const systemPrompt = `Sen profesyonel bir hukuk analistisin. Analizini sadece ${targetLang} dilinde yap. Paragrafları tekrar etme.${contextText ? ' ' + sourcesText : ''}${dateConflictInstruction}${localizationInstruction}${legalContextInstruction}${crossJurisdictionalInstruction}${riskAssessmentInstruction}${bibliographyInstruction}${deepAnalysisInstruction}${jsonFormatInstruction}`;
     const userPrompt = userPromptText;
 
     // Admin ise limit kontrolünü bypass et
@@ -965,6 +999,37 @@ export async function POST(req: Request) {
       let formattedReply = response.choices[0].message.content || '';
       if ((targetLang === 'EN' || targetLang === 'English') && relevantDocs.length > 0) {
         formattedReply = formatAnalysisWithCitations(formattedReply, relevantDocs);
+      }
+      
+      // JSON formatından veri çıkar (eğer varsa)
+      let parsedJsonData: any = null;
+      const jsonStartMarker = '===JSON_START===';
+      const jsonEndMarker = '===JSON_END===';
+      const jsonStartIdx = formattedReply.indexOf(jsonStartMarker);
+      const jsonEndIdx = formattedReply.indexOf(jsonEndMarker);
+      
+      if (jsonStartIdx !== -1 && jsonEndIdx !== -1) {
+        try {
+          const jsonStr = formattedReply.substring(jsonStartIdx + jsonStartMarker.length, jsonEndIdx).trim();
+          parsedJsonData = JSON.parse(jsonStr);
+          // JSON kısmını formattedReply'den çıkar (sadece analiz metni kalsın)
+          formattedReply = formattedReply.substring(0, jsonStartIdx) + formattedReply.substring(jsonEndIdx + jsonEndMarker.length);
+        } catch (e) {
+          console.error('JSON parse error:', e);
+        }
+      }
+      
+      // Alternatif: JSON'u markdown code block içinde ara
+      if (!parsedJsonData) {
+        const jsonCodeBlockRegex = /```json\s*([\s\S]*?)\s*```/i;
+        const match = formattedReply.match(jsonCodeBlockRegex);
+        if (match) {
+          try {
+            parsedJsonData = JSON.parse(match[1]);
+          } catch (e) {
+            console.error('JSON code block parse error:', e);
+          }
+        }
       }
       
       // Cross-jurisdictional conflicts'u parse et (sadece Global paket için)
@@ -993,7 +1058,7 @@ export async function POST(req: Request) {
         }
       }
       
-      // Legal References & Bibliography parsing
+      // Legal References & Bibliography parsing - Önce JSON'dan, sonra text'ten
       let legalReferences: Array<{
         country: string;
         countryFlag: string;
@@ -1009,16 +1074,39 @@ export async function POST(req: Request) {
         }>;
       }> = [];
       
-      if (formattedReply) {
+      const flagToCountry: { [key: string]: string } = {
+        '🇹🇷': 'TR',
+        '🇺🇸': 'US',
+        '🇬🇧': 'UK',
+        '🇩🇪': 'DE'
+      };
+      
+      const countryToFlag: { [key: string]: string } = {
+        'TR': '🇹🇷',
+        'US': '🇺🇸',
+        'UK': '🇬🇧',
+        'DE': '🇩🇪'
+      };
+      
+      // Önce JSON'dan referans verilerini çıkar
+      if (parsedJsonData && parsedJsonData.references && Array.isArray(parsedJsonData.references)) {
+        parsedJsonData.references.forEach((refItem: any) => {
+          const country = refItem.country || 'UNKNOWN';
+          legalReferences.push({
+            country: country,
+            countryFlag: countryToFlag[country] || '🌍',
+            lawName: refItem.law || '',
+            article: refItem.section || '',
+            summary: refItem.summary || '',
+            isPrecedent: /Court|Case|Precedent|İçtihat|Karar/i.test(refItem.law || '')
+          });
+        });
+      }
+      
+      // Eğer JSON'dan veri yoksa, text'ten parse et
+      if (legalReferences.length === 0 && formattedReply) {
         const referenceRegex = /([🇹🇷🇺🇸🇬🇧🇩🇪])\s+([^-]+?)\s*-\s*([^\n]+)/g;
         const matches = formattedReply.matchAll(referenceRegex);
-        
-        const flagToCountry: { [key: string]: string } = {
-          '🇹🇷': 'TR',
-          '🇺🇸': 'US',
-          '🇬🇧': 'UK',
-          '🇩🇪': 'DE'
-        };
         
         for (const match of matches) {
           const flag = match[1];
@@ -1046,25 +1134,26 @@ export async function POST(req: Request) {
             });
           }
         }
+      }
+      
+      // Cross-reference ekle (Global paket için)
+      if (isGlobalPackage && legalReferences.length > 0) {
+        const groupedRefs = new Map<string, typeof legalReferences>();
+        legalReferences.forEach(ref => {
+          const key = ref.summary.toLowerCase().substring(0, 30);
+          if (!groupedRefs.has(key)) {
+            groupedRefs.set(key, []);
+          }
+          groupedRefs.get(key)!.push(ref);
+        });
         
-        if (isGlobalPackage && legalReferences.length > 0) {
-          const groupedRefs = new Map<string, typeof legalReferences>();
-          legalReferences.forEach(ref => {
-            const key = ref.summary.toLowerCase().substring(0, 30);
-            if (!groupedRefs.has(key)) {
-              groupedRefs.set(key, []);
-            }
-            groupedRefs.get(key)!.push(ref);
-          });
-          
-          groupedRefs.forEach((refs, key) => {
-            if (refs.length >= 2) {
-              refs.forEach(ref => {
-                ref.crossReference = refs.filter(r => r.country !== ref.country);
-              });
-            }
-          });
-        }
+        groupedRefs.forEach((refs, key) => {
+          if (refs.length >= 2) {
+            refs.forEach(ref => {
+              ref.crossReference = refs.filter(r => r.country !== ref.country);
+            });
+          }
+        });
       }
       
       // Risk Assessments'ı parse et

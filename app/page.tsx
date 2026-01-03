@@ -120,6 +120,20 @@ export default function Home() {
   
   // Admin Email Listesi
   const ADMIN_EMAILS = ['elmas7853@gmail.com'];
+  
+  // Admin kontrolü ve user.role/user.plan ayarlama
+  useEffect(() => {
+    if (user?.email && ADMIN_EMAILS.includes(user.email)) {
+      // Admin email ise role ve plan'ı ayarla
+      setUser((prevUser: any) => ({
+        ...prevUser,
+        role: 'ADMIN',
+        plan: 'GLOBAL'
+      }));
+      setIsAdmin(true);
+      setUserPackage('quantum_global'); // Admin'e Global paket ver
+    }
+  }, [user?.email]);
   const [analysisCount, setAnalysisCount] = useState(0);
   const [analysisHistory, setAnalysisHistory] = useState<Array<{id: string, title: string, date: string, summary: string, fullResult: string, riskScore: number | null}>>([]);
   const [file, setFile] = useState<File | null>(null);
@@ -550,6 +564,15 @@ export default function Home() {
         const adminStatus = userEmail && ADMIN_EMAILS.includes(userEmail);
         setIsAdmin(adminStatus || false);
         
+        // Admin ise user.role ve user.plan ayarla
+        if (adminStatus) {
+          setUser((prevUser: any) => ({
+            ...prevUser,
+            role: 'ADMIN',
+            plan: 'GLOBAL'
+          }));
+        }
+        
         try {
           // Profiles tablosundan paket bilgisini çek
           const { data: profile, error: profileError } = await supabase
@@ -562,7 +585,10 @@ export default function Home() {
             console.error('Profile fetch error:', profileError);
           }
           
-          const packageType = (profile?.package_type || 'free') as UserPackage;
+          // Admin ise quantum_global paketini zorla ayarla
+          const packageType = adminStatus 
+            ? 'quantum_global' as UserPackage
+            : (profile?.package_type || 'free') as UserPackage;
           setUserPackage(packageType);
           
           // Aylık reset kontrolü
@@ -3106,17 +3132,8 @@ export default function Home() {
                           e.currentTarget.style.transform = 'translateY(0)';
                         }
                       }}
-                      onMouseLeave={(e) => {
-                        if (
-                          ((uploadMode === 'single' && file) || (uploadMode === 'compare' && file && file2)) && 
-                          !loading && !isAnalyzing && !isLimitReached()
-                        ) {
-                          e.currentTarget.style.backgroundColor = '#ffffff';
-                          e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
-                        }
-                      }}
                     >
-                      <span style={{ color: (loading || isAnalyzing) ? lightText : (isLimitReached() ? lightText : darkBlue) }}>
+                      <span style={{ color: '#ffffff' }}>
                         {uploadMode === 'compare' 
                           ? (language === 'TR' ? 'Dosyaları Karşılaştır' : 'Compare Documents')
                           : ui[language].btn

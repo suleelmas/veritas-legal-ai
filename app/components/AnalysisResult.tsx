@@ -198,7 +198,8 @@ export default function AnalysisResult({
               }}>🔒</span>
             )}
           </button>
-          {riskAssessments && riskAssessments.length > 0 && (
+          {/* Risk Assessments sekmesi - Admin/Global kullanıcılar için her zaman göster */}
+          {(riskAssessments && riskAssessments.length > 0) || (isGlobalPackage || effectivePackage === 'quantum_global' || effectivePackage === 'enterprise') ? (
             <button
               onClick={() => setActiveResultTab('risks')}
               style={{
@@ -226,7 +227,7 @@ export default function AnalysisResult({
               }}
             >
               {language === 'TR' ? 'Hukuki Risk Analizi' : 'Legal Risk Analysis'}
-              {riskAssessments.length > 0 && (
+              {riskAssessments && riskAssessments.length > 0 && (
                 <span style={{
                   marginLeft: '8px',
                   fontSize: '11px',
@@ -241,7 +242,7 @@ export default function AnalysisResult({
                 </span>
               )}
             </button>
-          )}
+          ) : null}
         </div>
 
         <div style={{ minHeight: '200px' }}>
