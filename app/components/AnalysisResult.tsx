@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 
-type UserPackage = "free" | "basic" | "professional" | "enterprise" | null;
+type UserPackage = "free" | "basic" | "professional" | "enterprise" | "quantum_global" | null;
 
 interface AnalysisResultProps {
   result: string;

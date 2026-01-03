@@ -149,7 +149,7 @@ export default function Home() {
   const [adminTestPackage, setAdminTestPackage] = useState<UserPackage | null>(null);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [limitWarningDismissed, setLimitWarningDismissed] = useState(false);
-  const [activeResultTab, setActiveResultTab] = useState<'summary' | 'detailed'>('summary');
+  const [activeResultTab, setActiveResultTab] = useState<'summary' | 'detailed' | 'risks'>('summary');
   const [chatMessages, setChatMessages] = useState<Array<{role: 'user' | 'assistant', content: string}>>([]);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
