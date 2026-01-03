@@ -3573,6 +3573,7 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
                         activeResultTab={activeResultTab}
                         setActiveResultTab={setActiveResultTab}
                         effectivePackage={effectivePackage}
+                        isAdmin={isAdmin}
                         parseAnalysisResult={parseAnalysisResult}
                         extractRiskScore={extractRiskScore}
                         getRiskColor={getRiskColor}

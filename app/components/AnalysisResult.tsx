@@ -16,6 +16,7 @@ interface AnalysisResultProps {
   activeResultTab: 'summary' | 'detailed' | 'risks';
   setActiveResultTab: (tab: 'summary' | 'detailed' | 'risks') => void;
   effectivePackage: UserPackage;
+  isAdmin?: boolean;
   parseAnalysisResult: (text: string) => { summary: string; detailed: string };
   extractRiskScore: (text: string) => number;
   getRiskColor: (score: number) => string;
@@ -63,11 +64,14 @@ interface AnalysisResultProps {
     }>;
   }>;
   riskAssessments?: Array<{
-    description: string;
+    risk?: string;
+    description?: string;
     severity: number;
     countries?: string[];
-    legalReference: string;
-    isQuantumConflict: boolean;
+    reference?: string;
+    legalReference?: string;
+    type?: 'Standard Risk' | 'Quantum Conflict Detected';
+    isQuantumConflict?: boolean;
   }>;
 }
 
@@ -81,6 +85,7 @@ export default function AnalysisResult({
   activeResultTab,
   setActiveResultTab,
   effectivePackage,
+  isAdmin = false,
   parseAnalysisResult,
   extractRiskScore,
   getRiskColor,
@@ -114,7 +119,26 @@ export default function AnalysisResult({
 
   if (!result) return null;
 
-  const { summary, detailed } = parseAnalysisResult(result);
+  // JSON kod bloklarını temizle ve parse et
+  let cleanResult = result;
+  const jsonBlockRegex = /```json\s*[\s\S]*?```/gi;
+  const jsonStartEndRegex = /===JSON_START===[\s\S]*?===JSON_END===/gi;
+  cleanResult = cleanResult.replace(jsonBlockRegex, '');
+  cleanResult = cleanResult.replace(jsonStartEndRegex, '');
+  cleanResult = cleanResult.replace(/```[\s\S]*?```/g, ''); // Tüm kod bloklarını temizle
+  
+  // JSON parse etmeyi dene
+  let parsedData: any = null;
+  try {
+    const jsonMatch = result.match(/```json\s*([\s\S]*?)\s*```/i);
+    if (jsonMatch) {
+      parsedData = JSON.parse(jsonMatch[1]);
+    }
+  } catch (e) {
+    // JSON parse edilemezse devam et
+  }
+
+  const { summary, detailed } = parseAnalysisResult(cleanResult);
 
   return (
     <>
@@ -122,13 +146,52 @@ export default function AnalysisResult({
         ref={reportRef} 
         style={{ 
           marginTop: '30px', 
-          background: '#1a1f2e', 
-          padding: '30px', 
-          borderRadius: '15px', 
-          border: `1px solid ${gold}44` 
+          background: '#ffffff', 
+          padding: '40px', 
+          borderRadius: '20px', 
+          border: `2px solid ${gold}44`,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
+          color: '#1a1f2e'
         }}
       >
-        <h3 style={{ color: gold, marginBottom: '20px', fontSize: '1.5rem' }}>{ui[language].resultTitle}</h3>
+        {/* Professional Header with Logo */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '20px',
+          marginBottom: '30px',
+          paddingBottom: '20px',
+          borderBottom: `3px solid ${gold}`
+        }}>
+          <img 
+            src="/vq.png" 
+            alt="Veritas Q-AI Logo" 
+            style={{ 
+              height: '60px',
+              width: 'auto',
+              objectFit: 'contain'
+            }}
+          />
+          <div>
+            <h2 style={{ 
+              color: '#1a1f2e', 
+              margin: 0, 
+              fontSize: '2rem',
+              fontWeight: 'bold',
+              fontFamily: 'Inter, sans-serif'
+            }}>
+              {language === 'TR' ? 'Veritas Q-AI Analiz Raporu' : 'Veritas Q-AI Analysis Report'}
+            </h2>
+            <p style={{
+              color: '#666666',
+              margin: '5px 0 0 0',
+              fontSize: '0.9rem',
+              fontFamily: 'Inter, sans-serif'
+            }}>
+              {language === 'TR' ? 'Kuantum Tabanlı Hukuk Analizi' : 'Quantum-Based Legal Analysis'}
+            </p>
+          </div>
+        </div>
         
         <div style={{
           display: 'flex',
@@ -247,8 +310,32 @@ export default function AnalysisResult({
 
         <div style={{ minHeight: '200px' }}>
           {activeResultTab === 'summary' && (
-            <div style={{ color: lightText, whiteSpace: 'pre-wrap', textAlign: 'left', lineHeight: '1.8' }}>
-              {summary || result}
+            <div style={{ 
+              color: '#1a1f2e', 
+              whiteSpace: 'pre-wrap', 
+              textAlign: 'left', 
+              lineHeight: '1.8',
+              fontSize: '1rem',
+              fontFamily: 'Inter, sans-serif'
+            }}>
+              <h3 style={{
+                color: '#1a1f2e',
+                fontSize: '1.5rem',
+                fontWeight: 'bold',
+                marginBottom: '20px',
+                paddingBottom: '10px',
+                borderBottom: `2px solid ${gold}`
+              }}>
+                {language === 'TR' ? '📋 Özet' : '📋 Executive Summary'}
+              </h3>
+              <div style={{
+                background: '#f8f9fa',
+                padding: '20px',
+                borderRadius: '10px',
+                border: `1px solid ${gold}22`
+              }}>
+                {summary || cleanResult || 'Analiz sonucu hazırlanıyor...'}
+              </div>
             </div>
           )}
           {activeResultTab === 'risks' && riskAssessments && riskAssessments.length > 0 && (
@@ -468,9 +555,9 @@ export default function AnalysisResult({
                               fontWeight: 'bold',
                               margin: 0
                             }}>
-                              {risk.description}
+                              {risk.risk || risk.description || 'Risk tespit edildi'}
                             </h4>
-                            {risk.isQuantumConflict && (
+                            {((risk.type === 'Quantum Conflict Detected') || risk.isQuantumConflict) && (
                               <motion.span
                                 animate={{
                                   boxShadow: [
@@ -497,7 +584,7 @@ export default function AnalysisResult({
                                 ⚛️ [Quantum Conflict Detected]
                               </motion.span>
                             )}
-                            {!risk.isQuantumConflict && (
+                            {!((risk.type === 'Quantum Conflict Detected') || risk.isQuantumConflict) && (
                               <span style={{
                                 background: `${riskColor}22`,
                                 color: riskColor,
@@ -562,7 +649,7 @@ export default function AnalysisResult({
                             </div>
                           )}
                           
-                          {risk.legalReference && (
+                          {(risk.reference || risk.legalReference) && (
                             <div style={{
                               marginTop: '12px',
                               padding: '12px',
@@ -583,7 +670,7 @@ export default function AnalysisResult({
                                 fontSize: '0.9rem',
                                 lineHeight: '1.6'
                               }}>
-                                {risk.legalReference}
+                                {(risk.reference || risk.legalReference || '').replace(/N\/A|n\/a|N\/a/g, '').trim() || 'Referans belirtilmemiş'}
                               </div>
                             </div>
                           )}
@@ -599,7 +686,8 @@ export default function AnalysisResult({
             const riskScore = extractRiskScore(result);
             const riskColor = getRiskColor(riskScore);
             const riskLevel = getRiskLevel(riskScore);
-            const canViewDetailed = effectivePackage === 'professional' || effectivePackage === 'enterprise';
+            // Admin kontrolü - elmas7853@gmail.com için tüm kilitleri kaldır
+            const canViewDetailed = isAdmin || effectivePackage === 'professional' || effectivePackage === 'enterprise' || effectivePackage === 'quantum_global';
             
             return (
               <div style={{ position: 'relative' }}>
@@ -1001,13 +1089,16 @@ export default function AnalysisResult({
                                 }}>
                                   {ref.lawName}
                                 </span>
-                                {ref.article && (
+                                {ref.article && !ref.article.includes('N/A') && !ref.article.includes('n/a') && (
                                   <>
                                     <span style={{ color: lightText, opacity: 0.7 }}>-</span>
                                     <span style={{
                                       color: gold,
                                       fontSize: '0.9rem',
-                                      fontWeight: '600'
+                                      fontWeight: '600',
+                                      background: `${gold}11`,
+                                      padding: '2px 8px',
+                                      borderRadius: '4px'
                                     }}>
                                       {ref.article.includes('Madde') ? ref.article : 
                                        ref.article.includes('§') ? ref.article :
@@ -1051,7 +1142,8 @@ export default function AnalysisResult({
                                 lineHeight: '1.6',
                                 opacity: 0.9
                               }}>
-                                {ref.summary}
+                                {ref.summary && !ref.summary.includes('N/A') ? ref.summary : 
+                                 language === 'TR' ? 'Özet bilgisi mevcut değil' : 'Summary not available'}
                               </div>
                               
                               {/* Cross-Reference (Global Paket için) */}
