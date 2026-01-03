@@ -88,14 +88,15 @@ export default function Header({
           }}
         >
           <img 
-            src="/mainicon.png" 
-            alt="Home" 
-            width="48" 
-            height="48" 
+            src="/vq.png" 
+            alt="Veritas Q-AI Logo" 
             style={{ 
+              height: '40px',
+              width: 'auto',
               cursor: 'pointer', 
               transition: 'opacity 0.2s',
-              display: 'block'
+              display: 'block',
+              objectFit: 'contain'
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.opacity = '0.8';

@@ -1840,14 +1840,14 @@ export default function Home() {
                 marginTop: '-50px' 
               }}>
                 <img 
-                  src="/logoverl.png" 
-                  alt="Logo" 
+                  src="/vq.png" 
+                  alt="Veritas Q-AI Logo" 
                   style={{ 
                     width: '180px', 
                     height: '180px',
                     objectFit: 'contain',
                     maxWidth: '90%'
-                  }} 
+                  }}
                 />
                 <h1 style={{ 
                   color: gold, 
