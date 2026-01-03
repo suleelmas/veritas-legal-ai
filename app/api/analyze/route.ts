@@ -815,9 +815,15 @@ export async function POST(req: Request) {
     const isAdmin = session?.user?.email && ADMIN_EMAILS.includes(session.user.email);
     
     // 0.1. KULLANICI PAKET KONTROLÜ - Global paket kontrolü (getRelevantDocuments'tan ÖNCE)
+    // Admin email kontrolü - Veritabanına bakmadan direkt GLOBAL plan ve isAdmin=true
     let userPackage = 'free';
     let isGlobalPackage = false;
-    if (session?.user?.id) {
+    
+    if (isAdmin) {
+      // Admin email ise veritabanına bakmadan direkt GLOBAL plan ver
+      userPackage = 'quantum_global';
+      isGlobalPackage = true;
+    } else if (session?.user?.id) {
       const { data: profile } = await supabase
         .from('profiles')
         .select('package_type')
@@ -826,7 +832,7 @@ export async function POST(req: Request) {
       
       userPackage = profile?.package_type || 'free';
       // Global paket kontrolü: 'enterprise' veya 'quantum_global' olabilir
-      isGlobalPackage = (userPackage === 'enterprise' || userPackage === 'quantum_global' || isAdmin) ? true : false;
+      isGlobalPackage = (userPackage === 'enterprise' || userPackage === 'quantum_global') ? true : false;
     }
     
     // 2. Hibrit veri çekme - Vector DB + Live Fetch
@@ -932,13 +938,13 @@ export async function POST(req: Request) {
       ? ` CROSS-JURISDICTIONAL CONFLICT DETECTION MODE (Quantum Global Feature): Analyze this document by cross-referencing laws from multiple jurisdictions (TR, US, UK, DE). Identify direct conflicts, such as different penalty rates, jurisdiction clauses, or contradictory compliance requirements between countries. For each conflict found, provide in this EXACT format: [Article/Clause] | [Country A: Rule Description] | [Country B: Rule Description] | [Risk Score Number]. Example: [Article 5] | [TR: 10% penalty rate] | [US: 15% penalty rate] | [75]. Format all conflicts in a structured table at the end of your analysis under "Global Conflict Map" section. This is a premium feature available only to Quantum Global subscribers.`
       : '';
     
-    // Legal Citations & Bibliography Instruction
-    const bibliographyInstruction = ` LEGAL CITATIONS & BIBLIOGRAPHY REQUIREMENT: At the end of your analysis, you MUST include a "Sources & References" or "Hukuki Referanslar ve Kaynakça" section. List all specific legal references (laws, regulations, court precedents) that support your risk assessments. Format each reference as: [Country Flag Emoji] [Law Name] - [Article Number]: [Brief Summary or Title]. Examples: 🇹🇷 TBK Madde 112 - Borcun ifa edilmemesi / Genel sorumluluk, 🇩🇪 BGB § 433 - Vertragstypische Pflichten beim Kaufvertrag, 🇺🇸 UCC § 2-201 - Statute of Frauds, 🇬🇧 Sale of Goods Act 1979 s.13 - Implied terms about description. Include both legislation and high court precedents when available. ${isGlobalPackage ? 'For Global package users, provide cross-referenced citations showing how the same risk is addressed in different jurisdictions side by side.' : ''}`;
+    // Legal Citations & Bibliography Instruction - GÜÇLENDİRİLMİŞ
+    const bibliographyInstruction = ` LEGAL CITATIONS & BIBLIOGRAPHY REQUIREMENT: At the end of your analysis, you MUST include a "Sources & References" or "Hukuki Referanslar ve Kaynakça" section. List all specific legal references (laws, regulations, court precedents) that support your risk assessments. You MUST provide at least 3-5 legal references. Format each reference as: [Country Flag Emoji] [Law Name] - [Article Number]: [Brief Summary or Title]. Examples: 🇹🇷 TBK Madde 112 - Borcun ifa edilmemesi / Genel sorumluluk, 🇩🇪 BGB § 433 - Vertragstypische Pflichten beim Kaufvertrag, 🇺🇸 UCC § 2-201 - Statute of Frauds, 🇬🇧 Sale of Goods Act 1979 s.13 - Implied terms about description. Include both legislation and high court precedents when available. CRITICAL: Do not return empty references array. Always provide detailed legal citations. ${isGlobalPackage ? 'For Global package users, provide cross-referenced citations showing how the same risk is addressed in different jurisdictions side by side.' : ''}`;
     
-    // Risk Assessment Module
+    // Risk Assessment Module - GÜÇLENDİRİLMİŞ PROMPT
     const riskAssessmentInstruction = isGlobalPackage
-      ? ` RISK ASSESSMENT MODULE (Quantum Cross-Risk Analysis): Perform a Cross-Jurisdictional Risk Analysis. Compare the document against both ${detectedCountry || 'primary'} and other major jurisdictions (TR, US, UK, DE) simultaneously to detect conflicting risks. For each risk identified, provide: [Risk Description] | [Severity Score 1-10] | [Country/Countries Affected] | [Legal Reference: Law Article]. Format risks in a structured list. Mark cross-jurisdictional conflicts with [Quantum Conflict Detected] tag. Example: [Penalty rate discrepancy] | [8] | [TR, US] | [TBK Madde 112, UCC § 2-201] [Quantum Conflict Detected].`
-      : ` RISK ASSESSMENT MODULE (Basic Risk Analysis): Please identify all legal risks in this document and assign each risk a severity score from 1-10 (where 1 is minimal risk and 10 is critical risk). For each risk, provide: [Risk Description] | [Severity Score 1-10] | [Legal Reference: Law Article]. Format risks in a structured list. Mark each risk with [Standard Risk] tag. Focus only on the primary jurisdiction (${detectedCountry || 'detected country'}). Example: [Breach of contract liability] | [7] | [TBK Madde 112] [Standard Risk].`;
+      ? ` RISK ASSESSMENT MODULE (Quantum Cross-Risk Analysis): Sözleşmeyi derinlemesine analiz et ve riskleri madde madde ayır. Perform a Cross-Jurisdictional Risk Analysis. Compare the document against both ${detectedCountry || 'primary'} and other major jurisdictions (TR, US, UK, DE) simultaneously to detect conflicting risks. You MUST identify at least 3-5 risks. For each risk identified, provide: [Risk Description] | [Severity Score 1-10] | [Country/Countries Affected] | [Legal Reference: Law Article]. Format risks in a structured list. Mark cross-jurisdictional conflicts with [Quantum Conflict Detected] tag. Example: [Penalty rate discrepancy] | [8] | [TR, US] | [TBK Madde 112, UCC § 2-201] [Quantum Conflict Detected]. CRITICAL: Do not return empty risks array. Always provide detailed risk analysis.`
+      : ` RISK ASSESSMENT MODULE (Basic Risk Analysis): Sözleşmeyi derinlemesine analiz et ve riskleri madde madde ayır. Please identify all legal risks in this document and assign each risk a severity score from 1-10 (where 1 is minimal risk and 10 is critical risk). You MUST identify at least 2-4 risks. For each risk, provide: [Risk Description] | [Severity Score 1-10] | [Legal Reference: Law Article]. Format risks in a structured list. Mark each risk with [Standard Risk] tag. Focus only on the primary jurisdiction (${detectedCountry || 'detected country'}). Example: [Breach of contract liability] | [7] | [TBK Madde 112] [Standard Risk]. CRITICAL: Do not return empty risks array. Always provide detailed risk analysis.`;
     
     // JSON Format Instruction - AI'dan yapılandırılmış veri iste
     const jsonFormatInstruction = ` CRITICAL OUTPUT FORMAT: At the end of your analysis, you MUST provide a JSON structure (even if embedded in text) with the following format:
