@@ -1158,15 +1158,29 @@ export default function Home() {
 
   const handleAuth = async () => {
     // Dinamik olarak mevcut domain'i kullan (production'da veritasq.ai, development'ta localhost)
-    const baseUrl = typeof window !== 'undefined' 
-      ? window.location.origin 
-      : (process.env.NEXT_PUBLIC_SITE_URL || 'https://veritasq.ai');
+    // Önce environment variable'ı kontrol et, yoksa window.location.origin kullan
+    let baseUrl = 'https://veritasq.ai'; // Default production URL
+    
+    if (typeof window !== 'undefined') {
+      // Browser'da çalışıyorsa mevcut origin'i kullan
+      baseUrl = window.location.origin;
+    } else if (process.env.NEXT_PUBLIC_SITE_URL) {
+      // Server-side'da environment variable varsa onu kullan
+      baseUrl = process.env.NEXT_PUBLIC_SITE_URL;
+    }
+    
     const redirectUrl = `${baseUrl}/auth/callback`;
+    
+    console.log('Google Auth Redirect URL:', redirectUrl); // Debug için
     
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { 
-        redirectTo: redirectUrl
+        redirectTo: redirectUrl,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        }
       }
     });
   };
@@ -3052,12 +3066,13 @@ export default function Home() {
                       style={{ 
                         width: '100%', 
                         padding: '18px', 
-                        backgroundColor: isLimitReached() ? '#666666' : '#ffffff', 
-                        color: isLimitReached() ? lightText : darkBlue, 
+                        backgroundColor: isLimitReached() ? '#666666' : '#3b82f6', // Mavi arka plan (bg-blue-600)
+                        color: '#ffffff', // Beyaz metin
                         borderRadius: '12px', 
                         border: 'none', 
                         marginTop: '30px', 
                         fontWeight: '900',
+                        fontSize: '16px',
                         cursor: (
                           (uploadMode === 'single' && file) || 
                           (uploadMode === 'compare' && file && file2)
@@ -3066,16 +3081,29 @@ export default function Home() {
                           (uploadMode === 'single' && file) || 
                           (uploadMode === 'compare' && file && file2)
                         ) && !loading && !isAnalyzing && !isLimitReached() ? 1 : 0.6,
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-                        transition: 'all 0.2s ease'
+                        boxShadow: '0 4px 12px rgba(59, 130, 246, 0.4)',
+                        transition: 'all 0.2s ease',
+                        position: 'relative',
+                        zIndex: 50 // Diğer elementlerin üstünde olması için
                       }}
                       onMouseEnter={(e) => {
                         if (
                           ((uploadMode === 'single' && file) || (uploadMode === 'compare' && file && file2)) && 
                           !loading && !isAnalyzing && !isLimitReached()
                         ) {
-                          e.currentTarget.style.backgroundColor = '#f5f5f5';
-                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
+                          e.currentTarget.style.backgroundColor = '#2563eb'; // Hover: bg-blue-700
+                          e.currentTarget.style.boxShadow = '0 6px 16px rgba(59, 130, 246, 0.6)';
+                          e.currentTarget.style.transform = 'translateY(-2px)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (
+                          ((uploadMode === 'single' && file) || (uploadMode === 'compare' && file && file2)) && 
+                          !loading && !isAnalyzing && !isLimitReached()
+                        ) {
+                          e.currentTarget.style.backgroundColor = '#3b82f6';
+                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.4)';
+                          e.currentTarget.style.transform = 'translateY(0)';
                         }
                       }}
                       onMouseLeave={(e) => {
