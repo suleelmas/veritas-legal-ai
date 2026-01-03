@@ -140,3 +140,4 @@ GET /api/sync-court-decisions?authorization=Bearer YOUR_CRON_SECRET
 - ABD kaynakları için büyük model kullanımı
 - Vector search'te otomatik filtreleme
 
+

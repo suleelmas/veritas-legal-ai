@@ -133,3 +133,4 @@ if (fullUrl.endsWith('.pdf')) {
 3. Regex yerine Cheerio gibi bir parser kullan
 4. PDF desteği ekle (Resmi Gazete için)
 
+

@@ -17,6 +17,7 @@ interface HeaderProps {
   user: any;
   userMenuOpen: boolean;
   setUserMenuOpen: (open: boolean) => void;
+  isAdmin?: boolean;
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
   setActiveTab: (tab: Tab) => void;
@@ -40,6 +41,7 @@ export default function Header({
   user,
   userMenuOpen,
   setUserMenuOpen,
+  isAdmin = false,
   sidebarOpen,
   setSidebarOpen,
   setActiveTab,
@@ -262,6 +264,57 @@ export default function Header({
                 }}>
                   {user.email}
                 </div>
+                
+                {/* VIP/Admin Status */}
+                {isAdmin && (
+                  <div style={{
+                    padding: '10px 15px',
+                    borderBottom: `1px solid ${gold}33`,
+                    background: `linear-gradient(135deg, ${gold}22, ${gold}11)`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <span style={{ fontSize: '18px' }}>⭐</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{
+                        color: gold,
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                        marginBottom: '2px'
+                      }}>
+                        {language === 'TR' ? 'Plan: Veritas VIP / Developer' : 'Plan: Veritas VIP / Developer'}
+                      </div>
+                      <div style={{
+                        color: lightText,
+                        fontSize: '10px',
+                        opacity: 0.7
+                      }}>
+                        {language === 'TR' ? 'Sınırsız Analiz' : 'Unlimited Analysis'}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {isAdmin && (
+                  <div style={{
+                    padding: '10px 15px',
+                    borderBottom: `1px solid ${gold}33`,
+                    background: `linear-gradient(135deg, ${gold}22, ${gold}11)`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <span style={{ fontSize: '16px' }}>⭐</span>
+                    <span style={{
+                      color: gold,
+                      fontSize: '13px',
+                      fontWeight: 'bold'
+                    }}>
+                      Plan: Veritas VIP / Developer
+                    </span>
+                  </div>
+                )}
                 
                 <Link href="/profile" style={{ textDecoration: 'none' }}>
                   <button

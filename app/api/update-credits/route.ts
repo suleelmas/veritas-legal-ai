@@ -1,31 +1,63 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 
+function getUserKey(req: Request) {
+  const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "";
+  const ua = req.headers.get("user-agent") || "";
+  return `${ip}_${ua}`;
+}
+
 export async function POST(req: Request) {
   try {
     const supabase = await createClient();
-    const { user_key, purchased_package } = await req.json();
-    // Shopier webhooksdan veya admin panelden: purchased_package="basic" ise 10, pro 50, elite 9999
-    let credit = 1;
-    if (purchased_package === "basic") credit = 10;
-    else if (purchased_package === "professional" || purchased_package === "pro") credit = 50;
-    else if (purchased_package === "elite") credit = 9999;
-
-    // Kullanıcı zaten varsa üzerine yazar yoksa ekler
-    await supabase
-      .from("user_credits")
-      .upsert({ user_key, purchased_package, credit }, { onConflict: 'user_key' });
-
-    return NextResponse.json({ success: true, message: `Kullanıcıya (${purchased_package}) ${credit} analiz hakkı tanımlandı.` });
-  } catch (err) {
-    return NextResponse.json({ success: false, error: String(err) }, { status: 500 });
+    const { action, amount } = await req.json();
+    
+    // Session kontrolü
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    
+    // user_key oluştur
+    const userKey = getUserKey(req);
+    
+    if (action === 'decrement') {
+      // Kredi azalt
+      const { data: creditRow } = await supabase
+        .from("user_credits")
+        .select("credit")
+        .eq("user_key", userKey)
+        .maybeSingle();
+      
+      if (creditRow && creditRow.credit > 0) {
+        await supabase
+          .from("user_credits")
+          .update({ credit: creditRow.credit - 1 })
+          .eq("user_key", userKey);
+      }
+    } else if (action === 'increment' && amount) {
+      // Kredi ekle
+      const { data: creditRow } = await supabase
+        .from("user_credits")
+        .select("credit")
+        .eq("user_key", userKey)
+        .maybeSingle();
+      
+      if (creditRow) {
+        await supabase
+          .from("user_credits")
+          .update({ credit: (creditRow.credit || 0) + amount })
+          .eq("user_key", userKey);
+      } else {
+        await supabase
+          .from("user_credits")
+          .insert({ user_key: userKey, credit: amount });
+      }
+    }
+    
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    console.error("Update credits error:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
-
-
-
-
-
-
-
-

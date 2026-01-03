@@ -25,6 +25,9 @@ import { detectJurisdiction, type JurisdictionResult } from '@/lib/jurisdictionD
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+// Admin Email Listesi - Limit kontrolünden muaf tutulacak kullanıcılar
+const ADMIN_EMAILS = ['elmas7853@gmail.com'];
+
 // Kritik anahtar kelimeler - bunlar için canlı veri çekilecek
 const CRITICAL_KEYWORDS_TR = [
   'KVKK', 'TBK', 'HMK', 'İİK', 'AYM', 'Yargıtay', 'Danıştay', 
@@ -588,7 +591,8 @@ async function getRelevantDocuments(
   limit: number = 5,
   onStatusUpdate?: (status: string) => void,
   detectedCountry?: string | null,
-  secondaryCountries?: string[]
+  secondaryCountries?: string[],
+  isGlobalPackage: boolean = false
 ): Promise<{ documents: Array<any>, usedLiveFetch: boolean }> {
   try {
     const supabase = await createClient();
@@ -670,18 +674,26 @@ async function getRelevantDocuments(
             
             dbDocuments = filteredDocs;
           } else {
-            // Türkiye kaynakları: ABD ve UK kaynaklarını filtrele
-            dbDocuments = documents.filter((doc: any) => 
-              doc.metadata?.country !== 'US' && doc.metadata?.country !== 'UK' &&
-              doc.metadata?.source !== 'congress' && 
-              doc.metadata?.source !== 'scotus' &&
-              doc.metadata?.source !== 'courtlistener' &&
-              doc.metadata?.source !== 'openjurist' &&
-              doc.metadata?.source !== 'govinfo' &&
-              doc.metadata?.source !== 'loc' &&
-              doc.metadata?.source !== 'uk' &&
-              !['ny', 'ca', 'de', 'federalregister', 'uscode'].includes(doc.metadata?.source?.toLowerCase())
-            );
+            // Türkiye kaynakları: Global paket değilse ABD ve UK kaynaklarını filtrele
+            if (isGlobalPackage) {
+              // Global paket: Tüm ülkelerden veri çek (TR, US, UK, DE)
+              dbDocuments = documents; // Filtreleme yapma, tüm ülkelerden veri al
+            } else {
+              // Normal paket: Sadece Türkiye kaynakları
+              dbDocuments = documents.filter((doc: any) => 
+                doc.metadata?.country !== 'US' && doc.metadata?.country !== 'UK' && doc.metadata?.country !== 'DE' &&
+                doc.metadata?.source !== 'congress' && 
+                doc.metadata?.source !== 'scotus' &&
+                doc.metadata?.source !== 'courtlistener' &&
+                doc.metadata?.source !== 'openjurist' &&
+                doc.metadata?.source !== 'govinfo' &&
+                doc.metadata?.source !== 'loc' &&
+                doc.metadata?.source !== 'uk' &&
+                doc.metadata?.source !== 'gesetze_im_internet' &&
+                doc.metadata?.source !== 'rechtsprechung_im_internet' &&
+                !['ny', 'ca', 'de', 'federalregister', 'uscode'].includes(doc.metadata?.source?.toLowerCase())
+              );
+            }
           }
         }
     } catch (rpcError) {
@@ -692,8 +704,15 @@ async function getRelevantDocuments(
         sources.push('congress', 'scotus', 'courtlistener', 'openjurist', 'govinfo', 'loc', 
                      'ny', 'ca', 'de', 'federalregister', 'uscode', 'uk');
       } else {
-        // Türkiye kaynakları
-        sources.push('resmigazete', 'yargitay', 'danistay', 'anayasa', 'kvkk', 'tbmm', 'mbs');
+        // Türkiye kaynakları - Global paket için tüm ülkelerden veri çek
+        if (isGlobalPackage) {
+          sources.push('resmigazete', 'yargitay', 'danistay', 'anayasa', 'kvkk', 'tbmm', 'mbs',
+                       'congress', 'scotus', 'courtlistener', 'openjurist', 'govinfo', 'loc',
+                       'ny', 'ca', 'de', 'federalregister', 'uscode', 'uk', 'uk_case',
+                       'gesetze_im_internet', 'rechtsprechung_im_internet');
+        } else {
+          sources.push('resmigazete', 'yargitay', 'danistay', 'anayasa', 'kvkk', 'tbmm', 'mbs');
+        }
       }
       
       const { data: recentDocs } = await supabase
@@ -793,13 +812,15 @@ export async function POST(req: Request) {
     
     // 2. Hibrit veri çekme - Vector DB + Live Fetch
     // Detected country'ye göre filtreleme yapılacak
+    // Global paket için tüm ülkelerden veri çek
     const { documents: relevantDocs, usedLiveFetch } = await getRelevantDocuments(
       pdfText, 
       targetLang,
-      5,
+      isGlobalPackage ? 10 : 5, // Global paket için daha fazla doküman
       undefined, // onStatusUpdate
       detectedCountry, // Detected country
-      jurisdictionResult?.secondary_countries // Secondary countries (cross-border)
+      jurisdictionResult?.secondary_countries, // Secondary countries (cross-border)
+      isGlobalPackage // Global paket kontrolü
     );
     
     let contextText = '';
@@ -844,18 +865,45 @@ export async function POST(req: Request) {
       });
     }
 
-    // 1. KREDİ KONTROLÜ
-    const { data: creditRow } = await supabase
-      .from("user_credits")
-      .select("credit")
-      .eq("user_key", userKey)
-      .maybeSingle();
-    // 2. İlk ücretsiz hakkı kontrolü
-    const { data: usedDisks } = await supabase
-      .from("user_analysis_rights")
-      .select("id")
-      .eq("user_key", userKey)
-      .maybeSingle();
+    // 0. ADMIN KONTROLÜ - Session'dan email al ve admin kontrolü yap
+    const { data: { session } } = await supabase.auth.getSession();
+    const isAdmin = session?.user?.email && ADMIN_EMAILS.includes(session.user.email);
+    
+    // 0.1. KULLANICI PAKET KONTROLÜ - Global paket kontrolü
+    let userPackage = 'free';
+    let isGlobalPackage = false;
+    if (session?.user?.id) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('package_type')
+        .eq('id', session.user.id)
+        .maybeSingle();
+      
+      userPackage = profile?.package_type || 'free';
+      // Global paket kontrolü: 'enterprise' veya 'quantum_global' olabilir
+      isGlobalPackage = userPackage === 'enterprise' || userPackage === 'quantum_global' || isAdmin;
+    }
+    
+    // 1. KREDİ KONTROLÜ (Admin değilse)
+    let creditRow = null;
+    let usedDisks = null;
+    
+    if (!isAdmin) {
+      const creditResult = await supabase
+        .from("user_credits")
+        .select("credit")
+        .eq("user_key", userKey)
+        .maybeSingle();
+      creditRow = creditResult.data;
+      
+      // 2. İlk ücretsiz hakkı kontrolü
+      const usedDisksResult = await supabase
+        .from("user_analysis_rights")
+        .select("id")
+        .eq("user_key", userKey)
+        .maybeSingle();
+      usedDisks = usedDisksResult.data;
+    }
     
     // İngilizce analizlerde Congress.gov, SCOTUS, CourtListener ve OpenJurist'i de dahil et
     const sourcesText = (targetLang === 'EN' || targetLang === 'English')
@@ -879,10 +927,24 @@ export async function POST(req: Request) {
       ? ' CRITICAL: Use text-embedding-3-large model with LEGAL CONTEXT MODE for Common Law terminology. When translating Common Law terms to Civil Law (Kıta Avrupası) equivalents, preserve legal meaning and context. For example: "precedent" -> "içtihat" (not just "önceden"), "stare decisis" -> "içtihat hukuku" (not literal translation), "tort" -> "haksız fiil" (preserving legal concept). Always consider the legal system context (Common Law vs. Civil Law) when translating. Maintain legal precision and avoid meaning loss. ENGLISH LAW SPECIFIC TERMS: When analyzing UK legal documents, be aware that certain terms have English Law-specific meanings that differ from US Common Law: "Deed" (UK: formal written instrument under seal; US: broader meaning), "Covenant" (UK: specific contractual promise with legal consequences; US: similar but context-dependent), "Indemnity" (UK: specific obligation to make good loss; US: broader insurance context). Always use "English Law specific" context when these terms appear in UK documents to avoid confusion with US Common Law equivalents.'
       : '';
     
-    const systemPrompt = `Sen profesyonel bir hukuk analistisin. Analizini sadece ${targetLang} dilinde yap. Paragrafları tekrar etme.${contextText ? ' ' + sourcesText : ''}${dateConflictInstruction}${localizationInstruction}${legalContextInstruction}`;
+    // Cross-Jurisdictional Conflict Detection - Sadece Global paket için
+    const crossJurisdictionalInstruction = isGlobalPackage
+      ? ` CROSS-JURISDICTIONAL CONFLICT DETECTION MODE (Quantum Global Feature): Analyze this document by cross-referencing laws from multiple jurisdictions (TR, US, UK, DE). Identify direct conflicts, such as different penalty rates, jurisdiction clauses, or contradictory compliance requirements between countries. For each conflict found, provide in this EXACT format: [Article/Clause] | [Country A: Rule Description] | [Country B: Rule Description] | [Risk Score Number]. Example: [Article 5] | [TR: 10% penalty rate] | [US: 15% penalty rate] | [75]. Format all conflicts in a structured table at the end of your analysis under "Global Conflict Map" section. This is a premium feature available only to Quantum Global subscribers.`
+      : '';
+    
+    // Legal Citations & Bibliography Instruction
+    const bibliographyInstruction = ` LEGAL CITATIONS & BIBLIOGRAPHY REQUIREMENT: At the end of your analysis, you MUST include a "Sources & References" or "Hukuki Referanslar ve Kaynakça" section. List all specific legal references (laws, regulations, court precedents) that support your risk assessments. Format each reference as: [Country Flag Emoji] [Law Name] - [Article Number]: [Brief Summary or Title]. Examples: 🇹🇷 TBK Madde 112 - Borcun ifa edilmemesi / Genel sorumluluk, 🇩🇪 BGB § 433 - Vertragstypische Pflichten beim Kaufvertrag, 🇺🇸 UCC § 2-201 - Statute of Frauds, 🇬🇧 Sale of Goods Act 1979 s.13 - Implied terms about description. Include both legislation and high court precedents when available. ${isGlobalPackage ? 'For Global package users, provide cross-referenced citations showing how the same risk is addressed in different jurisdictions side by side.' : ''}`;
+    
+    // Risk Assessment Module
+    const riskAssessmentInstruction = isGlobalPackage
+      ? ` RISK ASSESSMENT MODULE (Quantum Cross-Risk Analysis): Perform a Cross-Jurisdictional Risk Analysis. Compare the document against both ${detectedCountry || 'primary'} and other major jurisdictions (TR, US, UK, DE) simultaneously to detect conflicting risks. For each risk identified, provide: [Risk Description] | [Severity Score 1-10] | [Country/Countries Affected] | [Legal Reference: Law Article]. Format risks in a structured list. Mark cross-jurisdictional conflicts with [Quantum Conflict Detected] tag. Example: [Penalty rate discrepancy] | [8] | [TR, US] | [TBK Madde 112, UCC § 2-201] [Quantum Conflict Detected].`
+      : ` RISK ASSESSMENT MODULE (Basic Risk Analysis): Please identify all legal risks in this document and assign each risk a severity score from 1-10 (where 1 is minimal risk and 10 is critical risk). For each risk, provide: [Risk Description] | [Severity Score 1-10] | [Legal Reference: Law Article]. Format risks in a structured list. Mark each risk with [Standard Risk] tag. Focus only on the primary jurisdiction (${detectedCountry || 'detected country'}). Example: [Breach of contract liability] | [7] | [TBK Madde 112] [Standard Risk].`;
+    
+    const systemPrompt = `Sen profesyonel bir hukuk analistisin. Analizini sadece ${targetLang} dilinde yap. Paragrafları tekrar etme.${contextText ? ' ' + sourcesText : ''}${dateConflictInstruction}${localizationInstruction}${legalContextInstruction}${crossJurisdictionalInstruction}${riskAssessmentInstruction}${bibliographyInstruction}`;
     const userPrompt = userPromptText;
 
-    if (creditRow && creditRow.credit > 0) {
+    // Admin ise limit kontrolünü bypass et
+    if (isAdmin || (creditRow && creditRow.credit > 0)) {
       // Kredisi olanlar için analiz
       const response = await openai.chat.completions.create({
         model: "gpt-4o",
@@ -892,15 +954,43 @@ export async function POST(req: Request) {
         ],
         temperature: 0.3,
       });
-      // Kredi bir azaltılır
-      await supabase.from("user_credits")
-        .update({ credit: creditRow.credit - 1 })
-        .eq("user_key", userKey);
+      // Kredi bir azaltılır (Admin değilse)
+      if (!isAdmin && creditRow) {
+        await supabase.from("user_credits")
+          .update({ credit: creditRow.credit - 1 })
+          .eq("user_key", userKey);
+      }
       
       // Bluebook citation formatı ile analiz sonucunu formatla (ABD kaynakları için)
       let formattedReply = response.choices[0].message.content || '';
       if ((targetLang === 'EN' || targetLang === 'English') && relevantDocs.length > 0) {
         formattedReply = formatAnalysisWithCitations(formattedReply, relevantDocs);
+      }
+      
+      // Cross-jurisdictional conflicts'u parse et (sadece Global paket için)
+      let globalConflicts: Array<{
+        article: string;
+        countryA: string;
+        countryARule: string;
+        countryB: string;
+        countryBRule: string;
+        riskScore: number;
+      }> = [];
+      
+      if (isGlobalPackage && formattedReply) {
+        // AI'dan gelen conflict tablosunu parse et
+        const conflictTableRegex = /\[([^\]]+)\]\s*\|\s*\[([^\]]+)\]\s*\|\s*\[([^\]]+)\]\s*\|\s*\[([^\]]+)\]/g;
+        const matches = formattedReply.matchAll(conflictTableRegex);
+        for (const match of matches) {
+          globalConflicts.push({
+            article: match[1] || '',
+            countryA: match[2]?.split(':')[0] || '',
+            countryARule: match[2]?.split(':').slice(1).join(':') || match[2] || '',
+            countryB: match[3]?.split(':')[0] || '',
+            countryBRule: match[3]?.split(':').slice(1).join(':') || match[3] || '',
+            riskScore: parseInt(match[4] || '0')
+          });
+        }
       }
       
       // Jurisdiction detection sonucunu response'a ekle
@@ -913,9 +1003,14 @@ export async function POST(req: Request) {
           cross_border: jurisdictionResult.cross_border,
           secondary_countries: jurisdictionResult.secondary_countries,
           scores: jurisdictionResult.scores
-        } : null
+        } : null,
+        globalConflicts: isGlobalPackage ? globalConflicts : null,
+        isGlobalPackage: isGlobalPackage,
+        legalReferences: legalReferences.length > 0 ? legalReferences : null,
+        riskAssessments: riskAssessments.length > 0 ? riskAssessments : null
+        riskAssessments: riskAssessments.length > 0 ? riskAssessments : null
       });
-    } else if (!usedDisks) {
+    } else if (isAdmin || !usedDisks) {
       // İlk analiz ücretsiz,
       const response = await openai.chat.completions.create({
         model: "gpt-4o",
@@ -925,7 +1020,10 @@ export async function POST(req: Request) {
         ],
         temperature: 0.3,
       });
-      await supabase.from("user_analysis_rights").insert({ user_key: userKey });
+      // İlk analiz kaydı (Admin değilse)
+      if (!isAdmin) {
+        await supabase.from("user_analysis_rights").insert({ user_key: userKey });
+      }
       
       // Bluebook citation formatı ile analiz sonucunu formatla (ABD kaynakları için)
       let formattedReply = response.choices[0].message.content || '';
@@ -953,11 +1051,115 @@ export async function POST(req: Request) {
         relevance: 0.8 - (relevantDocs.indexOf(doc) * 0.1)
       }));
       
+      // Cross-jurisdictional conflicts'u parse et (sadece Global paket için)
+      let globalConflictsFree: Array<{
+        article: string;
+        countryA: string;
+        countryARule: string;
+        countryB: string;
+        countryBRule: string;
+        riskScore: number;
+      }> = [];
+      
+      if (isGlobalPackage && formattedReply) {
+        // AI'dan gelen conflict tablosunu parse et
+        const conflictTableRegex = /\[([^\]]+)\]\s*\|\s*\[([^\]]+)\]\s*\|\s*\[([^\]]+)\]\s*\|\s*\[([^\]]+)\]/g;
+        const matches = formattedReply.matchAll(conflictTableRegex);
+        for (const match of matches) {
+          globalConflictsFree.push({
+            article: match[1] || '',
+            countryA: match[2]?.split(':')[0] || '',
+            countryARule: match[2]?.split(':').slice(1).join(':') || match[2] || '',
+            countryB: match[3]?.split(':')[0] || '',
+            countryBRule: match[3]?.split(':').slice(1).join(':') || match[3] || '',
+            riskScore: parseInt(match[4] || '0')
+          });
+        }
+      }
+      
+      // Legal References & Bibliography parsing (ikinci return için)
+      let legalReferencesFree2: Array<{
+        country: string;
+        countryFlag: string;
+        lawName: string;
+        article: string;
+        summary: string;
+        isPrecedent: boolean;
+        crossReference?: Array<{
+          country: string;
+          countryFlag: string;
+          lawName: string;
+          article: string;
+        }>;
+      }> = [];
+      
+      if (formattedReply) {
+        const referenceRegex = /([🇹🇷🇺🇸🇬🇧🇩🇪])\s+([^-]+?)\s*-\s*([^\n]+)/g;
+        const matches = formattedReply.matchAll(referenceRegex);
+        
+        const flagToCountry: { [key: string]: string } = {
+          '🇹🇷': 'TR',
+          '🇺🇸': 'US',
+          '🇬🇧': 'UK',
+          '🇩🇪': 'DE'
+        };
+        
+        for (const match of matches) {
+          const flag = match[1];
+          const lawPart = match[2].trim();
+          const summary = match[3].trim();
+          
+          const articleMatch = lawPart.match(/(.+?)\s+(?:Madde|§|Article|s\.|Art\.)\s*(\d+[a-z]?)/i);
+          if (articleMatch) {
+            legalReferencesFree2.push({
+              country: flagToCountry[flag] || 'UNKNOWN',
+              countryFlag: flag,
+              lawName: articleMatch[1].trim(),
+              article: articleMatch[2],
+              summary: summary,
+              isPrecedent: /Court|Case|Precedent|İçtihat|Karar/i.test(lawPart)
+            });
+          } else {
+            legalReferencesFree2.push({
+              country: flagToCountry[flag] || 'UNKNOWN',
+              countryFlag: flag,
+              lawName: lawPart,
+              article: '',
+              summary: summary,
+              isPrecedent: /Court|Case|Precedent|İçtihat|Karar/i.test(lawPart)
+            });
+          }
+        }
+        
+        if (isGlobalPackage && legalReferencesFree2.length > 0) {
+          const groupedRefs = new Map<string, typeof legalReferencesFree2>();
+          legalReferencesFree2.forEach(ref => {
+            const key = ref.summary.toLowerCase().substring(0, 30);
+            if (!groupedRefs.has(key)) {
+              groupedRefs.set(key, []);
+            }
+            groupedRefs.get(key)!.push(ref);
+          });
+          
+          groupedRefs.forEach((refs, key) => {
+            if (refs.length >= 2) {
+              refs.forEach(ref => {
+                ref.crossReference = refs.filter(r => r.country !== ref.country);
+              });
+            }
+          });
+        }
+      }
+      
       // Jurisdiction detection sonucunu response'a ekle
       return NextResponse.json({ 
         reply: formattedReply,
+        globalConflicts: isGlobalPackage ? globalConflictsFree : null,
+        isGlobalPackage: isGlobalPackage,
         risk_score: riskScore,
         legal_citations: legalCitations,
+        legalReferences: legalReferencesFree2.length > 0 ? legalReferencesFree2 : null,
+        riskAssessments: riskAssessmentsFree.length > 0 ? riskAssessmentsFree : null,
         jurisdiction: jurisdictionResult ? {
           detected_country: jurisdictionResult.primary_country,
           confidence: jurisdictionResult.scores.find(s => s.country === jurisdictionResult!.primary_country)?.confidence || 'low',

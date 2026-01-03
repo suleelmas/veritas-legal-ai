@@ -100,3 +100,4 @@ export const GERMAN_LEGAL_TERMS = [
   'Kaufpreis' // Satış fiyatı
 ];
 
+

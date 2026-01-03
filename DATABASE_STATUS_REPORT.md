@@ -316,3 +316,4 @@ $$;
 
 Eğer her iki model de kullanılıyorsa, iki ayrı fonksiyon oluşturulmalı veya embedding boyutuna göre dinamik sorgu yapılmalı.
 
+

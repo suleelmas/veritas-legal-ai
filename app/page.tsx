@@ -7,8 +7,10 @@ import PricingCard from "./components/PricingCard";
 import Header from "./components/Header";
 import Sidebar from "./components/Sidebar";
 import AnalysisResult from "./components/AnalysisResult";
+import ComparisonResult from "./components/ComparisonResult";
 import BetaBanner from "./components/BetaBanner";
 import FeedbackModal from "./components/FeedbackModal";
+import FeedbackHub from "./components/FeedbackHub";
 import { createBrowserClient } from '@supabase/ssr';
 import { jsPDF } from "jspdf";
 import html2canvas from 'html2canvas';
@@ -114,16 +116,30 @@ export default function Home() {
 
   const [user, setUser] = useState<any>(null);
   const [userPackage, setUserPackage] = useState<UserPackage>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  
+  // Admin Email Listesi
+  const ADMIN_EMAILS = ['elmas7853@gmail.com'];
   const [analysisCount, setAnalysisCount] = useState(0);
   const [analysisHistory, setAnalysisHistory] = useState<Array<{id: string, title: string, date: string, summary: string, fullResult: string, riskScore: number | null}>>([]);
   const [file, setFile] = useState<File | null>(null);
+  const [uploadMode, setUploadMode] = useState<'single' | 'compare'>('single');
+  const [file2, setFile2] = useState<File | null>(null);
+  const [comparisonResult, setComparisonResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisStatus, setAnalysisStatus] = useState<string>('');
   const [currentLoadingMessageIndex, setCurrentLoadingMessageIndex] = useState(0);
   const [result, setResult] = useState("");
   const [language, setLanguage] = useState("EN");
+  const [userCredits, setUserCredits] = useState<number>(0);
+  const [showCreditModal, setShowCreditModal] = useState(false);
+  const [contractCount, setContractCount] = useState<number>(10);
+  const [roiCurrency, setRoiCurrency] = useState<'TR' | 'USD'>('USD');
   const [activeTab, setActiveTab] = useState<Tab>("analyze");
+  const [showSuccessCelebration, setShowSuccessCelebration] = useState(false);
+  const [showROIModal, setShowROIModal] = useState(false);
+  const [roiRecommendedPackage, setRoiRecommendedPackage] = useState<any>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -140,6 +156,36 @@ export default function Home() {
   const [pdfText, setPdfText] = useState('');
   const [riskScore, setRiskScore] = useState<number | null>(null);
   const [legalCitations, setLegalCitations] = useState<Array<{source: string; citation: string; relevance: number}>>([]);
+  const [globalConflicts, setGlobalConflicts] = useState<Array<{
+    article: string;
+    countryA: string;
+    countryARule: string;
+    countryB: string;
+    countryBRule: string;
+    riskScore: number;
+  }>>([]);
+  const [isGlobalPackage, setIsGlobalPackage] = useState(false);
+  const [legalReferences, setLegalReferences] = useState<Array<{
+    country: string;
+    countryFlag: string;
+    lawName: string;
+    article: string;
+    summary: string;
+    isPrecedent: boolean;
+    crossReference?: Array<{
+      country: string;
+      countryFlag: string;
+      lawName: string;
+      article: string;
+    }>;
+  }>>([]);
+  const [riskAssessments, setRiskAssessments] = useState<Array<{
+    description: string;
+    severity: number;
+    countries?: string[];
+    legalReference: string;
+    isQuantumConflict: boolean;
+  }>>([]);
   const [jurisdictionConfirmation, setJurisdictionConfirmation] = useState<{
     detected_country: string;
     confidence: string;
@@ -153,6 +199,7 @@ export default function Home() {
   const [selectedLegislation, setSelectedLegislation] = useState<{title: string, content: string} | null>(null);
   const [showLegislationModal, setShowLegislationModal] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [showFeedbackHub, setShowFeedbackHub] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
 
   // Admin test modunda adminTestPackage, normal modda userPackage kullan
@@ -165,104 +212,94 @@ export default function Home() {
 
   const packages = [
     {
-      name: "Basic",
-      fullName: "Veritas Q-AI Basic Analiz Paketi",
-      fullNameGlobal: "Veritas Q-AI Basic Plan (Starter)",
-      priceTR: "49 TL",
-      priceGlobal: "$19.00 / month",
-      description: "Hukuki süreçlerinize hız kazandırmak için ilk adımı atın! Bireysel kullanıcılar ve küçük ölçekli ofisler için ideal.",
-      descriptionGlobal: "Take the first step to accelerate your legal processes! Ideal for individual users and small-scale offices.",
+      name: "Single Quantum Scan",
+      fullName: "Single Quantum Scan",
+      fullNameGlobal: "Single Quantum Scan",
+      priceTR: "990 TL",
+      priceGlobal: "$49",
+      description: "Tek seferlik uluslararası sözleşme kontrolleri için mükemmel. Bir belge için TR, US, UK ve DE veritabanlarına tam erişim içerir.",
+      descriptionGlobal: "Perfect for one-time international contract checks. Includes full access to TR, US, UK, and DE databases for one document.",
       features: [
-        "Ayda 10 Adet Analiz Hakkı",
-        "Hızlı Dosya Özeti (Quick Summary) ✓",
-        "Temel Risk Tespiti ⚠️",
-        "Ayrıntılı Risk Analizi (Detailed Analysis) ✗",
-        "Yapay Zeka Destekli Anlık Analiz",
-        "7/24 Web Tabanlı Erişim",
-        "Rapor İndirme: Yok"
+        "1 Kuantum Analizi",
+        "TR, US, UK, DE veritabanlarına tam erişim",
+        "Tek seferlik uluslararası sözleşme kontrolü için ideal",
+        "✓ Basic Risk Analysis (Single Country)",
+        "PDF/Word rapor indirme"
       ],
       featuresGlobal: [
-        "10 Analysis Credits Per Month",
-        "Quick File Summary ✓",
-        "Basic Risk Detection ⚠️",
-        "Detailed Risk Analysis ✗",
-        "AI-Powered Instant Analysis",
-        "24/7 Web-Based Access",
-        "Report Download: No"
+        "1 Quantum Scan",
+        "Full access to TR, US, UK, DE databases",
+        "Perfect for one-time international contract checks",
+        "✓ Basic Risk Analysis (Single Country)",
+        "PDF/Word report download"
       ],
       buttonText: "Satın Al",
-      buttonTextGlobal: "Buy with Lemon Squeezy",
+      buttonTextGlobal: "Buy Now",
       isPopular: false,
       shopierLink: "https://www.shopier.com/mirale/42406232",
       lemonSqueezyLink: "https://veritaslegalai.lemonsqueezy.com/checkout/buy/03856d56-2876-4a9a-a979-90d00ee77a6a"
     },
     {
       name: "Professional",
-      fullName: "Veritas Q-AI Professional – Uzman Paketi ★",
-      fullNameGlobal: "Veritas Q-AI Professional Plan (Advocate) ★",
-      priceTR: "149 TL",
-      priceGlobal: "$49.00 / month",
-      description: "İş yükünü hafifletmek isteyen profesyoneller için tasarlandı! En popüler ve verimli çözümümüz.",
-      descriptionGlobal: "Designed for professionals who want to lighten their workload! Our most popular and efficient solution.",
+      fullName: "Professional",
+      fullNameGlobal: "Professional",
+      priceTR: "2.450 TL",
+      priceGlobal: "$99",
+      description: "Ayda 5 kuantum analizi ile profesyonel hukuki süreçlerinizi hızlandırın.",
+      descriptionGlobal: "Accelerate your professional legal processes with 5 quantum scans per month.",
       features: [
-        "Ayda 50 Adet Gelişmiş Analiz Hakkı",
-        "Hızlı Dosya Özeti (Quick Summary) ✓",
-        "Tam Ayrıntılı Analiz Raporu ✓",
-        "Görsel Risk Puanlaması (AI Risk Score) ✓",
-        "PDF/Word İndirme ✓",
-        "Geniş Mevzuat Taraması",
-        "Yapılandırılmış Hukuki Görüş Çıktısı"
+        "Ayda 5 Kuantum Analizi",
+        "TR, US, UK, DE veritabanlarına tam erişim",
+        "✓ Basic Risk Analysis (Single Country)",
+        "✓ Document Version Comparison (Same Language)",
+        "PDF/Word rapor indirme",
+        "Analiz geçmişi erişimi"
       ],
       featuresGlobal: [
-        "50 Advanced Analysis Credits Per Month",
-        "Quick File Summary ✓",
-        "Full Detailed Analysis Report ✓",
-        "Visual Risk Scoring (AI Risk Score) ✓",
-        "PDF/Word Download ✓",
-        "Comprehensive Legislation Scanning",
-        "Structured Legal Opinion Output"
+        "5 Quantum Scans Per Month",
+        "Full access to TR, US, UK, DE databases",
+        "✓ Basic Risk Analysis (Single Country)",
+        "✓ Document Version Comparison (Same Language)",
+        "PDF/Word report download",
+        "Analysis history access"
       ],
-      buttonText: "Hemen Başla",
-      buttonTextGlobal: "Subscribe Now",
+      buttonText: "Abone Ol",
+      buttonTextGlobal: "Subscribe",
       isPopular: true,
       shopierLink: "https://www.shopier.com/mirale/42406252",
-      lemonSqueezyLink: "https://veritaslegalai.lemonsqueezy.com/checkout/buy/3b88cbb9-24b7-4749-af97-5cdb4e28538f"
+      lemonSqueezyLink: "https://veritaslegalai.lemonsqueezy.com/checkout/buy/599f8b7f-860a-4803-9920-4b0b07165e45"
     },
     {
-      name: "Enterprise",
-      fullName: "Veritas Q-AI Enterprise – Kurumsal Çözüm",
-      fullNameGlobal: "Veritas Q-AI Enterprise – Global Partner",
-      priceTR: "399 TL",
-      priceGlobal: "$129.00 / month",
-      description: "Hukuki operasyonlarınızda sınırları kaldırın! Büyük ofisler ve kurumsal şirketler için limitsiz prestij paketi.",
-      descriptionGlobal: "Remove boundaries in your legal operations! Unlimited prestige package for large offices and corporate companies.",
+      name: "Quantum Global",
+      fullName: "Quantum Global",
+      fullNameGlobal: "Quantum Global",
+      priceTR: "7.450 TL",
+      priceGlobal: "$299",
+      description: "Sınırsız kuantum analizi ve çapraz sınır risk haritalama ile kurumsal çözüm.",
+      descriptionGlobal: "Unlimited quantum scans and cross-border risk mapping for enterprise solutions.",
       features: [
-        "Sınırsız Analiz Hakkı (Kota Sınırı Yok)",
-        "Hızlı Dosya Özeti (Quick Summary) ✓",
-        "Tam Ayrıntılı Analiz Raporu ✓",
-        "Görsel Risk Puanlaması (AI Risk Score) ✓",
-        "PDF/Word İndirme ✓",
-        "Geçmiş Analiz Kayıtlarına Sınırsız Erişim",
-        "Dosya Yönetimi ve Arşivleme",
-        "En Yüksek İşlemci Önceliği",
-        "Analiz Geçmişi: Aktif"
+        "Sınırsız Kuantum Analizi",
+        "Çapraz Sınır Risk Haritalama",
+        "TR, US, UK, DE veritabanlarına tam erişim",
+        "✓ Advanced Quantum Risk Mapping (Multi-Country Cross-Check)",
+        "✓ Cross-Language Document Comparison & Translation Accuracy Check",
+        "PDF/Word rapor indirme",
+        "Sınırsız analiz geçmişi"
       ],
       featuresGlobal: [
-        "Unlimited Analysis Credits (No Quota Limit)",
-        "Quick File Summary ✓",
-        "Full Detailed Analysis Report ✓",
-        "Visual Risk Scoring (AI Risk Score) ✓",
-        "PDF/Word Download ✓",
-        "Unlimited Access to Historical Analysis Records",
-        "File Management and Archiving",
-        "Highest Processor Priority",
-        "Analysis History: Active"
+        "Unlimited Quantum Scans",
+        "Cross-Border Risk Mapping",
+        "Full access to TR, US, UK, DE databases",
+        "✓ Advanced Quantum Risk Mapping (Multi-Country Cross-Check)",
+        "✓ Cross-Language Document Comparison & Translation Accuracy Check",
+        "PDF/Word report download",
+        "Unlimited analysis history"
       ],
       buttonText: "Sınırsızlığa Geç",
       buttonTextGlobal: "Get Unlimited Access",
       isPopular: false,
       shopierLink: "https://www.shopier.com/mirale/42406288",
-      lemonSqueezyLink: "https://veritaslegalai.lemonsqueezy.com/checkout/buy/599f8b7f-860a-4803-9920-4b0b07165e45"
+      lemonSqueezyLink: "https://veritaslegalai.lemonsqueezy.com/checkout/buy/3b88cbb9-24b7-4749-af97-5cdb4e28538f"
     }
   ]; 
 
@@ -275,7 +312,7 @@ export default function Home() {
       aboutText: "Veritas Q-AI, hukuk profesyonellerinin çalışma biçimini dönüştürmek için tasarlanmış ileri seviye bir analiz ekosistemidir. Karmaşık hukuk belgelerini (PDF), güncel mevzuat ve yüksek mahkeme içtihatları ışığında saniyeler içinde tarar.\n\nSadece bir kelime arama motoru değil, metnin hukuki mantığını kavrayan bir yardımcıdır. Sözleşmelerdeki gizli riskleri tespit eder, dava dosyalarındaki eksiklikleri raporlar ve avukatlara stratejik karar alma süreçlerinde veri temelli bir dayanak sunar. Veritas ile manuel dosya inceleme saatlerini saniyelere indirerek, adaletin hızıyla teknolojinin gücünü birleştiriyoruz.",
       googleBtn: "Google ile Giriş Yap", 
       select: "Dosya Seç", 
-      btn: "ANALİZİ BAŞLAT", 
+      btn: "KUANTUM MOTORU İLE SİMÜLE ET", 
       upload: "PDF Belgesini Seçin", 
       download: "RAPORU İNDİR (.PDF)",
       resultTitle: "Analiz Sonucu",
@@ -315,11 +352,11 @@ export default function Home() {
       title: "Veritas Q-AI", 
       sub: "SUPREME LEGAL ANALYTICS", 
       aboutBtn: "What is Veritas Q-AI?", 
-      aboutTitle: "The Future of Law: Meet Veritas Q-AI",
-      aboutText: "Veritas Q-AI is an advanced analytics ecosystem designed to transform how legal professionals work. It scans complex legal documents (PDFs) in seconds, illuminated by current legislation and high court precedents.\n\nIt's not just a word search engine, but an assistant that understands the legal logic of text. It detects hidden risks in contracts, reports deficiencies in case files, and provides lawyers with data-driven support in strategic decision-making processes. With Veritas, we combine the speed of justice with the power of technology by reducing manual file review hours to seconds.",
+      aboutTitle: "Quantum-Driven Legal Intelligence: Veritas Q-AI",
+      aboutText: "Veritas Q-AI is not just a tool; it is a global legal ecosystem. Powered by a **Quantum Simulation Engine**, it analyzes complex documents across multiple jurisdictions simultaneously, delivering precision that classical AI cannot reach.\n\nVeritas Q-AI utilizes Quantum Entanglement Logic to cross-reference your documents with millions of live data points from Turkey, USA, UK, and Germany in real-time.\n\nBy simulating legal probabilities in a Multi-Jurisdictional Superposition, we detect hidden conflicts and risks before they become liabilities.",
       googleBtn: "Sign in with Google", 
       select: "Select File", 
-      btn: "START ANALYSIS", 
+      btn: "SIMULATE WITH QUANTUM ENGINE", 
       upload: "Select PDF Document", 
       download: "Download PDF",
       downloadWord: "Download Word",
@@ -483,6 +520,22 @@ export default function Home() {
     }
   };
 
+  // Check for payment success
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('success') === 'true' || urlParams.get('payment') === 'success') {
+        setShowSuccessCelebration(true);
+        // Clean URL
+        window.history.replaceState({}, '', window.location.pathname);
+        // Auto-hide after 5 seconds
+        setTimeout(() => {
+          setShowSuccessCelebration(false);
+        }, 5000);
+      }
+    }
+  }, []);
+
   useEffect(() => {
     const initAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -491,6 +544,11 @@ export default function Home() {
       // Kullanıcı paket bilgisini ve analiz sayısını Supabase'den yükle
       if (session?.user) {
         const userId = session.user.id;
+        
+        // Admin kontrolü
+        const userEmail = session.user.email;
+        const adminStatus = userEmail && ADMIN_EMAILS.includes(userEmail);
+        setIsAdmin(adminStatus || false);
         
         try {
           // Profiles tablosundan paket bilgisini çek
@@ -524,6 +582,22 @@ export default function Home() {
             setAnalysisCount(0);
           } else {
             setAnalysisCount(profile?.analysis_count || 0);
+          }
+          
+          // Kullanıcı kredilerini çek
+          try {
+            const response = await fetch('/api/get-credits', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userId: userId })
+            });
+            
+            if (response.ok) {
+              const data = await response.json();
+              setUserCredits(data.credits || 0);
+            }
+          } catch (err) {
+            console.error('Credit fetch error:', err);
           }
           
           // Enterprise kullanıcıları için analiz geçmişini çek
@@ -1126,13 +1200,43 @@ export default function Home() {
   };
 
   const handleAnalyze = async () => {
+    // Compare mode kontrolü
+    if (uploadMode === 'compare') {
+      if (!file || !file2) {
+        alert(language === 'TR' ? 'Lütfen karşılaştırma için iki dosya seçin.' : 'Please select both documents for comparison.');
+        return;
+      }
+      
+      // Paket kontrolü
+      if (!effectivePackage || effectivePackage === 'free') {
+        alert(language === 'TR' 
+          ? 'Dosya karşılaştırma özelliği Professional veya Global paket gerektirir.' 
+          : 'Document comparison requires Professional or Global package.');
+        setActiveTab('pricing');
+        return;
+      }
+      
+      // Compare işlemi
+      await handleCompare();
+      return;
+    }
+    
     if (!file) return;
     
-    // Limit kontrolü (Supabase'den)
+    // Admin kontrolü - Admin ise limit bypass
+    if (!isAdmin) {
+      // Kredi kontrolü (Pay-as-you-go için)
+      if (userCredits <= 0 && !userPackage) {
+        setShowCreditModal(true);
+        return;
+      }
+      
+      // Limit kontrolü (Supabase'den - Subscription için)
     const canAnalyze = await checkAnalysisLimit();
     if (!canAnalyze) {
       setShowLimitModal(true);
       return;
+      }
     }
     
     setLoading(true);
@@ -1224,6 +1328,28 @@ export default function Home() {
       // Legal citations
       if (data.legal_citations && Array.isArray(data.legal_citations)) {
         setLegalCitations(data.legal_citations);
+      }
+      
+      // Global Conflicts (sadece Global paket için)
+      setIsGlobalPackage(data.isGlobalPackage || false);
+      if (data.globalConflicts && Array.isArray(data.globalConflicts) && data.isGlobalPackage) {
+        setGlobalConflicts(data.globalConflicts);
+      } else {
+        setGlobalConflicts([]);
+      }
+      
+      // Legal References & Bibliography
+      if (data.legalReferences && Array.isArray(data.legalReferences)) {
+        setLegalReferences(data.legalReferences);
+      } else {
+        setLegalReferences([]);
+      }
+      
+      // Risk Assessments
+      if (data.riskAssessments && Array.isArray(data.riskAssessments)) {
+        setRiskAssessments(data.riskAssessments);
+      } else {
+        setRiskAssessments([]);
       }
       
       // Analiz sayısını artır ve Supabase'e kaydet
@@ -1469,6 +1595,101 @@ export default function Home() {
     }, 4000);
   };
 
+  // Feedback Hub event listener
+  useEffect(() => {
+    const handleOpenFeedbackHub = () => {
+      setShowFeedbackHub(true);
+    };
+
+    window.addEventListener('openFeedbackHub', handleOpenFeedbackHub);
+    return () => {
+      window.removeEventListener('openFeedbackHub', handleOpenFeedbackHub);
+    };
+  }, []);
+
+  const handleCompare = async () => {
+    if (!file || !file2) return;
+    
+    setLoading(true);
+    setResult("");
+    setComparisonResult(null);
+    
+    try {
+      // PDF'lerden metin çıkarma
+      const pdfjsLib = await import('pdfjs-dist');
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+      
+      // İlk dosya
+      const arrayBuffer1 = await file.arrayBuffer();
+      const pdf1 = await pdfjsLib.getDocument({ data: arrayBuffer1 }).promise;
+      let fullText1 = '';
+      for (let i = 1; i <= pdf1.numPages; i++) {
+        const page = await pdf1.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map((item: any) => item.str).join(' ');
+        fullText1 += pageText + '\n';
+      }
+      
+      // İkinci dosya
+      const arrayBuffer2 = await file2.arrayBuffer();
+      const pdf2 = await pdfjsLib.getDocument({ data: arrayBuffer2 }).promise;
+      let fullText2 = '';
+      for (let i = 1; i <= pdf2.numPages; i++) {
+        const page = await pdf2.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map((item: any) => item.str).join(' ');
+        fullText2 += pageText + '\n';
+      }
+      
+      // Dil kodunu belirle
+      const langMap: any = {
+        'TR': 'Türkçe',
+        'EN': 'English',
+        'FR': 'Français',
+        'DE': 'Deutsch',
+        'RU': 'Русский',
+        'ZH': '中文',
+        'AR': 'العربية'
+      };
+      const targetLang = langMap[language] || 'English';
+      
+      // API'ye gönder
+      const res = await fetch('/api/compare', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          pdfText1: fullText1,
+          pdfText2: fullText2,
+          targetLang: targetLang,
+          userPackage: effectivePackage,
+          isGlobalPackage: effectivePackage === 'enterprise' || effectivePackage === 'quantum_global'
+        })
+      });
+
+      const data = await res.json();
+      
+      if (!res.ok) {
+        if (data.requiresUpgrade) {
+          alert(data.error || (language === 'TR' ? 'Paket yükseltmesi gerekli' : 'Package upgrade required'));
+          setActiveTab('pricing');
+          return;
+        }
+        throw new Error(data.error || 'Comparison failed');
+      }
+      
+      setResult(data.reply || 'Comparison complete');
+      setComparisonResult(data);
+      setAnalysisStatus('');
+    } catch (error: any) {
+      console.error('Comparison error:', error);
+      alert(error.message || (language === 'TR' ? 'Karşılaştırma sırasında bir hata oluştu.' : 'An error occurred during comparison.'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleFeedbackSubmit = async (title: string, description: string, screenshot: File | null) => {
     try {
       // FormData oluştur
@@ -1525,6 +1746,7 @@ export default function Home() {
         user={user}
         userMenuOpen={userMenuOpen}
         setUserMenuOpen={setUserMenuOpen}
+        isAdmin={isAdmin}
         sidebarOpen={sidebarOpen}
         setSidebarOpen={setSidebarOpen}
         setActiveTab={setActiveTab}
@@ -1551,6 +1773,12 @@ export default function Home() {
           handleAuth={handleAuth}
           canAccessHistory={canAccessHistory}
           ui={ui}
+          isAdmin={isAdmin}
+          userCredits={userCredits}
+          contractCount={contractCount}
+          setContractCount={setContractCount}
+          roiCurrency={roiCurrency}
+          setRoiCurrency={setRoiCurrency}
         />
 
         <main style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '40px', width: '100%' }}>
@@ -1660,25 +1888,587 @@ export default function Home() {
               </button>
               </div>
 
-              {/* Veritas Nedir? Bölümü - Her zaman görünür */}
-              <div style={{ marginTop: '80px', maxWidth: '700px', textAlign: 'left', width: '100%' }}>
-                <h2 style={{ color: gold, fontSize: '2rem', marginBottom: '30px', textAlign: 'center' }}>{ui[language].aboutTitle}</h2>
-                <p style={{ color: lightText, fontSize: '1.1rem', lineHeight: '1.8', marginBottom: '20px', whiteSpace: 'pre-line' }}>{ui[language].aboutText}</p>
-                <div style={{ background: midBlue, padding: '25px', borderRadius: '15px', marginTop: '30px' }}>
-                  <h3 style={{ color: gold, marginBottom: '15px' }}>{ui[language].features}</h3>
-                  <ul style={{ color: lightText, lineHeight: '2' }}>
-                    <li>{ui[language].feature1}</li>
-                    <li>{ui[language].feature2}</li>
-                    <li>{ui[language].feature3}</li>
-                    <li>{ui[language].feature4}</li>
-                  </ul>
+              {/* Quantum-Driven Legal Intelligence Bölümü - Her zaman görünür */}
+              <div style={{ marginTop: '80px', maxWidth: '1200px', textAlign: 'left', width: '100%' }}>
+                {/* Quantum-Driven Header */}
+                <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+                  <h2 style={{ color: gold, fontSize: '2.5rem', marginBottom: '15px', fontWeight: 'bold' }}>
+                    {language === 'TR' ? 'Kuantum Tabanlı Hukuk Zekası: Veritas Q-AI' : 'Quantum-Driven Legal Intelligence: Veritas Q-AI'}
+                  </h2>
+                  <p style={{ 
+                    color: lightText, 
+                    fontSize: '1.2rem', 
+                    lineHeight: '1.8', 
+                    marginBottom: '30px',
+                    maxWidth: '900px',
+                    margin: '0 auto 30px auto',
+                    opacity: 0.9
+                  }}>
+                    {language === 'TR' 
+                      ? <>Veritas Q-AI sadece bir araç değil; küresel bir hukuk ekosistemidir. <span style={{ fontWeight: 'bold', color: gold }}>Kuantum Simülasyon Motoru</span> ile desteklenen sistem, karmaşık belgeleri birden fazla yargı alanında aynı anda analiz eder ve klasik AI'ın ulaşamadığı hassasiyeti sunar.</>
+                      : <>Veritas Q-AI is not just a tool; it is a global legal ecosystem. Powered by a <span style={{ fontWeight: 'bold', color: gold }}>Quantum Simulation Engine</span>, it analyzes complex documents across multiple jurisdictions simultaneously, delivering precision that classical AI cannot reach.</>}
+                  </p>
+                </div>
+
+                {/* Global Jurisdictional Visualization */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  gap: '40px',
+                  marginBottom: '40px',
+                  padding: '40px',
+                  background: `linear-gradient(135deg, ${darkBlue}ee, ${midBlue}dd)`,
+                  borderRadius: '20px',
+                  border: `2px solid ${gold}44`,
+                  position: 'relative',
+                  overflow: 'hidden',
+                  flexWrap: 'wrap'
+                }}>
+                  {/* Quantum Data Flow Lines */}
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: [0.3, 0.7, 0.3] }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                    style={{
+                      position: 'absolute',
+                      width: '100%',
+                      height: '100%',
+                      pointerEvents: 'none'
+                    }}
+                  >
+                    {/* Connecting lines between flags */}
+                    <svg width="100%" height="100%" style={{ position: 'absolute', top: 0, left: 0 }}>
+                      <motion.line
+                        x1="20%"
+                        y1="50%"
+                        x2="40%"
+                        y2="50%"
+                        stroke={gold}
+                        strokeWidth="2"
+                        strokeOpacity={0.4}
+                        initial={{ pathLength: 0 }}
+                        animate={{ pathLength: [0, 1, 0] }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                      />
+                      <motion.line
+                        x1="40%"
+                        y1="50%"
+                        x2="60%"
+                        y2="50%"
+                        stroke={gold}
+                        strokeWidth="2"
+                        strokeOpacity={0.4}
+                        initial={{ pathLength: 0 }}
+                        animate={{ pathLength: [0, 1, 0] }}
+                        transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
+                      />
+                      <motion.line
+                        x1="60%"
+                        y1="50%"
+                        x2="80%"
+                        y2="50%"
+                        stroke={gold}
+                        strokeWidth="2"
+                        strokeOpacity={0.4}
+                        initial={{ pathLength: 0 }}
+                        animate={{ pathLength: [0, 1, 0] }}
+                        transition={{ duration: 2, repeat: Infinity, delay: 1 }}
+                      />
+                    </svg>
+                  </motion.div>
+
+                  {/* Country Flags with Glow Effect */}
+                  {[
+                    { code: 'TR', name: language === 'TR' ? 'Türkiye' : 'Turkey', emoji: '🇹🇷' },
+                    { code: 'US', name: language === 'TR' ? 'ABD' : 'United States', emoji: '🇺🇸' },
+                    { code: 'UK', name: language === 'TR' ? 'İngiltere' : 'United Kingdom', emoji: '🇬🇧' },
+                    { code: 'DE', name: language === 'TR' ? 'Almanya' : 'Germany', emoji: '🇩🇪' }
+                  ].map((country, idx) => (
+                    <motion.div
+                      key={country.code}
+                      initial={{ opacity: 0, scale: 0.8, y: 20 }}
+                      animate={{ 
+                        opacity: 1, 
+                        scale: [1, 1.1, 1],
+                        y: 0
+                      }}
+                      transition={{ 
+                        delay: idx * 0.2,
+                        duration: 2,
+                        repeat: Infinity,
+                        repeatType: 'reverse'
+                      }}
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '10px',
+                        position: 'relative',
+                        zIndex: 1,
+                        minWidth: '120px'
+                      }}
+                    >
+                      <div style={{
+                        fontSize: '64px',
+                        filter: 'drop-shadow(0 0 10px rgba(199, 176, 121, 0.6))'
+                      }}>
+                        {country.emoji}
+                      </div>
+                      <span style={{
+                        color: gold,
+                        fontSize: '14px',
+                        fontWeight: 'bold',
+                        textAlign: 'center'
+                      }}>
+                        {country.name}
+                      </span>
+                    </motion.div>
+                  ))}
+                </div>
+
+                {/* Main Description */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6 }}
+                  style={{
+                  marginBottom: '40px',
+                  padding: '30px',
+                  background: midBlue,
+                  borderRadius: '15px',
+                  border: `1px solid ${gold}33`
+                  }}
+                >
+                  <p style={{ 
+                    color: lightText, 
+                    fontSize: '1.1rem', 
+                    lineHeight: '1.8', 
+                    marginBottom: '20px',
+                    whiteSpace: 'pre-line'
+                  }}>
+                    {language === 'TR' 
+                      ? 'Veritas Q-AI, Kuantum Dolanıklık Mantığını kullanarak belgelerinizi Türkiye, ABD, İngiltere ve Almanya\'dan milyonlarca canlı veri noktasıyla gerçek zamanlı olarak çapraz referanslandırır.'
+                      : 'Veritas Q-AI utilizes Quantum Entanglement Logic to cross-reference your documents with millions of live data points from Turkey, USA, UK, and Germany in real-time.'}
+                  </p>
+                  <p style={{ 
+                    color: lightText, 
+                    fontSize: '1.1rem', 
+                    lineHeight: '1.8', 
+                    marginBottom: '0',
+                    whiteSpace: 'pre-line',
+                    fontWeight: '500'
+                  }}>
+                    {language === 'TR' 
+                      ? 'Çok Yargı Alanlı Süperpozisyon\'da hukuki olasılıkları simüle ederek, gizli çatışmaları ve riskleri bunlar yükümlülük haline gelmeden önce tespit ederiz.'
+                      : 'By simulating legal probabilities in a Multi-Jurisdictional Superposition, we detect hidden conflicts and risks before they become liabilities.'}
+                  </p>
+                </motion.div>
+
+                {/* Quantum Features List */}
+                <div style={{
+                  marginTop: '40px',
+                  padding: '30px',
+                  background: darkBlue,
+                  borderRadius: '15px',
+                  border: `1px solid ${gold}44`
+                }}>
+                  <h3 style={{
+                    color: gold,
+                    fontSize: '1.5rem',
+                    marginBottom: '25px',
+                    fontWeight: 'bold',
+                    textAlign: 'center'
+                  }}>
+                    {language === 'TR' ? '⚛️ Kuantum Özellikler' : '⚛️ Quantum Features'}
+                  </h3>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                    gap: '20px'
+                  }}>
+                    {[
+                      {
+                        icon: '📊',
+                        title: language === 'TR' ? 'Kuantum Olasılık Haritalama' : 'Quantum Probability Mapping',
+                        desc: language === 'TR' 
+                          ? 'Binlerce potansiyel hukuki sonuca dayalı kesin risk skorlama.'
+                          : 'Precise risk scoring based on thousands of potential legal outcomes.'
+                      },
+                      {
+                        icon: '🌍',
+                        title: language === 'TR' ? 'Küresel Yargı Erişimi' : 'Global Jurisdictional Reach',
+                        desc: language === 'TR'
+                          ? 'TR, ABD (Federal & Eyalet), İngiltere (XML Tabanlı) ve DE (BGB/HGB) entegre canlı veri akışları.'
+                          : 'Integrated live data streams from TR, US (Federal & State), UK (XML-Based), and DE (BGB/HGB).'
+                      },
+                      {
+                        icon: '🔗',
+                        title: language === 'TR' ? 'Dolanıklık Analizi' : 'Entanglement Analysis',
+                        desc: language === 'TR'
+                          ? 'Sözleşmeniz ile yüksek mahkeme içtihatları arasındaki görünmez bağlantıları keşfetme.'
+                          : 'Discovering invisible links between your contract and high court precedents.'
+                      },
+                      {
+                        icon: '🌐',
+                        title: language === 'TR' ? 'Çapraz Sınır Uyumluluğu' : 'Cross-Border Compliance',
+                        desc: language === 'TR'
+                          ? '4 büyük hukuk sistemi genelinde uluslararası anlaşmalar için otomatik hukuki kontroller.'
+                          : 'Automated legal checks for international agreements across 4 major legal systems.'
+                      }
+                    ].map((feature, idx) => (
+                      <motion.div
+                        key={idx}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: idx * 0.1 }}
+                        style={{
+                          padding: '20px',
+                          background: midBlue,
+                          borderRadius: '12px',
+                          border: `1px solid ${gold}33`,
+                          transition: 'all 0.3s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = gold;
+                          e.currentTarget.style.transform = 'translateY(-5px)';
+                          e.currentTarget.style.boxShadow = `0 8px 24px ${gold}33`;
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = gold + '33';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = 'none';
+                        }}
+                      >
+                        <div style={{
+                          fontSize: '32px',
+                          marginBottom: '12px',
+                          filter: 'drop-shadow(0 0 8px rgba(199, 176, 121, 0.5))'
+                        }}>
+                          {feature.icon}
+                        </div>
+                        <h4 style={{
+                          color: gold,
+                          fontSize: '1.1rem',
+                          marginBottom: '10px',
+                          fontWeight: 'bold'
+                        }}>
+                          {feature.title}
+                        </h4>
+                        <p style={{
+                          color: lightText,
+                          fontSize: '0.95rem',
+                          lineHeight: '1.6',
+                          opacity: 0.9
+                        }}>
+                          {feature.desc}
+                        </p>
+                      </motion.div>
+                    ))}
+                  </div>
                 </div>
               </div>
 
               {/* Paketler Bölümü - Her zaman görünür */}
               <div id="pricing" style={{ marginTop: '80px', width: '100%' }}>
-                <h2 style={{ color: gold, fontSize: '2rem', marginBottom: '60px', marginTop: '0', textAlign: 'center' }}>{ui[language].pricing.toUpperCase()}</h2>
-                <div style={{ display: 'flex', gap: '25px', justifyContent: 'center', flexWrap: 'nowrap', alignItems: 'stretch', width: '100%', maxWidth: '1200px', margin: '0 auto' }}>
+                <h2 style={{ color: gold, fontSize: '2rem', marginBottom: '40px', marginTop: '0', textAlign: 'center' }}>{ui[language].pricing.toUpperCase()}</h2>
+
+                {/* ROI Calculator */}
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6 }}
+                  style={{
+                    marginBottom: '50px',
+                    padding: '30px',
+                    background: `linear-gradient(135deg, ${darkBlue}ee, ${midBlue}dd)`,
+                    borderRadius: '20px',
+                    border: `2px solid ${gold}44`,
+                    maxWidth: '800px',
+                    margin: '0 auto 50px auto'
+                  }}
+                >
+                  <h3 style={{
+                    color: gold,
+                    fontSize: '1.5rem',
+                    fontWeight: 'bold',
+                    marginBottom: '20px',
+                    textAlign: 'center'
+                  }}>
+                    {language === 'TR' ? 'Kuantum ROI Hesaplayıcı' : 'Quantum ROI Calculator'}
+                  </h3>
+                  
+                  {/* Currency Selector */}
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    gap: '10px',
+                    marginBottom: '25px'
+                  }}>
+                    <button
+                      onClick={() => setRoiCurrency('TR')}
+                      style={{
+                        padding: '8px 20px',
+                        background: roiCurrency === 'TR' ? gold : 'transparent',
+                        color: roiCurrency === 'TR' ? '#000000' : gold,
+                        border: `2px solid ${gold}`,
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontWeight: 'bold',
+                        fontSize: '0.9rem',
+                        transition: 'all 0.3s'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (roiCurrency !== 'TR') {
+                          e.currentTarget.style.background = `${gold}33`;
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (roiCurrency !== 'TR') {
+                          e.currentTarget.style.background = 'transparent';
+                        }
+                      }}
+                    >
+                      TR (TL)
+                    </button>
+                    <button
+                      onClick={() => setRoiCurrency('USD')}
+                      style={{
+                        padding: '8px 20px',
+                        background: roiCurrency === 'USD' ? gold : 'transparent',
+                        color: roiCurrency === 'USD' ? '#000000' : gold,
+                        border: `2px solid ${gold}`,
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontWeight: 'bold',
+                        fontSize: '0.9rem',
+                        transition: 'all 0.3s'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (roiCurrency !== 'USD') {
+                          e.currentTarget.style.background = `${gold}33`;
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (roiCurrency !== 'USD') {
+                          e.currentTarget.style.background = 'transparent';
+                        }
+                      }}
+                    >
+                      Global (USD)
+                    </button>
+                  </div>
+                  
+                  <div style={{ marginBottom: '25px' }}>
+                    <label style={{
+                      color: lightText,
+                      fontSize: '1rem',
+                      marginBottom: '10px',
+                      display: 'block',
+                      textAlign: 'center'
+                    }}>
+                      {language === 'TR' ? 'Kaç sözleşme analiz edeceksiniz?' : 'How many contracts will you analyze?'}
+                    </label>
+                    <input
+                      type="range"
+                      min="1"
+                      max="100"
+                      value={contractCount}
+                      onChange={(e) => setContractCount(parseInt(e.target.value))}
+                      style={{
+                        width: '100%',
+                        height: '8px',
+                        borderRadius: '5px',
+                        background: midBlue,
+                        outline: 'none',
+                        marginTop: '15px',
+                        accentColor: gold
+                      }}
+                    />
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      marginTop: '10px',
+                      color: lightText,
+                      fontSize: '0.9rem',
+                      opacity: 0.8
+                    }}>
+                      <span>1</span>
+                      <span style={{ color: gold, fontWeight: 'bold', fontSize: '1.2rem' }}>{contractCount}</span>
+                      <span>100</span>
+                    </div>
+                  </div>
+                  <div style={{
+                    padding: '20px',
+                    background: `linear-gradient(135deg, ${gold}22, ${gold}11)`,
+                    borderRadius: '15px',
+                    border: `2px solid ${gold}44`,
+                    textAlign: 'center'
+                  }}>
+                    {/* Calculations based on currency */}
+                    {(() => {
+                      const isTR = roiCurrency === 'TR';
+                      const hourlyRate = isTR ? 2500 : 150;
+                      const veritasRate = isTR ? 990 : 49;
+                      const currencySymbol = isTR ? 'TL' : '$';
+                      const traditionalCost = contractCount * 8 * hourlyRate;
+                      const veritasCost = contractCount * veritasRate;
+                      const savings = traditionalCost - veritasCost;
+                      
+                      return (
+                        <>
+                          <div style={{
+                            color: lightText,
+                            fontSize: '0.9rem',
+                            marginBottom: '10px',
+                            opacity: 0.9
+                          }}>
+                            {language === 'TR' ? 'Geleneksel Avukatlık Maliyeti' : 'Traditional Legal Cost'}
+                          </div>
+                          <div style={{
+                            color: '#ff6b6b',
+                            fontSize: '1.2rem',
+                            fontWeight: 'bold',
+                            marginBottom: '20px'
+                          }}>
+                            {currencySymbol} {traditionalCost.toLocaleString('tr-TR')}
+                          </div>
+                          <div style={{
+                            color: lightText,
+                            fontSize: '0.9rem',
+                            marginBottom: '10px',
+                            opacity: 0.9
+                          }}>
+                            {language === 'TR' ? 'Veritas Q-AI Maliyeti' : 'Veritas Q-AI Cost'}
+                          </div>
+                          <div style={{
+                            color: '#4ade80',
+                            fontSize: '1.2rem',
+                            fontWeight: 'bold',
+                            marginBottom: '20px'
+                          }}>
+                            {currencySymbol} {veritasCost.toLocaleString('tr-TR')}
+                          </div>
+                          <div style={{
+                            height: '1px',
+                            background: `linear-gradient(90deg, transparent, ${gold}66, transparent)`,
+                            marginBottom: '20px'
+                          }} />
+                          <div style={{
+                            color: lightText,
+                            fontSize: '0.9rem',
+                            marginBottom: '10px',
+                            opacity: 0.9
+                          }}>
+                            {language === 'TR' ? 'Yıllık Tasarrufunuz' : 'Potential Annual Saving'}
+                          </div>
+                          <motion.div
+                            animate={{
+                              scale: [1, 1.1, 1],
+                              filter: ['brightness(1)', 'brightness(1.5)', 'brightness(1)'],
+                              textShadow: [
+                                `0 0 30px ${gold}88`,
+                                `0 0 50px ${gold}cc, 0 0 80px ${gold}99`,
+                                `0 0 30px ${gold}88`
+                              ]
+                            }}
+                            transition={{
+                              duration: 2.5,
+                              repeat: Infinity,
+                              ease: "easeInOut"
+                            }}
+                            style={{
+                              color: gold,
+                              fontSize: '4rem',
+                              fontWeight: '900',
+                              textShadow: `0 0 30px ${gold}88, 0 0 60px ${gold}66`,
+                              marginBottom: '15px',
+                              lineHeight: '1.2',
+                              letterSpacing: '2px'
+                            }}
+                          >
+                            {currencySymbol} {savings.toLocaleString('tr-TR')}
+                          </motion.div>
+                          <div style={{
+                            color: lightText,
+                            fontSize: '0.8rem',
+                            opacity: 0.7,
+                            marginTop: '10px',
+                            marginBottom: '20px'
+                          }}>
+                            {isTR
+                              ? `(${contractCount} sözleşme × 8 saat × ${hourlyRate.toLocaleString('tr-TR')} TL) - (${contractCount} sözleşme × ${veritasRate.toLocaleString('tr-TR')} TL)`
+                              : `(${contractCount} contracts × 8 hours × ${currencySymbol}${hourlyRate}) - (${contractCount} contracts × ${currencySymbol}${veritasRate})`
+                            }
+                          </div>
+                          <div style={{
+                            marginTop: '20px',
+                            padding: '15px',
+                            background: `${gold}11`,
+                            borderRadius: '10px',
+                            border: `1px solid ${gold}33`,
+                            textAlign: 'center'
+                          }}>
+                            <p style={{
+                              color: lightText,
+                              fontSize: '0.85rem',
+                              lineHeight: '1.6',
+                              margin: 0,
+                              opacity: 0.9
+                            }}>
+                              {language === 'TR'
+                                ? 'Kuantum Cross-Risk analizi ile ülkeler arası hukuk çelişkilerini tespit ederek, uluslararası operasyonlarınızda %100 yasal güvenlik sağlayın.'
+                                : 'Detect cross-jurisdictional legal conflicts with Quantum Cross-Risk analysis to ensure 100% legal security in your international operations.'}
+                            </p>
+                          </div>
+                          {/* Get Started Button - Opens Modal */}
+                          <button
+                            onClick={() => {
+                              // Determine best package based on savings
+                              let recommendedPackage = packages.find(p => p.name === 'Single Quantum Scan');
+                              if (savings > 50000 || (isTR && savings > 200000)) {
+                                recommendedPackage = packages.find(p => p.name === 'Quantum Global');
+                              } else if (savings > 20000 || (isTR && savings > 80000)) {
+                                recommendedPackage = packages.find(p => p.name === 'Professional');
+                              }
+                              setRoiRecommendedPackage(recommendedPackage || packages[0]);
+                              setShowROIModal(true);
+                            }}
+                            style={{
+                              display: 'inline-block',
+                              padding: '18px 50px',
+                              background: `linear-gradient(135deg, ${gold}, #d4b877)`,
+                              color: '#000000',
+                              borderRadius: '15px',
+                              fontWeight: '900',
+                              fontSize: '1.2rem',
+                              border: 'none',
+                              cursor: 'pointer',
+                              transition: 'all 0.3s',
+                              boxShadow: `0 6px 30px ${gold}88`,
+                              marginTop: '15px',
+                              textTransform: 'uppercase',
+                              letterSpacing: '1px'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.transform = 'translateY(-4px) scale(1.05)';
+                              e.currentTarget.style.boxShadow = `0 8px 40px ${gold}aa`;
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                              e.currentTarget.style.boxShadow = `0 6px 30px ${gold}88`;
+                            }}
+                          >
+                            {language === 'TR' ? '✨ Hemen Tasarruf Et ✨' : '✨ Get Started ✨'}
+                          </button>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </motion.div>
+
+                {/* Quantum Packages */}
+                <div style={{ display: 'flex', gap: '25px', justifyContent: 'center', flexWrap: 'wrap', alignItems: 'stretch', width: '100%', maxWidth: '1200px', margin: '0 auto' }}>
                   {packages.map((pkg) => (
                     <PricingCard 
                       key={pkg.name}
@@ -1686,12 +2476,12 @@ export default function Home() {
                       plan={pkg.name}
                       priceTR={pkg.priceTR}
                       priceGlobal={pkg.priceGlobal}
-                      features={pkg.features}
+                      features={language === 'TR' ? pkg.features : pkg.featuresGlobal}
                       featuresGlobal={pkg.featuresGlobal}
                       popular={pkg.isPopular}
-                      fullName={pkg.fullName}
+                      fullName={language === 'TR' ? pkg.fullName : pkg.fullNameGlobal}
                       fullNameGlobal={pkg.fullNameGlobal}
-                      description={pkg.description}
+                      description={language === 'TR' ? pkg.description : pkg.descriptionGlobal}
                       descriptionGlobal={pkg.descriptionGlobal}
                       buttonText={pkg.buttonText}
                       buttonTextGlobal={pkg.buttonTextGlobal}
@@ -1702,6 +2492,70 @@ export default function Home() {
                       testMode={testMode}
                     />
                   ))}
+                </div>
+
+                {/* Secure Payment Logos */}
+                <div style={{
+                  marginTop: '60px',
+                  padding: '30px',
+                  textAlign: 'center',
+                  background: `linear-gradient(135deg, ${darkBlue}88, ${midBlue}66)`,
+                  borderRadius: '15px',
+                  border: `1px solid ${gold}33`,
+                  maxWidth: '1200px',
+                  margin: '60px auto 0 auto'
+                }}>
+                  <div style={{
+                    color: lightText,
+                    fontSize: '0.9rem',
+                    marginBottom: '20px',
+                    opacity: 0.9
+                  }}>
+                    {language === 'TR' ? 'Güvenli Ödeme' : 'Secure Payment'}
+                  </div>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    gap: '30px',
+                    flexWrap: 'wrap'
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '10px 20px',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      borderRadius: '10px',
+                      border: `1px solid ${gold}33`
+                    }}>
+                      <span style={{ fontSize: '1.5rem' }}>🔒</span>
+                      <span style={{ color: lightText, fontSize: '0.9rem', fontWeight: 'bold' }}>Stripe</span>
+                    </div>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '10px 20px',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      borderRadius: '10px',
+                      border: `1px solid ${gold}33`
+                    }}>
+                      <span style={{ fontSize: '1.5rem' }}>🛡️</span>
+                      <span style={{ color: lightText, fontSize: '0.9rem', fontWeight: 'bold' }}>Shopier</span>
+                    </div>
+                  </div>
+                  <div style={{
+                    color: `${gold}aa`,
+                    fontSize: '0.75rem',
+                    marginTop: '15px',
+                    opacity: 0.8
+                  }}>
+                    {language === 'TR' 
+                      ? 'Tüm ödemeler SSL şifreleme ile korunmaktadır'
+                      : 'All payments are protected with SSL encryption'
+                    }
+                  </div>
                 </div>
               </div>
             </div>
@@ -1714,53 +2568,229 @@ export default function Home() {
                   {/* PDF Yükleme Alanı */}
                   <div style={{ background: midBlue, padding: '50px', borderRadius: '25px', border: `2px dashed ${gold}44` }}>
                     <h2 style={{ color: gold, fontSize: '2rem', marginBottom: '30px' }}>{ui[language].title}</h2>
-                    <input 
-                      type="file" 
-                      id="pdfInputFinal" 
-                      accept=".pdf" 
-                      style={{ display: 'none' }} 
-                      onChange={(e) => setFile(e.target.files?.[0] || null)} 
-                    />
-                    <button
-                      id="selectFileButton"
-                      onClick={() => document.getElementById('pdfInputFinal')?.click()} 
-                      style={{ 
-                        backgroundColor: '#ffffff',
-                        background: '#ffffff',
-                        color: '#000000', 
-                        borderRadius: '50px', 
-                        padding: '15px 40px', 
-                        fontWeight: 'bold',
-                        border: '2px solid #ffffff',
-                        cursor: 'pointer',
-                        marginBottom: '20px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: 'fit-content',
-                        margin: '0 auto 20px auto',
-                        boxShadow: '0 4px 20px rgba(255, 255, 255, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.2)',
-                        transition: 'all 0.3s ease',
-                        fontSize: '16px'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.setProperty('background-color', '#f5f5f5', 'important');
-                        e.currentTarget.style.setProperty('background', '#f5f5f5', 'important');
-                        e.currentTarget.style.setProperty('color', '#000000', 'important');
-                        e.currentTarget.style.transform = 'translateY(-2px)';
-                        e.currentTarget.style.boxShadow = '0 6px 25px rgba(255, 255, 255, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.4)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.setProperty('background-color', '#ffffff', 'important');
-                        e.currentTarget.style.setProperty('background', '#ffffff', 'important');
-                        e.currentTarget.style.setProperty('color', '#000000', 'important');
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = '0 4px 20px rgba(255, 255, 255, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.2)';
-                      }}
-                    >
-                      <span style={{ color: '#000000', fontWeight: 'bold' }}>{ui[language].selectFileForAnalysis || 'Analiz İçin Dosya Seçin'}</span>
-                    </button>
-                    {file && <p style={{ marginTop: '20px', color: '#4ade80', fontWeight: 'bold', fontSize: '1rem' }}>● {file.name}</p>}
+                    
+                    {/* Upload Mode Tabs */}
+                    <div style={{
+                      display: 'flex',
+                      gap: '10px',
+                      marginBottom: '30px',
+                      justifyContent: 'center',
+                      borderBottom: `2px solid ${gold}33`
+                    }}>
+                      <button
+                        onClick={() => {
+                          setUploadMode('single');
+                          setFile2(null);
+                        }}
+                        style={{
+                          padding: '12px 24px',
+                          background: uploadMode === 'single' ? gold : 'transparent',
+                          color: uploadMode === 'single' ? '#000000' : gold,
+                          border: `2px solid ${gold}`,
+                          borderRadius: '10px 10px 0 0',
+                          cursor: 'pointer',
+                          fontWeight: 'bold',
+                          fontSize: '15px',
+                          transition: 'all 0.3s',
+                          borderBottom: uploadMode === 'single' ? `2px solid ${midBlue}` : 'none'
+                        }}
+                      >
+                        {language === 'TR' ? 'Tek Dosya Analizi' : 'Single Document'}
+                      </button>
+                      <button
+                        onClick={() => {
+                          // Paket kontrolü
+                          if (!userPackage || userPackage === 'free') {
+                            alert(language === 'TR' 
+                              ? 'Dosya karşılaştırma özelliği Professional veya Global paket gerektirir. Lütfen paketinizi yükseltin.' 
+                              : 'Document comparison requires Professional or Global package. Please upgrade your plan.');
+                            setActiveTab('pricing');
+                            return;
+                          }
+                          setUploadMode('compare');
+                          setFile(null);
+                        }}
+                        style={{
+                          padding: '12px 24px',
+                          background: uploadMode === 'compare' ? gold : 'transparent',
+                          color: uploadMode === 'compare' ? '#000000' : gold,
+                          border: `2px solid ${gold}`,
+                          borderRadius: '10px 10px 0 0',
+                          cursor: 'pointer',
+                          fontWeight: 'bold',
+                          fontSize: '15px',
+                          transition: 'all 0.3s',
+                          borderBottom: uploadMode === 'compare' ? `2px solid ${midBlue}` : 'none',
+                          opacity: (!userPackage || userPackage === 'free') ? 0.5 : 1,
+                          position: 'relative'
+                        }}
+                        title={(!userPackage || userPackage === 'free') ? (language === 'TR' ? 'Professional veya Global paket gerekli' : 'Professional or Global package required') : ''}
+                      >
+                        {language === 'TR' ? 'Dosya Karşılaştır' : 'Compare Two Documents'}
+                        {(!userPackage || userPackage === 'free') && <span style={{ marginLeft: '8px' }}>🔒</span>}
+                      </button>
+                    </div>
+
+                    {/* Single Document Mode */}
+                    {uploadMode === 'single' && (
+                      <>
+                        <input 
+                          type="file" 
+                          id="pdfInputFinal" 
+                          accept=".pdf" 
+                          style={{ display: 'none' }} 
+                          onChange={(e) => setFile(e.target.files?.[0] || null)} 
+                        />
+                        <button
+                          id="selectFileButton"
+                          onClick={() => document.getElementById('pdfInputFinal')?.click()} 
+                          style={{ 
+                            backgroundColor: '#ffffff',
+                            background: '#ffffff',
+                            color: '#000000', 
+                            borderRadius: '50px', 
+                            padding: '15px 40px', 
+                            fontWeight: 'bold',
+                            border: '2px solid #ffffff',
+                            cursor: 'pointer',
+                            marginBottom: '20px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: 'fit-content',
+                            margin: '0 auto 20px auto',
+                            boxShadow: '0 4px 20px rgba(255, 255, 255, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.2)',
+                            transition: 'all 0.3s ease',
+                            fontSize: '16px'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.setProperty('background-color', '#f5f5f5', 'important');
+                            e.currentTarget.style.setProperty('background', '#f5f5f5', 'important');
+                            e.currentTarget.style.setProperty('color', '#000000', 'important');
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                            e.currentTarget.style.boxShadow = '0 6px 25px rgba(255, 255, 255, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.4)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.setProperty('background-color', '#ffffff', 'important');
+                            e.currentTarget.style.setProperty('background', '#ffffff', 'important');
+                            e.currentTarget.style.setProperty('color', '#000000', 'important');
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = '0 4px 20px rgba(255, 255, 255, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.2)';
+                          }}
+                        >
+                          <span style={{ color: '#000000', fontWeight: 'bold' }}>{ui[language].selectFileForAnalysis || 'Analiz İçin Dosya Seçin'}</span>
+                        </button>
+                        {file && <p style={{ marginTop: '20px', color: '#4ade80', fontWeight: 'bold', fontSize: '1rem' }}>● {file.name}</p>}
+                      </>
+                    )}
+
+                    {/* Compare Mode */}
+                    {uploadMode === 'compare' && (
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 1fr',
+                        gap: '30px',
+                        marginTop: '20px'
+                      }}>
+                        {/* Document 1 */}
+                        <div style={{
+                          padding: '30px',
+                          background: darkBlue,
+                          borderRadius: '15px',
+                          border: `2px dashed ${gold}66`
+                        }}>
+                          <h3 style={{ color: gold, fontSize: '1.2rem', marginBottom: '20px', textAlign: 'center' }}>
+                            {language === 'TR' ? 'İlk Dosya' : 'Document 1'}
+                          </h3>
+                          <input 
+                            type="file" 
+                            id="pdfInputCompare1" 
+                            accept=".pdf" 
+                            style={{ display: 'none' }} 
+                            onChange={(e) => setFile(e.target.files?.[0] || null)} 
+                          />
+                          <button
+                            onClick={() => document.getElementById('pdfInputCompare1')?.click()} 
+                            style={{ 
+                              width: '100%',
+                              padding: '15px',
+                              background: gold,
+                              color: '#000000', 
+                              borderRadius: '10px', 
+                              fontWeight: 'bold',
+                              border: 'none',
+                              cursor: 'pointer',
+                              fontSize: '14px',
+                              transition: 'all 0.3s'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = '#d4c08a';
+                              e.currentTarget.style.transform = 'translateY(-2px)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = gold;
+                              e.currentTarget.style.transform = 'translateY(0)';
+                            }}
+                          >
+                            {language === 'TR' ? 'Dosya Seç' : 'Select File'}
+                          </button>
+                          {file && (
+                            <p style={{ marginTop: '15px', color: '#4ade80', fontWeight: 'bold', fontSize: '0.9rem', textAlign: 'center' }}>
+                              ✓ {file.name}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Document 2 */}
+                        <div style={{
+                          padding: '30px',
+                          background: darkBlue,
+                          borderRadius: '15px',
+                          border: `2px dashed ${gold}66`
+                        }}>
+                          <h3 style={{ color: gold, fontSize: '1.2rem', marginBottom: '20px', textAlign: 'center' }}>
+                            {language === 'TR' ? 'İkinci Dosya' : 'Document 2'}
+                          </h3>
+                          <input 
+                            type="file" 
+                            id="pdfInputCompare2" 
+                            accept=".pdf" 
+                            style={{ display: 'none' }} 
+                            onChange={(e) => setFile2(e.target.files?.[0] || null)} 
+                          />
+                          <button
+                            onClick={() => document.getElementById('pdfInputCompare2')?.click()} 
+                            style={{ 
+                              width: '100%',
+                              padding: '15px',
+                              background: gold,
+                              color: '#000000', 
+                              borderRadius: '10px', 
+                              fontWeight: 'bold',
+                              border: 'none',
+                              cursor: 'pointer',
+                              fontSize: '14px',
+                              transition: 'all 0.3s'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = '#d4c08a';
+                              e.currentTarget.style.transform = 'translateY(-2px)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = gold;
+                              e.currentTarget.style.transform = 'translateY(0)';
+                            }}
+                          >
+                            {language === 'TR' ? 'Dosya Seç' : 'Select File'}
+                          </button>
+                          {file2 && (
+                            <p style={{ marginTop: '15px', color: '#4ade80', fontWeight: 'bold', fontSize: '0.9rem', textAlign: 'center' }}>
+                              ✓ {file2.name}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
                     
                     {/* Limit Uyarı Banner - %80 ve üzeri */}
                     {user && shouldShowLimitWarning() && (
@@ -2007,7 +3037,13 @@ export default function Home() {
 
                     <button 
                       onClick={handleAnalyze}
-                      disabled={!file || loading || isAnalyzing || isLimitReached()}
+                      disabled={
+                        (uploadMode === 'single' && !file) || 
+                        (uploadMode === 'compare' && (!file || !file2)) || 
+                        loading || 
+                        isAnalyzing || 
+                        isLimitReached()
+                      }
                       style={{ 
                         width: '100%', 
                         padding: '18px', 
@@ -2017,28 +3053,46 @@ export default function Home() {
                         border: 'none', 
                         marginTop: '30px', 
                         fontWeight: '900',
-                        cursor: (file && !loading && !isAnalyzing && !isLimitReached()) ? 'pointer' : 'not-allowed',
-                        opacity: (file && !loading && !isAnalyzing && !isLimitReached()) ? 1 : 0.6,
+                        cursor: (
+                          (uploadMode === 'single' && file) || 
+                          (uploadMode === 'compare' && file && file2)
+                        ) && !loading && !isAnalyzing && !isLimitReached() ? 'pointer' : 'not-allowed',
+                        opacity: (
+                          (uploadMode === 'single' && file) || 
+                          (uploadMode === 'compare' && file && file2)
+                        ) && !loading && !isAnalyzing && !isLimitReached() ? 1 : 0.6,
                         boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
                         transition: 'all 0.2s ease'
                       }}
                       onMouseEnter={(e) => {
-                        if (file && !loading && !isAnalyzing && !isLimitReached()) {
+                        if (
+                          ((uploadMode === 'single' && file) || (uploadMode === 'compare' && file && file2)) && 
+                          !loading && !isAnalyzing && !isLimitReached()
+                        ) {
                           e.currentTarget.style.backgroundColor = '#f5f5f5';
                           e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
                         }
                       }}
                       onMouseLeave={(e) => {
-                        if (file && !loading && !isAnalyzing && !isLimitReached()) {
+                        if (
+                          ((uploadMode === 'single' && file) || (uploadMode === 'compare' && file && file2)) && 
+                          !loading && !isAnalyzing && !isLimitReached()
+                        ) {
                           e.currentTarget.style.backgroundColor = '#ffffff';
                           e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)';
                         }
                       }}
                     >
                       <span style={{ color: (loading || isAnalyzing) ? lightText : (isLimitReached() ? lightText : darkBlue) }}>
+                        {uploadMode === 'compare' 
+                          ? (language === 'TR' ? 'Dosyaları Karşılaştır' : 'Compare Documents')
+                          : ui[language].btn
+                        }
                         {isAnalyzing ? (language === 'TR' ? '🔍 Analiz Ediliyor...' : '🔍 Analyzing...') : 
                          isLimitReached() ? (language === 'TR' ? 'Limit Doldu' : 'Limit Reached') : 
-                         ui[language].btn}
+                         uploadMode === 'compare' 
+                           ? (language === 'TR' ? 'Dosyaları Karşılaştır' : 'Compare Documents')
+                           : ui[language].btn}
                       </span>
                     </button>
                     
@@ -2385,7 +3439,20 @@ export default function Home() {
                         </div>
                       </div>
                     )}
-                    {result && (
+                    {comparisonResult && uploadMode === 'compare' ? (
+                      <ComparisonResult
+                        result={result}
+                        differences={comparisonResult.differences}
+                        isCrossLanguage={comparisonResult.isCrossLanguage}
+                        gold={gold}
+                        darkBlue={darkBlue}
+                        midBlue={midBlue}
+                        lightText={lightText}
+                        language={language}
+                        file1Name={file?.name}
+                        file2Name={file2?.name}
+                      />
+                    ) : result && (
                       <AnalysisResult
                         result={result}
                         gold={gold}
@@ -2419,6 +3486,10 @@ export default function Home() {
                         chatLoading={chatLoading}
                         handleChatSend={handleChatSend}
                         ui={ui}
+                        globalConflicts={globalConflicts}
+                        isGlobalPackage={isGlobalPackage}
+                        legalReferences={legalReferences}
+                        riskAssessments={riskAssessments}
                       />
                     )}
                   </div>
@@ -2530,17 +3601,560 @@ export default function Home() {
               )}
 
               {activeTab === 'about' && (
-                <div style={{ marginTop: '40px', maxWidth: '700px', textAlign: 'left' }}>
-                  <h2 style={{ color: gold, fontSize: '2rem', marginBottom: '30px', textAlign: 'center' }}>{ui[language].aboutTitle}</h2>
-                  <p style={{ color: lightText, fontSize: '1.1rem', lineHeight: '1.8', marginBottom: '20px', whiteSpace: 'pre-line' }}>{ui[language].aboutText}</p>
-                  <div style={{ background: midBlue, padding: '25px', borderRadius: '15px', marginTop: '30px' }}>
-                    <h3 style={{ color: gold, marginBottom: '15px' }}>{ui[language].features}</h3>
-                  <ul style={{ color: lightText, lineHeight: '2' }}>
-                    <li>{ui[language].feature1}</li>
-                    <li>{ui[language].feature2}</li>
-                    <li>{ui[language].feature3}</li>
-                    <li>{ui[language].feature4}</li>
-                  </ul>
+                <div style={{ marginTop: '40px', maxWidth: '1200px', textAlign: 'left', width: '100%' }}>
+                  {/* Quantum-Driven Header */}
+                  <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+                    <h2 style={{ color: gold, fontSize: '2.5rem', marginBottom: '15px', fontWeight: 'bold' }}>
+                      {language === 'TR' ? 'Kuantum Tabanlı Hukuk Zekası: Veritas Q-AI' : 'Quantum-Driven Legal Intelligence: Veritas Q-AI'}
+                    </h2>
+                    <p style={{ 
+                      color: lightText, 
+                      fontSize: '1.2rem', 
+                      lineHeight: '1.8', 
+                      marginBottom: '30px',
+                      maxWidth: '900px',
+                      margin: '0 auto 30px auto',
+                      opacity: 0.9
+                    }}>
+                      {language === 'TR' 
+                        ? 'Veritas Q-AI sadece bir araç değil; küresel bir hukuk ekosistemidir. **Kuantum Simülasyon Motoru** ile desteklenen sistem, karmaşık belgeleri birden fazla yargı alanında aynı anda analiz eder ve klasik AI\'ın ulaşamadığı hassasiyeti sunar.'
+                        : 'Veritas Q-AI is not just a tool; it is a global legal ecosystem. Powered by a **Quantum Simulation Engine**, it analyzes complex documents across multiple jurisdictions simultaneously, delivering precision that classical AI cannot reach.'}
+                    </p>
+                  </div>
+
+                  {/* Global Jurisdictional Visualization */}
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    gap: '40px',
+                    marginBottom: '40px',
+                    padding: '40px',
+                    background: `linear-gradient(135deg, ${darkBlue}ee, ${midBlue}dd)`,
+                    borderRadius: '20px',
+                    border: `2px solid ${gold}44`,
+                    position: 'relative',
+                    overflow: 'hidden',
+                    flexWrap: 'wrap'
+                  }}>
+                    {/* Quantum Data Flow Lines */}
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: [0.3, 0.7, 0.3] }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                      style={{
+                        position: 'absolute',
+                        width: '100%',
+                        height: '100%',
+                        pointerEvents: 'none'
+                      }}
+                    >
+                      {/* Connecting lines between flags */}
+                      <svg width="100%" height="100%" style={{ position: 'absolute', top: 0, left: 0 }}>
+                        <motion.line
+                          x1="20%"
+                          y1="50%"
+                          x2="40%"
+                          y2="50%"
+                          stroke={gold}
+                          strokeWidth="2"
+                          strokeOpacity={0.4}
+                          initial={{ pathLength: 0 }}
+                          animate={{ pathLength: [0, 1, 0] }}
+                          transition={{ duration: 2, repeat: Infinity }}
+                        />
+                        <motion.line
+                          x1="40%"
+                          y1="50%"
+                          x2="60%"
+                          y2="50%"
+                          stroke={gold}
+                          strokeWidth="2"
+                          strokeOpacity={0.4}
+                          initial={{ pathLength: 0 }}
+                          animate={{ pathLength: [0, 1, 0] }}
+                          transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
+                        />
+                        <motion.line
+                          x1="60%"
+                          y1="50%"
+                          x2="80%"
+                          y2="50%"
+                          stroke={gold}
+                          strokeWidth="2"
+                          strokeOpacity={0.4}
+                          initial={{ pathLength: 0 }}
+                          animate={{ pathLength: [0, 1, 0] }}
+                          transition={{ duration: 2, repeat: Infinity, delay: 1 }}
+                        />
+                      </svg>
+                    </motion.div>
+
+                    {/* Country Flags with Glow Effect */}
+                    {[
+                      { code: 'TR', name: language === 'TR' ? 'Türkiye' : 'Turkey', emoji: '🇹🇷' },
+                      { code: 'US', name: language === 'TR' ? 'ABD' : 'United States', emoji: '🇺🇸' },
+                      { code: 'UK', name: language === 'TR' ? 'İngiltere' : 'United Kingdom', emoji: '🇬🇧' },
+                      { code: 'DE', name: language === 'TR' ? 'Almanya' : 'Germany', emoji: '🇩🇪' }
+                    ].map((country, idx) => (
+                      <motion.div
+                        key={country.code}
+                        initial={{ opacity: 0, scale: 0.8, y: 20 }}
+                        animate={{ 
+                          opacity: 1, 
+                          scale: [1, 1.1, 1],
+                          y: 0
+                        }}
+                        transition={{ 
+                          delay: idx * 0.2,
+                          duration: 2,
+                          repeat: Infinity,
+                          repeatType: 'reverse'
+                        }}
+                        style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: '10px',
+                          position: 'relative',
+                          zIndex: 1,
+                          minWidth: '120px'
+                        }}
+                      >
+                        <div style={{
+                          fontSize: '64px',
+                          filter: 'drop-shadow(0 0 10px rgba(199, 176, 121, 0.6))'
+                        }}>
+                          {country.emoji}
+                        </div>
+                        <span style={{
+                          color: gold,
+                          fontSize: '14px',
+                          fontWeight: 'bold',
+                          textAlign: 'center'
+                        }}>
+                          {country.name}
+                        </span>
+                      </motion.div>
+                    ))}
+                  </div>
+
+                  {/* Main Description */}
+                  <div style={{
+                    marginBottom: '40px',
+                    padding: '30px',
+                    background: midBlue,
+                    borderRadius: '15px',
+                    border: `1px solid ${gold}33`
+                  }}>
+                    <p style={{ 
+                      color: lightText, 
+                      fontSize: '1.1rem', 
+                      lineHeight: '1.8', 
+                      marginBottom: '25px',
+                      whiteSpace: 'pre-line'
+                    }}>
+                      {language === 'TR' 
+                        ? 'Veritas Q-AI, Kuantum Dolanıklık Mantığını kullanarak belgelerinizi Türkiye, ABD, İngiltere ve Almanya\'dan milyonlarca canlı veri noktasıyla gerçek zamanlı olarak çapraz referanslandırır.\n\nÇok Yargı Alanlı Süperpozisyon\'da hukuki olasılıkları simüle ederek, gizli çatışmaları ve riskleri bunlar yükümlülük haline gelmeden önce tespit ederiz.'
+                        : 'Veritas Q-AI utilizes Quantum Entanglement Logic to cross-reference your documents with millions of live data points from Turkey, USA, UK, and Germany in real-time.\n\nBy simulating legal probabilities in a Multi-Jurisdictional Superposition, we detect hidden conflicts and risks before they become liabilities.'}
+                    </p>
+                  </div>
+
+                  {/* How It Works Section */}
+                  <div style={{
+                    marginTop: '50px',
+                    marginBottom: '50px'
+                  }}>
+                    <h2 style={{
+                      color: gold,
+                      fontSize: '2rem',
+                      marginBottom: '40px',
+                      fontWeight: 'bold',
+                      textAlign: 'center',
+                      textShadow: `0 0 20px ${gold}44`
+                    }}>
+                      {language === 'TR' ? '⚛️ Nasıl Çalışır?' : '⚛️ How It Works'}
+                    </h2>
+
+                    {/* Steps */}
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '30px',
+                      marginBottom: '50px'
+                    }}>
+                      {[
+                        {
+                          step: 1,
+                          icon: '📥',
+                          title: language === 'TR' ? 'Kuantum İngestion' : 'Quantum Ingestion',
+                          description: language === 'TR' 
+                            ? 'Dökümanınızı yüklediğiniz an, sistemimiz metni 4 ülkenin (TR, US, UK, DE) hukuk vektörlerine parçalar.'
+                            : 'The moment you upload your document, our system fragments the text into legal vectors from 4 countries (TR, US, UK, DE).'
+                        },
+                        {
+                          step: 2,
+                          icon: '🔍',
+                          title: language === 'TR' ? 'Çapraz Kontrol Analizi' : 'Cross-Check Analysis',
+                          description: language === 'TR'
+                            ? 'Seçtiğiniz pakete göre, dökümanınız binlerce emsal karar ve kanun maddesiyle eş zamanlı olarak çarpıştırılır.'
+                            : 'Based on your selected package, your document is simultaneously cross-referenced with thousands of precedents and legal articles.'
+                        },
+                        {
+                          step: 3,
+                          icon: '🗺️',
+                          title: language === 'TR' ? 'Risk Haritalama' : 'Risk Mapping',
+                          description: language === 'TR'
+                            ? 'Yapay zeka değil, Kuantum mantığıyla riskleriniz 1-10 arası skorlanır ve yasal referanslarıyla listelenir.'
+                            : 'Not artificial intelligence, but Quantum logic: your risks are scored 1-10 and listed with their legal references.'
+                        }
+                      ].map((stepData, idx) => (
+                        <motion.div
+                          key={stepData.step}
+                          initial={{ opacity: 0, x: -50 }}
+                          whileInView={{ opacity: 1, x: 0 }}
+                          viewport={{ once: true, margin: "-100px" }}
+                          transition={{ delay: idx * 0.2, duration: 0.6 }}
+                          style={{
+                            display: 'flex',
+                            gap: '25px',
+                            padding: '30px',
+                            background: `linear-gradient(135deg, ${darkBlue}dd, ${midBlue}cc)`,
+                            borderRadius: '15px',
+                            border: `2px solid ${gold}44`,
+                            alignItems: 'center',
+                            position: 'relative',
+                            overflow: 'hidden'
+                          }}
+                        >
+                          {/* Step Number Badge */}
+                          <div style={{
+                            minWidth: '80px',
+                            height: '80px',
+                            borderRadius: '50%',
+                            background: `linear-gradient(135deg, ${gold}ff, ${gold}cc)`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '2rem',
+                            fontWeight: 'bold',
+                            color: darkBlue,
+                            boxShadow: `0 0 20px ${gold}66`,
+                            position: 'relative',
+                            zIndex: 2
+                          }}>
+                            {stepData.icon}
+                          </div>
+                          
+                          {/* Content */}
+                          <div style={{ flex: 1, position: 'relative', zIndex: 2 }}>
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '15px',
+                              marginBottom: '10px'
+                            }}>
+                              <h3 style={{
+                                color: gold,
+                                fontSize: '1.5rem',
+                                fontWeight: 'bold',
+                                margin: 0
+                              }}>
+                                {language === 'TR' ? `Adım ${stepData.step}:` : `Step ${stepData.step}:`} {stepData.title}
+                              </h3>
+                            </div>
+                            <p style={{
+                              color: lightText,
+                              fontSize: '1.1rem',
+                              lineHeight: '1.8',
+                              margin: 0,
+                              opacity: 0.9
+                            }}>
+                              {stepData.description}
+                            </p>
+                          </div>
+
+                          {/* Background Glow Effect */}
+                          <motion.div
+                            animate={{
+                              opacity: [0.1, 0.3, 0.1],
+                              scale: [1, 1.05, 1]
+                            }}
+                            transition={{
+                              duration: 3,
+                              repeat: Infinity,
+                              ease: "easeInOut"
+                            }}
+                            style={{
+                              position: 'absolute',
+                              top: '-50%',
+                              right: '-20%',
+                              width: '200px',
+                              height: '200px',
+                              background: `radial-gradient(circle, ${gold}44, transparent)`,
+                              borderRadius: '50%',
+                              filter: 'blur(40px)',
+                              zIndex: 1
+                            }}
+                          />
+                        </motion.div>
+                      ))}
+                    </div>
+
+                    {/* Why Quantum Section */}
+                    <div style={{
+                      marginTop: '50px',
+                      padding: '40px',
+                      background: `linear-gradient(135deg, ${gold}11, ${gold}05)`,
+                      borderRadius: '20px',
+                      border: `2px solid ${gold}44`,
+                      textAlign: 'center'
+                    }}>
+                      <h3 style={{
+                        color: gold,
+                        fontSize: '1.8rem',
+                        marginBottom: '20px',
+                        fontWeight: 'bold'
+                      }}>
+                        {language === 'TR' ? '❓ Neden Kuantum?' : '❓ Why Quantum?'}
+                      </h3>
+                      <p style={{
+                        color: lightText,
+                        fontSize: '1.2rem',
+                        lineHeight: '1.8',
+                        maxWidth: '900px',
+                        margin: '0 auto',
+                        opacity: 0.95
+                      }}>
+                        {language === 'TR'
+                          ? 'Geleneksel AI sadece metni okur; Veritas Kuantum Motoru, metnin farklı hukuk sistemlerindeki olasılıklarını simüle eder. Bu, %0 halüsinasyon ve %100 yasal referans demektir.'
+                          : 'Traditional AI only reads text; Veritas Quantum Engine simulates the probabilities of text across different legal systems. This means 0% hallucination and 100% legal references.'}
+                      </p>
+                    </div>
+
+                    {/* Feature Glossary */}
+                    <div style={{
+                      marginTop: '50px',
+                      padding: '40px',
+                      background: darkBlue,
+                      borderRadius: '20px',
+                      border: `2px solid ${gold}44`
+                    }}>
+                      <h3 style={{
+                        color: gold,
+                        fontSize: '1.8rem',
+                        marginBottom: '30px',
+                        fontWeight: 'bold',
+                        textAlign: 'center'
+                      }}>
+                        {language === 'TR' ? '📚 Paket Özellikleri Sözlüğü' : '📚 Feature Glossary'}
+                      </h3>
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+                        gap: '20px'
+                      }}>
+                        {[
+                          {
+                            term: language === 'TR' ? 'Çapraz Yargı Çelişkisi' : 'Cross-Jurisdictional Conflict',
+                            definition: language === 'TR'
+                              ? 'İki farklı ülke yasasının birbiriyle çeliştiği noktaların tespiti.'
+                              : 'Detection of points where laws from two different countries conflict with each other.'
+                          },
+                          {
+                            term: language === 'TR' ? 'Kuantum Karşılaştırma' : 'Quantum Comparison',
+                            definition: language === 'TR'
+                              ? 'Versiyonlar arası hukuki anlam kaymalarının milimetrik tespiti.'
+                              : 'Millimeter-precise detection of legal meaning shifts between versions.'
+                          },
+                          {
+                            term: language === 'TR' ? 'Emsal Karar Döngüsü' : 'Case-Law Roulette',
+                            definition: language === 'TR'
+                              ? 'Veritabanımızdaki canlı emsal karar döngüsü.'
+                              : 'Live precedent case cycle from our database.'
+                          },
+                          {
+                            term: language === 'TR' ? 'Kuantum Risk Haritalama' : 'Quantum Risk Mapping',
+                            definition: language === 'TR'
+                              ? 'Çok yargı alanlı risk analizi ve olasılık simülasyonu.'
+                              : 'Multi-jurisdictional risk analysis and probability simulation.'
+                          },
+                          {
+                            term: language === 'TR' ? 'Çapraz Dil Karşılaştırması' : 'Cross-Language Comparison',
+                            definition: language === 'TR'
+                              ? 'Farklı dillerdeki belgeleri karşılaştırarak çeviri doğruluğunu ve hukuki anlam kaymalarını tespit etme.'
+                              : 'Comparing documents in different languages to detect translation accuracy and legal meaning shifts.'
+                          },
+                          {
+                            term: language === 'TR' ? 'Canlı Veri Senkronizasyonu' : 'Live Data Synchronization',
+                            definition: language === 'TR'
+                              ? '4 büyük yargı alanından güncel yüksek mahkeme kararları ve yasal değişikliklerin otomatik taranması.'
+                              : 'Automatic scanning of current supreme court rulings and legislative changes from 4 major jurisdictions.'
+                          }
+                        ].map((item, idx) => (
+                          <motion.div
+                            key={idx}
+                            initial={{ opacity: 0, y: 20 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true, margin: "-50px" }}
+                            transition={{ delay: idx * 0.1 }}
+                            style={{
+                              padding: '20px',
+                              background: midBlue,
+                              borderRadius: '12px',
+                              border: `1px solid ${gold}33`,
+                              position: 'relative'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = gold;
+                              e.currentTarget.style.transform = 'translateY(-5px)';
+                              e.currentTarget.style.boxShadow = `0 8px 20px ${gold}33`;
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = `${gold}33`;
+                              e.currentTarget.style.transform = 'translateY(0)';
+                              e.currentTarget.style.boxShadow = 'none';
+                            }}
+                          >
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'flex-start',
+                              gap: '12px'
+                            }}>
+                              <span style={{
+                                fontSize: '1.5rem',
+                                lineHeight: '1'
+                              }}>
+                                ℹ️
+                              </span>
+                              <div style={{ flex: 1 }}>
+                                <h4 style={{
+                                  color: gold,
+                                  fontSize: '1rem',
+                                  fontWeight: 'bold',
+                                  marginBottom: '8px',
+                                  marginTop: 0
+                                }}>
+                                  {item.term}
+                                </h4>
+                                <p style={{
+                                  color: lightText,
+                                  fontSize: '0.9rem',
+                                  lineHeight: '1.6',
+                                  margin: 0,
+                                  opacity: 0.9
+                                }}>
+                                  {item.definition}
+                                </p>
+                              </div>
+                            </div>
+                          </motion.div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Quantum Features List */}
+                  <div style={{
+                    marginTop: '40px',
+                    padding: '30px',
+                    background: darkBlue,
+                    borderRadius: '15px',
+                    border: `1px solid ${gold}44`
+                  }}>
+                    <h3 style={{
+                      color: gold,
+                      fontSize: '1.5rem',
+                      marginBottom: '25px',
+                      fontWeight: 'bold',
+                      textAlign: 'center'
+                    }}>
+                      {language === 'TR' ? '⚛️ Kuantum Özellikler' : '⚛️ Quantum Features'}
+                    </h3>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                      gap: '20px'
+                    }}>
+                      {[
+                        {
+                          icon: '📊',
+                          title: language === 'TR' ? 'Kuantum Olasılık Haritalama' : 'Quantum Probability Mapping',
+                          desc: language === 'TR' 
+                            ? 'Binlerce potansiyel hukuki sonuca dayalı kesin risk skorlama.'
+                            : 'Precise risk scoring based on thousands of potential legal outcomes.'
+                        },
+                        {
+                          icon: '🌍',
+                          title: language === 'TR' ? 'Küresel Yargı Erişimi' : 'Global Jurisdictional Reach',
+                          desc: language === 'TR'
+                            ? 'TR, ABD (Federal & Eyalet), İngiltere (XML Tabanlı) ve DE (BGB/HGB) entegre canlı veri akışları.'
+                            : 'Integrated live data streams from TR, US (Federal & State), UK (XML-Based), and DE (BGB/HGB).'
+                        },
+                        {
+                          icon: '🔗',
+                          title: language === 'TR' ? 'Dolanıklık Analizi' : 'Entanglement Analysis',
+                          desc: language === 'TR'
+                            ? 'Sözleşmeniz ile yüksek mahkeme içtihatları arasındaki görünmez bağlantıları keşfetme.'
+                            : 'Discovering invisible links between your contract and high court precedents.'
+                        },
+                        {
+                          icon: '🌐',
+                          title: language === 'TR' ? 'Çapraz Sınır Uyumluluğu' : 'Cross-Border Compliance',
+                          desc: language === 'TR'
+                            ? '4 büyük hukuk sistemi genelinde uluslararası anlaşmalar için otomatik hukuki kontroller.'
+                            : 'Automated legal checks for international agreements across 4 major legal systems.'
+                        }
+                      ].map((feature, idx) => (
+                        <motion.div
+                          key={idx}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: idx * 0.1 }}
+                          style={{
+                            padding: '20px',
+                            background: midBlue,
+                            borderRadius: '12px',
+                            border: `1px solid ${gold}33`,
+                            transition: 'all 0.3s'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = gold;
+                            e.currentTarget.style.transform = 'translateY(-5px)';
+                            e.currentTarget.style.boxShadow = `0 8px 24px ${gold}33`;
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = gold + '33';
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = 'none';
+                          }}
+                        >
+                          <div style={{
+                            fontSize: '32px',
+                            marginBottom: '12px',
+                            filter: 'drop-shadow(0 0 8px rgba(199, 176, 121, 0.5))'
+                          }}>
+                            {feature.icon}
+                          </div>
+                          <h4 style={{
+                            color: gold,
+                            fontSize: '1.1rem',
+                            marginBottom: '10px',
+                            fontWeight: 'bold'
+                          }}>
+                            {feature.title}
+                          </h4>
+                          <p style={{
+                            color: lightText,
+                            fontSize: '0.95rem',
+                            lineHeight: '1.6',
+                            opacity: 0.9
+                          }}>
+                            {feature.desc}
+                          </p>
+                        </motion.div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}
@@ -2635,6 +4249,17 @@ export default function Home() {
         darkBlue={darkBlue}
         lightText={lightText}
       />
+      
+      <FeedbackHub
+        isOpen={showFeedbackHub}
+        onClose={() => setShowFeedbackHub(false)}
+        language={language}
+        gold={gold}
+        darkBlue={darkBlue}
+        midBlue={midBlue}
+        lightText={lightText}
+        userEmail={user?.email}
+      />
 
       {/* Toast Notification */}
       {showToast && (
@@ -2700,6 +4325,161 @@ export default function Home() {
       </button>
 
       {/* Limit Reached Modal */}
+      {/* Credit Purchase Modal */}
+      {showCreditModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.8)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2000,
+          padding: '20px'
+        }}
+        onClick={() => setShowCreditModal(false)}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: darkBlue,
+              border: `2px solid ${gold}`,
+              borderRadius: '20px',
+              padding: '40px',
+              maxWidth: '500px',
+              width: '100%',
+              boxShadow: `0 20px 60px rgba(0,0,0,0.5)`
+            }}
+          >
+            <h2 style={{
+              color: gold,
+              fontSize: '1.8rem',
+              marginBottom: '20px',
+              textAlign: 'center'
+            }}>
+              {language === 'TR' ? 'Kuantum Kredisi Gerekli' : 'Quantum Credits Required'}
+            </h2>
+            <p style={{
+              color: lightText,
+              fontSize: '1rem',
+              marginBottom: '30px',
+              textAlign: 'center',
+              lineHeight: '1.6'
+            }}>
+              {language === 'TR' 
+                ? 'Analiz yapmak için kuantum kredisi satın almanız veya abonelik paketine geçmeniz gerekiyor.'
+                : 'You need to purchase quantum credits or subscribe to a plan to perform analysis.'}
+            </p>
+            <div style={{
+              display: 'flex',
+              gap: '15px',
+              justifyContent: 'center',
+              flexWrap: 'wrap'
+            }}>
+              <button
+                onClick={() => {
+                  setShowCreditModal(false);
+                  setActiveTab('pricing');
+                  // Navigate to pricing section
+                  const pricingElement = document.getElementById('pricing');
+                  if (pricingElement) {
+                    pricingElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }
+                  setTimeout(() => {
+                    const pricingElement = document.getElementById('pricing');
+                    if (pricingElement) {
+                      pricingElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                  }, 200);
+                }}
+                style={{
+                  padding: '15px 30px',
+                  background: gold,
+                  color: '#000000',
+                  border: 'none',
+                  borderRadius: '10px',
+                  fontWeight: 'bold',
+                  fontSize: '1rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = `0 6px 20px ${gold}66`;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                {language === 'TR' ? 'Kuantum Kredisi Al' : 'Buy Credits'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowCreditModal(false);
+                  setActiveTab('pricing');
+                  // Navigate to pricing section
+                  const pricingElement = document.getElementById('pricing');
+                  if (pricingElement) {
+                    pricingElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }
+                  setTimeout(() => {
+                    const pricingElement = document.getElementById('pricing');
+                    if (pricingElement) {
+                      pricingElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                  }, 200);
+                }}
+                style={{
+                  padding: '15px 30px',
+                  background: 'transparent',
+                  color: gold,
+                  border: `2px solid ${gold}`,
+                  borderRadius: '10px',
+                  fontWeight: 'bold',
+                  fontSize: '1rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = `${gold}22`;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent';
+                }}
+              >
+                {language === 'TR' ? 'Abone Ol' : 'Subscribe'}
+              </button>
+            </div>
+            <button
+              onClick={() => setShowCreditModal(false)}
+              style={{
+                position: 'absolute',
+                top: '15px',
+                right: '15px',
+                background: 'transparent',
+                border: 'none',
+                color: lightText,
+                fontSize: '24px',
+                cursor: 'pointer',
+                opacity: 0.7,
+                transition: 'opacity 0.2s'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
+              onMouseLeave={(e) => e.currentTarget.style.opacity = '0.7'}
+            >
+              ×
+            </button>
+          </motion.div>
+        </div>
+      )}
+
       {showLimitModal && (
         <div style={{
           position: 'fixed',
@@ -2774,6 +4554,404 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      {/* Success Celebration Modal */}
+      {showSuccessCelebration && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.9)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          padding: '20px'
+        }}
+        onClick={() => setShowSuccessCelebration(false)}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.5 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.5 }}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: `linear-gradient(135deg, ${darkBlue}, ${midBlue})`,
+              border: `3px solid ${gold}`,
+              borderRadius: '30px',
+              padding: '50px',
+              maxWidth: '600px',
+              width: '100%',
+              boxShadow: `0 20px 60px ${gold}66`,
+              textAlign: 'center',
+              position: 'relative',
+              overflow: 'hidden'
+            }}
+          >
+            {/* Confetti Effect */}
+            {typeof window !== 'undefined' && [...Array(50)].map((_, i) => (
+              <motion.div
+                key={i}
+                initial={{
+                  x: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 1200),
+                  y: -50,
+                  opacity: 1
+                }}
+                animate={{
+                  y: (typeof window !== 'undefined' ? window.innerHeight : 800) + 100,
+                  x: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 1200),
+                  opacity: [1, 1, 0],
+                  rotate: Math.random() * 360
+                }}
+                transition={{
+                  duration: Math.random() * 2 + 2,
+                  delay: Math.random() * 0.5,
+                  repeat: Infinity
+                }}
+                style={{
+                  position: 'absolute',
+                  width: '10px',
+                  height: '10px',
+                  background: [gold, '#4ade80', '#60a5fa', '#f59e0b', '#ef4444'][Math.floor(Math.random() * 5)],
+                  borderRadius: '50%',
+                  pointerEvents: 'none'
+                }}
+              />
+            ))}
+            
+            <motion.div
+              animate={{
+                scale: [1, 1.2, 1],
+                rotate: [0, 10, -10, 0]
+              }}
+              transition={{
+                duration: 0.5,
+                repeat: Infinity,
+                repeatDelay: 0.3
+              }}
+              style={{
+                fontSize: '80px',
+                marginBottom: '20px'
+              }}
+            >
+              🎉
+            </motion.div>
+            
+            <h2 style={{
+              color: gold,
+              fontSize: '2.5rem',
+              fontWeight: '900',
+              marginBottom: '20px',
+              textShadow: `0 0 20px ${gold}66`
+            }}>
+              {language === 'TR' ? 'Ödeme Başarılı!' : 'Payment Successful!'}
+            </h2>
+            
+            <p style={{
+              color: lightText,
+              fontSize: '1.2rem',
+              marginBottom: '30px',
+              lineHeight: '1.6'
+            }}>
+              {language === 'TR' 
+                ? 'Analiz hakkınız hesabınıza tanımlandı. Artık sınırsız kuantum analizi yapabilirsiniz!'
+                : 'Your analysis credits have been added to your account. You can now perform unlimited quantum analysis!'
+              }
+            </p>
+            
+            <button
+              onClick={() => setShowSuccessCelebration(false)}
+              style={{
+                padding: '15px 40px',
+                background: gold,
+                color: '#000000',
+                border: 'none',
+                borderRadius: '15px',
+                fontWeight: 'bold',
+                fontSize: '1.1rem',
+                cursor: 'pointer',
+                transition: 'all 0.3s',
+                boxShadow: `0 4px 20px ${gold}66`
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px) scale(1.05)';
+                e.currentTarget.style.boxShadow = `0 6px 30px ${gold}88`;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0) scale(1)';
+                e.currentTarget.style.boxShadow = `0 4px 20px ${gold}66`;
+              }}
+            >
+              {language === 'TR' ? 'Harika! Başlayalım' : 'Awesome! Let\'s Start'}
+            </button>
+          </motion.div>
+        </div>
+      )}
+
+      {/* ROI Get Started Modal */}
+      {showROIModal && roiRecommendedPackage && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.85)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000,
+          padding: '20px'
+        }}
+        onClick={() => setShowROIModal(false)}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: `linear-gradient(135deg, ${darkBlue}, ${midBlue})`,
+              border: `3px solid ${gold}`,
+              borderRadius: '25px',
+              padding: '40px',
+              maxWidth: '600px',
+              width: '100%',
+              boxShadow: `0 20px 60px ${gold}66`
+            }}
+          >
+            <h2 style={{
+              color: gold,
+              fontSize: '2rem',
+              fontWeight: 'bold',
+              marginBottom: '15px',
+              textAlign: 'center'
+            }}>
+              {language === 'TR' ? 'Hemen Başlayın!' : 'Get Started Now!'}
+            </h2>
+            <p style={{
+              color: lightText,
+              fontSize: '1.1rem',
+              marginBottom: '30px',
+              textAlign: 'center',
+              lineHeight: '1.6'
+            }}>
+              {language === 'TR' 
+                ? `Önerilen paket: ${roiRecommendedPackage.name}`
+                : `Recommended package: ${roiRecommendedPackage.name}`
+              }
+            </p>
+            
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              marginBottom: '20px'
+            }}>
+              {/* Global Payment Button */}
+              <a
+                href={roiRecommendedPackage.lemonSqueezyLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  padding: '15px 0',
+                  background: gold,
+                  color: '#000000',
+                  borderRadius: '12px',
+                  fontWeight: 'bold',
+                  fontSize: '1rem',
+                  textDecoration: 'none',
+                  textAlign: 'center',
+                  transition: 'all 0.3s',
+                  boxShadow: `0 4px 15px ${gold}66`
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = `0 6px 20px ${gold}88`;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = `0 4px 15px ${gold}66`;
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                  <span>💳</span>
+                  <span>{language === 'TR' ? 'Subscribe Globally ($)' : 'Pay in USD'}</span>
+                </div>
+              </a>
+              
+              {/* TR Payment Button */}
+              <a
+                href={roiRecommendedPackage.shopierLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'block',
+                  width: '100%',
+                  padding: '15px 0',
+                  background: 'transparent',
+                  color: gold,
+                  borderRadius: '12px',
+                  fontWeight: 'bold',
+                  fontSize: '1rem',
+                  textDecoration: 'none',
+                  textAlign: 'center',
+                  border: `2px solid ${gold}`,
+                  transition: 'all 0.3s',
+                  position: 'relative'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = `${gold}22`;
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                  <span>{language === 'TR' ? 'Türkiye Kartı ile Öde (TL / Taksit)' : 'Pay with Turkish Card (TL / Installment)'}</span>
+                  <span style={{
+                    fontSize: '0.7rem',
+                    background: `${gold}33`,
+                    color: gold,
+                    padding: '2px 10px',
+                    borderRadius: '8px',
+                    fontWeight: '600'
+                  }}>
+                    {language === 'TR' ? '✓ Taksit İmkanı' : '✓ Installment Available'}
+                  </span>
+                </div>
+              </a>
+              {/* Payment Methods Info */}
+              {language === 'TR' && (
+                <div style={{
+                  marginTop: '8px',
+                  padding: '8px 12px',
+                  textAlign: 'center',
+                  fontSize: '0.7rem',
+                  color: '#a0a0a0',
+                  lineHeight: '1.4',
+                  opacity: 0.85
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '4px' }}>
+                    <span>💳</span>
+                    <span>Kredi kartına 12 aya varan taksit</span>
+                  </div>
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center', 
+                    gap: '8px', 
+                    flexWrap: 'wrap',
+                    fontSize: '0.65rem'
+                  }}>
+                    <span style={{ fontWeight: '600' }}>Bonus</span>
+                    <span>•</span>
+                    <span style={{ fontWeight: '600' }}>World</span>
+                    <span>•</span>
+                    <span style={{ fontWeight: '600' }}>Maximum</span>
+                    <span>•</span>
+                    <span style={{ fontWeight: '600' }}>Axess</span>
+                    <span>ve diğer tüm kartlar</span>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <button
+              onClick={() => setShowROIModal(false)}
+              style={{
+                width: '100%',
+                padding: '12px 0',
+                background: 'transparent',
+                color: lightText,
+                border: `1px solid ${gold}44`,
+                borderRadius: '10px',
+                fontWeight: 'bold',
+                fontSize: '0.9rem',
+                cursor: 'pointer',
+                transition: 'all 0.3s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = `${gold}11`;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+              }}
+            >
+              {language === 'TR' ? 'Daha Sonra' : 'Maybe Later'}
+            </button>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Footer with Legal Disclaimer */}
+      <footer style={{
+        marginTop: '80px',
+        padding: '40px 20px',
+        background: darkBlue,
+        borderTop: `1px solid ${gold}22`,
+        textAlign: 'center'
+      }}>
+        <div style={{
+          maxWidth: '1200px',
+          margin: '0 auto'
+        }}>
+          <div style={{
+            marginBottom: '20px',
+            padding: '20px',
+            background: `${darkBlue}dd`,
+            borderRadius: '12px',
+            border: `1px solid ${gold}22`,
+            borderLeft: `4px solid ${gold}66`
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: '10px',
+              justifyContent: 'center',
+              flexWrap: 'wrap'
+            }}>
+              <span style={{
+                fontSize: '1.2rem',
+                lineHeight: '1.2'
+              }}>
+                ⚠️
+              </span>
+              <div style={{
+                flex: 1,
+                maxWidth: '900px',
+                color: lightText,
+                fontSize: '0.85rem',
+                lineHeight: '1.6',
+                fontStyle: 'italic',
+                opacity: 0.85,
+                textAlign: 'left'
+              }}>
+                <strong style={{ color: gold, fontStyle: 'normal' }}>
+                  {language === 'TR' ? 'Yasal Uyarı:' : 'Legal Disclaimer:'}
+                </strong>{' '}
+                {language === 'TR' 
+                  ? 'Veritas Q-AI, yapay zeka tabanlı bir analiz aracıdır. Sunulan raporlar ve analizler yalnızca bilgilendirme ve risk değerlendirme amaçlı olup, hukuki tavsiye niteliği taşımaz. Sistemimiz, yetkili bir avukatın profesyonel görüşünün yerini almaz. Kuantum-AI mantığı ile en yüksek doğruluk hedeflense de, hukuki yorumlar farklılık gösterebilir. Veritas Q-AI ve işletmecileri, bu analizlere dayanılarak alınan kararlardan sorumlu tutulamaz.'
+                  : 'Veritas Q-AI is an artificial intelligence-based analysis tool. The reports and insights provided are for informational and risk-assessment purposes only and do not constitute legal advice. Our system does not replace the professional judgment of a qualified lawyer. While we strive for 100% accuracy using Quantum-AI logic, legal interpretations may vary. Veritas Q-AI and its operators are not liable for any decisions made based on this analysis.'}
+              </div>
+            </div>
+          </div>
+          <div style={{
+            color: lightText,
+            fontSize: '0.8rem',
+            opacity: 0.6,
+            marginTop: '20px'
+          }}>
+            © {new Date().getFullYear()} Veritas Q-AI. {language === 'TR' ? 'Tüm hakları saklıdır.' : 'All rights reserved.'}
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

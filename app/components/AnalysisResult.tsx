@@ -2,6 +2,7 @@
 import React, { useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
 
 type UserPackage = "free" | "basic" | "professional" | "enterprise" | null;
 
@@ -12,8 +13,8 @@ interface AnalysisResultProps {
   midBlue: string;
   lightText: string;
   language: string;
-  activeResultTab: 'summary' | 'detailed';
-  setActiveResultTab: (tab: 'summary' | 'detailed') => void;
+  activeResultTab: 'summary' | 'detailed' | 'risks';
+  setActiveResultTab: (tab: 'summary' | 'detailed' | 'risks') => void;
   effectivePackage: UserPackage;
   parseAnalysisResult: (text: string) => { summary: string; detailed: string };
   extractRiskScore: (text: string) => number;
@@ -38,6 +39,36 @@ interface AnalysisResultProps {
   chatLoading: boolean;
   handleChatSend: () => void;
   ui: any;
+  globalConflicts?: Array<{
+    article: string;
+    countryA: string;
+    countryARule: string;
+    countryB: string;
+    countryBRule: string;
+    riskScore: number;
+  }>;
+  isGlobalPackage?: boolean;
+  legalReferences?: Array<{
+    country: string;
+    countryFlag: string;
+    lawName: string;
+    article: string;
+    summary: string;
+    isPrecedent: boolean;
+    crossReference?: Array<{
+      country: string;
+      countryFlag: string;
+      lawName: string;
+      article: string;
+    }>;
+  }>;
+  riskAssessments?: Array<{
+    description: string;
+    severity: number;
+    countries?: string[];
+    legalReference: string;
+    isQuantumConflict: boolean;
+  }>;
 }
 
 export default function AnalysisResult({
@@ -72,7 +103,11 @@ export default function AnalysisResult({
   setChatInput,
   chatLoading,
   handleChatSend,
-  ui
+  ui,
+  globalConflicts = [],
+  isGlobalPackage = false,
+  legalReferences = [],
+  riskAssessments = []
 }: AnalysisResultProps) {
   const router = useRouter();
   const reportRef = useRef<HTMLDivElement>(null);
@@ -163,12 +198,400 @@ export default function AnalysisResult({
               }}>🔒</span>
             )}
           </button>
+          {riskAssessments && riskAssessments.length > 0 && (
+            <button
+              onClick={() => setActiveResultTab('risks')}
+              style={{
+                padding: '12px 24px',
+                background: 'transparent',
+                color: activeResultTab === 'risks' ? gold : lightText,
+                border: 'none',
+                borderBottom: activeResultTab === 'risks' ? `3px solid ${gold}` : '3px solid transparent',
+                cursor: 'pointer',
+                fontWeight: activeResultTab === 'risks' ? 'bold' : 'normal',
+                fontSize: '15px',
+                transition: 'all 0.2s',
+                opacity: activeResultTab === 'risks' ? 1 : 0.7,
+                position: 'relative'
+              }}
+              onMouseEnter={(e) => {
+                if (activeResultTab !== 'risks') {
+                  e.currentTarget.style.opacity = '1';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (activeResultTab !== 'risks') {
+                  e.currentTarget.style.opacity = '0.7';
+                }
+              }}
+            >
+              {language === 'TR' ? 'Hukuki Risk Analizi' : 'Legal Risk Analysis'}
+              {riskAssessments.length > 0 && (
+                <span style={{
+                  marginLeft: '8px',
+                  fontSize: '11px',
+                  background: riskAssessments.some(r => r.severity >= 8) ? '#ef4444' : 
+                              riskAssessments.some(r => r.severity >= 5) ? '#f97316' : '#fbbf24',
+                  color: '#ffffff',
+                  padding: '2px 6px',
+                  borderRadius: '10px',
+                  fontWeight: 'bold'
+                }}>
+                  {riskAssessments.length}
+                </span>
+              )}
+            </button>
+          )}
         </div>
 
         <div style={{ minHeight: '200px' }}>
           {activeResultTab === 'summary' && (
             <div style={{ color: lightText, whiteSpace: 'pre-wrap', textAlign: 'left', lineHeight: '1.8' }}>
               {summary || result}
+            </div>
+          )}
+          {activeResultTab === 'risks' && riskAssessments && riskAssessments.length > 0 && (
+            <div style={{ position: 'relative' }}>
+              {/* Quantum Cross-Check Status */}
+              <div style={{
+                marginBottom: '30px',
+                padding: '20px',
+                background: `linear-gradient(135deg, ${midBlue}, ${darkBlue})`,
+                borderRadius: '15px',
+                border: `2px solid ${gold}44`,
+                textAlign: 'center'
+              }}>
+                {isGlobalPackage ? (
+                  <motion.div
+                    animate={{
+                      boxShadow: [
+                        `0 0 20px ${gold}66`,
+                        `0 0 30px ${gold}88`,
+                        `0 0 20px ${gold}66`
+                      ]
+                    }}
+                    transition={{
+                      duration: 2,
+                      repeat: Infinity,
+                      ease: "easeInOut"
+                    }}
+                    style={{
+                      display: 'inline-block',
+                      padding: '12px 24px',
+                      background: `linear-gradient(135deg, ${gold}22, ${gold}11)`,
+                      borderRadius: '12px',
+                      border: `2px solid ${gold}`,
+                      marginBottom: '10px'
+                    }}
+                  >
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      justifyContent: 'center'
+                    }}>
+                      <motion.div
+                        animate={{
+                          scale: [1, 1.2, 1],
+                          opacity: [1, 0.7, 1]
+                        }}
+                        transition={{
+                          duration: 1.5,
+                          repeat: Infinity,
+                          ease: "easeInOut"
+                        }}
+                        style={{
+                          width: '12px',
+                          height: '12px',
+                          borderRadius: '50%',
+                          background: '#4ade80',
+                          boxShadow: `0 0 10px #4ade80`
+                        }}
+                      />
+                      <span style={{
+                        color: gold,
+                        fontWeight: 'bold',
+                        fontSize: '1rem'
+                      }}>
+                        ⚛️ Quantum Cross-Check Status: ACTIVE
+                      </span>
+                    </div>
+                  </motion.div>
+                ) : (
+                  <div style={{
+                    padding: '12px 24px',
+                    background: `${darkBlue}dd`,
+                    borderRadius: '12px',
+                    border: `2px solid ${gold}44`,
+                    marginBottom: '10px'
+                  }}>
+                    <div style={{
+                      color: lightText,
+                      fontSize: '0.9rem',
+                      marginBottom: '15px',
+                      opacity: 0.8
+                    }}>
+                      {language === 'TR' 
+                        ? 'Çapraz Risk Analizi sadece Global paket kullanıcılarına özeldir.'
+                        : 'Cross-Risk Analysis is exclusive to Global package users.'}
+                    </div>
+                    <Link href="/#pricing" style={{ textDecoration: 'none' }}>
+                      <button
+                        style={{
+                          padding: '10px 20px',
+                          background: gold,
+                          color: darkBlue,
+                          border: 'none',
+                          borderRadius: '8px',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          fontSize: '0.9rem',
+                          transition: 'all 0.3s'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = 'scale(1.05)';
+                          e.currentTarget.style.boxShadow = `0 4px 15px ${gold}66`;
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = 'scale(1)';
+                          e.currentTarget.style.boxShadow = 'none';
+                        }}
+                      >
+                        {language === 'TR' ? 'UPGRADE TO GLOBAL FOR CROSS-CHECK' : 'UPGRADE TO GLOBAL FOR CROSS-CHECK'}
+                      </button>
+                    </Link>
+                  </div>
+                )}
+                <p style={{
+                  color: lightText,
+                  fontSize: '0.85rem',
+                  marginTop: '15px',
+                  opacity: 0.7,
+                  lineHeight: '1.5'
+                }}>
+                  {language === 'TR'
+                    ? 'Kuantum Cross-Risk analizi ile ülkeler arası hukuk çelişkilerini tespit ederek, uluslararası operasyonlarınızda %100 yasal güvenlik sağlayın.'
+                    : 'Detect cross-jurisdictional legal conflicts with Quantum Cross-Risk analysis to ensure 100% legal security in your international operations.'}
+                </p>
+              </div>
+
+              {/* Risk Cards */}
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '15px'
+              }}>
+                {riskAssessments.map((risk, idx) => {
+                  const getRiskColor = (severity: number) => {
+                    if (severity >= 8) return '#ef4444'; // Kırmızı
+                    if (severity >= 5) return '#f97316'; // Turuncu
+                    return '#fbbf24'; // Sarı
+                  };
+                  
+                  const getRiskIcon = (severity: number) => {
+                    if (severity >= 8) return '🔴';
+                    if (severity >= 5) return '🟠';
+                    return '🟡';
+                  };
+                  
+                  const riskColor = getRiskColor(risk.severity);
+                  const riskIcon = getRiskIcon(risk.severity);
+                  
+                  return (
+                    <motion.div
+                      key={idx}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: idx * 0.1 }}
+                      style={{
+                        padding: '20px',
+                        background: darkBlue,
+                        borderRadius: '12px',
+                        border: `2px solid ${riskColor}66`,
+                        position: 'relative',
+                        transition: 'all 0.3s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = riskColor;
+                        e.currentTarget.style.background = `${darkBlue}dd`;
+                        e.currentTarget.style.transform = 'translateX(5px)';
+                        e.currentTarget.style.boxShadow = `0 4px 15px ${riskColor}44`;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = `${riskColor}66`;
+                        e.currentTarget.style.background = darkBlue;
+                        e.currentTarget.style.transform = 'translateX(0)';
+                        e.currentTarget.style.boxShadow = 'none';
+                      }}
+                    >
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '15px'
+                      }}>
+                        <div style={{
+                          fontSize: '2rem',
+                          lineHeight: '1'
+                        }}>
+                          {risk.severity >= 8 ? (
+                            <motion.span
+                              animate={{
+                                opacity: [1, 0.5, 1],
+                                scale: [1, 1.1, 1]
+                              }}
+                              transition={{
+                                duration: 1.5,
+                                repeat: Infinity,
+                                ease: "easeInOut"
+                              }}
+                            >
+                              {riskIcon}
+                            </motion.span>
+                          ) : (
+                            <span>{riskIcon}</span>
+                          )}
+                        </div>
+                        <div style={{
+                          flex: 1
+                        }}>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '10px',
+                            marginBottom: '10px',
+                            flexWrap: 'wrap'
+                          }}>
+                            <h4 style={{
+                              color: riskColor,
+                              fontSize: '1.1rem',
+                              fontWeight: 'bold',
+                              margin: 0
+                            }}>
+                              {risk.description}
+                            </h4>
+                            {risk.isQuantumConflict && (
+                              <motion.span
+                                animate={{
+                                  boxShadow: [
+                                    `0 0 10px ${gold}66`,
+                                    `0 0 20px ${gold}88`,
+                                    `0 0 10px ${gold}66`
+                                  ]
+                                }}
+                                transition={{
+                                  duration: 2,
+                                  repeat: Infinity,
+                                  ease: "easeInOut"
+                                }}
+                                style={{
+                                  background: `linear-gradient(135deg, ${gold}33, ${gold}22)`,
+                                  color: gold,
+                                  padding: '4px 12px',
+                                  borderRadius: '8px',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 'bold',
+                                  border: `1px solid ${gold}66`
+                                }}
+                              >
+                                ⚛️ [Quantum Conflict Detected]
+                              </motion.span>
+                            )}
+                            {!risk.isQuantumConflict && (
+                              <span style={{
+                                background: `${riskColor}22`,
+                                color: riskColor,
+                                padding: '4px 12px',
+                                borderRadius: '8px',
+                                fontSize: '0.75rem',
+                                fontWeight: 'bold'
+                              }}>
+                                [Standard Risk]
+                              </span>
+                            )}
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                              marginLeft: 'auto'
+                            }}>
+                              <span style={{
+                                color: riskColor,
+                                fontSize: '1.5rem',
+                                fontWeight: 'bold'
+                              }}>
+                                {risk.severity}
+                              </span>
+                              <span style={{
+                                color: lightText,
+                                fontSize: '0.9rem',
+                                opacity: 0.7
+                              }}>
+                                /10
+                              </span>
+                            </div>
+                          </div>
+                          
+                          {risk.countries && risk.countries.length > 0 && (
+                            <div style={{
+                              marginBottom: '10px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                              flexWrap: 'wrap'
+                            }}>
+                              <span style={{
+                                color: gold,
+                                fontSize: '0.85rem',
+                                fontWeight: '600'
+                              }}>
+                                {language === 'TR' ? 'Etkilenen Ülkeler:' : 'Affected Countries:'}
+                              </span>
+                              {risk.countries.map((country, cIdx) => (
+                                <span key={cIdx} style={{
+                                  background: `${gold}22`,
+                                  color: gold,
+                                  padding: '4px 10px',
+                                  borderRadius: '6px',
+                                  fontSize: '0.8rem',
+                                  fontWeight: '600'
+                                }}>
+                                  {country}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          
+                          {risk.legalReference && (
+                            <div style={{
+                              marginTop: '12px',
+                              padding: '12px',
+                              background: `${gold}11`,
+                              borderRadius: '8px',
+                              border: `1px solid ${gold}22`
+                            }}>
+                              <div style={{
+                                color: gold,
+                                fontSize: '0.85rem',
+                                fontWeight: 'bold',
+                                marginBottom: '6px'
+                              }}>
+                                {language === 'TR' ? '📚 Hukuki Referans:' : '📚 Legal Reference:'}
+                              </div>
+                              <div style={{
+                                color: lightText,
+                                fontSize: '0.9rem',
+                                lineHeight: '1.6'
+                              }}>
+                                {risk.legalReference}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
             </div>
           )}
           {activeResultTab === 'detailed' && (() => {
@@ -276,6 +699,412 @@ export default function AnalysisResult({
                     </div>
                   </div>
                 </div>
+
+                {/* Global Conflict Map - Sadece Global Paket için */}
+                {isGlobalPackage && globalConflicts && globalConflicts.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6 }}
+                    style={{
+                      marginTop: '30px',
+                      padding: '30px',
+                      background: `linear-gradient(135deg, ${midBlue}, ${darkBlue})`,
+                      borderRadius: '20px',
+                      border: `3px solid ${gold}`,
+                      boxShadow: `0 0 30px ${gold}66, inset 0 0 20px ${gold}22`,
+                      position: 'relative',
+                      overflow: 'hidden'
+                    }}
+                  >
+                    {/* Quantum Global Feature Badge */}
+                    <div style={{
+                      position: 'absolute',
+                      top: '15px',
+                      right: '15px',
+                      background: `linear-gradient(135deg, ${gold}, #d4b877)`,
+                      color: '#000000',
+                      padding: '6px 15px',
+                      borderRadius: '20px',
+                      fontSize: '0.75rem',
+                      fontWeight: '900',
+                      textTransform: 'uppercase',
+                      letterSpacing: '1px',
+                      boxShadow: `0 2px 10px ${gold}88`
+                    }}>
+                      ⚛️ Quantum Global Feature
+                    </div>
+                    
+                    <h4 style={{ 
+                      color: gold, 
+                      fontSize: '1.5rem', 
+                      marginBottom: '25px',
+                      fontWeight: 'bold',
+                      textAlign: 'center',
+                      textShadow: `0 0 10px ${gold}66`
+                    }}>
+                      {language === 'TR' ? '🌍 Global Conflict Map' : '🌍 Global Conflict Map'}
+                    </h4>
+                    
+                    <div style={{
+                      overflowX: 'auto',
+                      marginTop: '20px'
+                    }}>
+                      <table style={{
+                        width: '100%',
+                        borderCollapse: 'collapse',
+                        background: darkBlue,
+                        borderRadius: '10px',
+                        overflow: 'hidden'
+                      }}>
+                        <thead>
+                          <tr style={{
+                            background: `linear-gradient(135deg, ${gold}33, ${gold}22)`,
+                            borderBottom: `2px solid ${gold}`
+                          }}>
+                            <th style={{
+                              padding: '15px',
+                              textAlign: 'left',
+                              color: gold,
+                              fontWeight: 'bold',
+                              fontSize: '0.9rem',
+                              borderRight: `1px solid ${gold}44`
+                            }}>
+                              {language === 'TR' ? 'Madde' : 'Article/Clause'}
+                            </th>
+                            <th style={{
+                              padding: '15px',
+                              textAlign: 'left',
+                              color: gold,
+                              fontWeight: 'bold',
+                              fontSize: '0.9rem',
+                              borderRight: `1px solid ${gold}44`
+                            }}>
+                              {language === 'TR' ? 'Ülke A Kuralı' : 'Country A Rule'}
+                            </th>
+                            <th style={{
+                              padding: '15px',
+                              textAlign: 'left',
+                              color: gold,
+                              fontWeight: 'bold',
+                              fontSize: '0.9rem',
+                              borderRight: `1px solid ${gold}44`
+                            }}>
+                              {language === 'TR' ? 'Ülke B Kuralı' : 'Country B Rule'}
+                            </th>
+                            <th style={{
+                              padding: '15px',
+                              textAlign: 'center',
+                              color: gold,
+                              fontWeight: 'bold',
+                              fontSize: '0.9rem'
+                            }}>
+                              {language === 'TR' ? 'Risk Skoru' : 'Risk Score'}
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {globalConflicts.map((conflict, idx) => {
+                            const riskColor = conflict.riskScore >= 80 ? '#ef4444' : 
+                                             conflict.riskScore >= 60 ? '#f97316' : 
+                                             conflict.riskScore >= 40 ? '#fbbf24' : '#4ade80';
+                            return (
+                              <motion.tr
+                                key={idx}
+                                initial={{ opacity: 0, x: -20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: idx * 0.1 }}
+                                style={{
+                                  borderBottom: `1px solid ${gold}22`,
+                                  transition: 'all 0.3s'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = `${gold}11`;
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = 'transparent';
+                                }}
+                              >
+                                <td style={{
+                                  padding: '15px',
+                                  color: lightText,
+                                  fontSize: '0.9rem',
+                                  borderRight: `1px solid ${gold}22`,
+                                  fontWeight: '600'
+                                }}>
+                                  {conflict.article}
+                                </td>
+                                <td style={{
+                                  padding: '15px',
+                                  color: lightText,
+                                  fontSize: '0.85rem',
+                                  borderRight: `1px solid ${gold}22`,
+                                  lineHeight: '1.6'
+                                }}>
+                                  <div style={{ 
+                                    color: gold, 
+                                    fontWeight: 'bold', 
+                                    marginBottom: '4px',
+                                    fontSize: '0.8rem'
+                                  }}>
+                                    {conflict.countryA}
+                                  </div>
+                                  {conflict.countryARule}
+                                </td>
+                                <td style={{
+                                  padding: '15px',
+                                  color: lightText,
+                                  fontSize: '0.85rem',
+                                  borderRight: `1px solid ${gold}22`,
+                                  lineHeight: '1.6'
+                                }}>
+                                  <div style={{ 
+                                    color: gold, 
+                                    fontWeight: 'bold', 
+                                    marginBottom: '4px',
+                                    fontSize: '0.8rem'
+                                  }}>
+                                    {conflict.countryB}
+                                  </div>
+                                  {conflict.countryBRule}
+                                </td>
+                                <td style={{
+                                  padding: '15px',
+                                  textAlign: 'center'
+                                }}>
+                                  <div style={{
+                                    display: 'inline-block',
+                                    padding: '8px 16px',
+                                    background: `${riskColor}22`,
+                                    color: riskColor,
+                                    borderRadius: '8px',
+                                    fontWeight: 'bold',
+                                    fontSize: '1rem',
+                                    border: `2px solid ${riskColor}44`,
+                                    boxShadow: `0 0 10px ${riskColor}33`
+                                  }}>
+                                    {conflict.riskScore}
+                                  </div>
+                                </td>
+                              </motion.tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                    
+                    {globalConflicts.length === 0 && (
+                      <div style={{
+                        textAlign: 'center',
+                        padding: '40px',
+                        color: lightText,
+                        opacity: 0.7,
+                        fontSize: '1rem'
+                      }}>
+                        {language === 'TR' 
+                          ? 'Bu belgede çapraz hukuk çelişkisi tespit edilmedi.'
+                          : 'No cross-jurisdictional conflicts detected in this document.'
+                        }
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+
+                {/* Legal References & Bibliography Section */}
+                {legalReferences && legalReferences.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6, delay: 0.3 }}
+                    style={{
+                      marginTop: '40px',
+                      padding: '30px',
+                      background: `linear-gradient(135deg, ${midBlue}, ${darkBlue})`,
+                      borderRadius: '20px',
+                      border: `2px solid ${gold}44`,
+                      position: 'relative'
+                    }}
+                  >
+                    <h4 style={{
+                      color: gold,
+                      fontSize: '1.5rem',
+                      marginBottom: '25px',
+                      fontWeight: 'bold',
+                      textAlign: 'center',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '10px'
+                    }}>
+                      <span>📚</span>
+                      <span>{language === 'TR' ? 'Hukuki Referanslar ve Kaynakça' : 'Legal Citations & Bibliography'}</span>
+                    </h4>
+                    
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '15px'
+                    }}>
+                      {legalReferences.map((ref, idx) => (
+                        <motion.div
+                          key={idx}
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: idx * 0.1 }}
+                          style={{
+                            padding: '18px',
+                            background: darkBlue,
+                            borderRadius: '12px',
+                            border: `1px solid ${gold}33`,
+                            transition: 'all 0.3s',
+                            position: 'relative'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = gold;
+                            e.currentTarget.style.background = `${darkBlue}dd`;
+                            e.currentTarget.style.transform = 'translateX(5px)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = gold + '33';
+                            e.currentTarget.style.background = darkBlue;
+                            e.currentTarget.style.transform = 'translateX(0)';
+                          }}
+                        >
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            gap: '12px',
+                            flexWrap: 'wrap'
+                          }}>
+                            <div style={{
+                              fontSize: '1.8rem',
+                              lineHeight: '1'
+                            }}>
+                              {ref.countryFlag}
+                            </div>
+                            <div style={{
+                              flex: 1,
+                              minWidth: '200px'
+                            }}>
+                              <div style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                marginBottom: '6px',
+                                flexWrap: 'wrap'
+                              }}>
+                                <span style={{
+                                  color: gold,
+                                  fontWeight: 'bold',
+                                  fontSize: '1rem'
+                                }}>
+                                  {ref.lawName}
+                                </span>
+                                {ref.article && (
+                                  <>
+                                    <span style={{ color: lightText, opacity: 0.7 }}>-</span>
+                                    <span style={{
+                                      color: gold,
+                                      fontSize: '0.9rem',
+                                      fontWeight: '600'
+                                    }}>
+                                      {ref.article.includes('Madde') ? ref.article : 
+                                       ref.article.includes('§') ? ref.article :
+                                       ref.article.includes('s.') ? ref.article :
+                                       `Madde ${ref.article}`}
+                                    </span>
+                                  </>
+                                )}
+                                {ref.isPrecedent && (
+                                  <span style={{
+                                    background: `${gold}33`,
+                                    color: gold,
+                                    padding: '2px 8px',
+                                    borderRadius: '6px',
+                                    fontSize: '0.7rem',
+                                    fontWeight: '600'
+                                  }}>
+                                    {language === 'TR' ? 'Emsal Karar' : 'Precedent'}
+                                  </span>
+                                )}
+                                <div style={{
+                                  position: 'relative',
+                                  display: 'inline-block'
+                                }}>
+                                  <span style={{
+                                    color: '#4ade80',
+                                    fontSize: '1rem',
+                                    cursor: 'help'
+                                  }}
+                                  title={language === 'TR' 
+                                    ? 'Veritas Quantum Database tarafından doğrulandı'
+                                    : 'Verified by Veritas Quantum Database'}
+                                  >
+                                    ✓
+                                  </span>
+                                </div>
+                              </div>
+                              <div style={{
+                                color: lightText,
+                                fontSize: '0.9rem',
+                                lineHeight: '1.6',
+                                opacity: 0.9
+                              }}>
+                                {ref.summary}
+                              </div>
+                              
+                              {/* Cross-Reference (Global Paket için) */}
+                              {isGlobalPackage && ref.crossReference && ref.crossReference.length > 0 && (
+                                <div style={{
+                                  marginTop: '12px',
+                                  padding: '12px',
+                                  background: `${gold}11`,
+                                  borderRadius: '8px',
+                                  border: `1px solid ${gold}22`
+                                }}>
+                                  <div style={{
+                                    color: gold,
+                                    fontSize: '0.8rem',
+                                    fontWeight: 'bold',
+                                    marginBottom: '8px',
+                                    opacity: 0.9
+                                  }}>
+                                    {language === 'TR' ? '🔗 Çapraz Referans' : '🔗 Cross-Reference'}
+                                  </div>
+                                  <div style={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: '6px'
+                                  }}>
+                                    {ref.crossReference.map((crossRef, crossIdx) => (
+                                      <div key={crossIdx} style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px',
+                                        fontSize: '0.85rem',
+                                        color: lightText,
+                                        opacity: 0.8
+                                      }}>
+                                        <span>{crossRef.countryFlag}</span>
+                                        <span style={{ fontWeight: '600' }}>{crossRef.lawName}</span>
+                                        {crossRef.article && (
+                                          <>
+                                            <span>-</span>
+                                            <span>{crossRef.article}</span>
+                                          </>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
 
                 {/* Legal Citations Visualization */}
                 {legalCitations && legalCitations.length > 0 && (
@@ -565,6 +1394,44 @@ export default function AnalysisResult({
               {ui[language].downloadWord || 'Word İndir'}
             </span>
           </button>
+        </div>
+
+        {/* Legal Disclaimer */}
+        <div style={{
+          marginTop: '30px',
+          padding: '20px',
+          background: `${darkBlue}dd`,
+          borderRadius: '12px',
+          border: `1px solid ${gold}22`,
+          borderLeft: `4px solid ${gold}66`
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '10px'
+          }}>
+            <span style={{
+              fontSize: '1.2rem',
+              lineHeight: '1.2'
+            }}>
+              ⚠️
+            </span>
+            <div style={{
+              flex: 1,
+              color: lightText,
+              fontSize: '0.85rem',
+              lineHeight: '1.6',
+              fontStyle: 'italic',
+              opacity: 0.85
+            }}>
+              <strong style={{ color: gold, fontStyle: 'normal' }}>
+                {language === 'TR' ? 'Yasal Uyarı:' : 'Legal Disclaimer:'}
+              </strong>{' '}
+              {language === 'TR' 
+                ? 'Veritas Q-AI, yapay zeka tabanlı bir analiz aracıdır. Sunulan raporlar ve analizler yalnızca bilgilendirme ve risk değerlendirme amaçlı olup, hukuki tavsiye niteliği taşımaz. Sistemimiz, yetkili bir avukatın profesyonel görüşünün yerini almaz. Kuantum-AI mantığı ile en yüksek doğruluk hedeflense de, hukuki yorumlar farklılık gösterebilir. Veritas Q-AI ve işletmecileri, bu analizlere dayanılarak alınan kararlardan sorumlu tutulamaz.'
+                : 'Veritas Q-AI is an artificial intelligence-based analysis tool. The reports and insights provided are for informational and risk-assessment purposes only and do not constitute legal advice. Our system does not replace the professional judgment of a qualified lawyer. While we strive for 100% accuracy using Quantum-AI logic, legal interpretations may vary. Veritas Q-AI and its operators are not liable for any decisions made based on this analysis.'}
+            </div>
+          </div>
         </div>
       </div>
       

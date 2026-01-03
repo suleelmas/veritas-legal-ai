@@ -231,3 +231,4 @@ WHERE routine_schema = 'public'
 
 **Öneri**: `/api/check-database` endpoint'ini çağırarak gerçek durumu kontrol edin.
 
+
