@@ -1797,15 +1797,80 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
 
   const handleFeedbackSubmit = async (title: string, description: string, screenshot: File | null) => {
     try {
-      // Dosya varsa base64'e çevir
+      // Dosya varsa base64'e çevir (boyut kontrolü ve küçültme ile)
       let screenshotBase64: string | null = null;
       if (screenshot) {
-        const reader = new FileReader();
-        screenshotBase64 = await new Promise<string>((resolve, reject) => {
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(screenshot);
-        });
+        // Dosya boyutu kontrolü (4.5MB limit - Vercel payload limiti)
+        const MAX_FILE_SIZE = 4.5 * 1024 * 1024; // 4.5MB
+        const fileSizeMB = (screenshot.size / (1024 * 1024)).toFixed(2);
+        
+        if (screenshot.size > MAX_FILE_SIZE) {
+          try {
+            // Görseli küçült
+            const compressedImage = await new Promise<string>((resolve, reject) => {
+              const img = new Image();
+              const canvas = document.createElement('canvas');
+              const ctx = canvas.getContext('2d');
+              
+              if (!ctx) {
+                reject(new Error('Canvas context alınamadı'));
+                return;
+              }
+              
+              img.onload = () => {
+                // Görseli küçült (quality: 0.5)
+                let quality = 0.5;
+                let targetWidth = img.width;
+                let targetHeight = img.height;
+                
+                // Eğer hala çok büyükse, boyutu da küçült
+                if (screenshot.size > MAX_FILE_SIZE * 2) {
+                  targetWidth = Math.floor(img.width * 0.7);
+                  targetHeight = Math.floor(img.height * 0.7);
+                  quality = 0.4;
+                }
+                
+                canvas.width = targetWidth;
+                canvas.height = targetHeight;
+                ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+                
+                // JPEG formatında küçültülmüş görseli al
+                const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+                resolve(compressedDataUrl);
+              };
+              
+              img.onerror = reject;
+              img.src = URL.createObjectURL(screenshot);
+            });
+            
+            screenshotBase64 = compressedImage;
+            
+            // Kullanıcıya bilgi ver
+            const newSizeMB = ((screenshotBase64.length * 3/4) / (1024 * 1024)).toFixed(2);
+            if (language === 'TR') {
+              showToastNotification(`Görsel ${fileSizeMB}MB'dan ${newSizeMB}MB'a küçültüldü.`);
+            } else {
+              showToastNotification(`Image compressed from ${fileSizeMB}MB to ${newSizeMB}MB.`);
+            }
+          } catch (compressError) {
+            // Küçültme başarısız olursa, kullanıcıya uyarı ver ve orijinal görseli göndermeyi dene
+            console.error('Görsel küçültme hatası:', compressError);
+            if (language === 'TR') {
+              alert(`Görsel küçültülemedi (${fileSizeMB}MB). Lütfen daha küçük bir görsel seçin veya görsel olmadan gönderin.`);
+            } else {
+              alert(`Image compression failed (${fileSizeMB}MB). Please select a smaller image or send without image.`);
+            }
+            return; // İşlemi durdur
+          }
+        } else {
+          // Normal boyutta, direkt base64'e çevir
+          const reader = new FileReader();
+          screenshotBase64 = await new Promise<string>((resolve, reject) => {
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(screenshot);
+          });
+        }
       }
 
       // JSON verisi hazırla
