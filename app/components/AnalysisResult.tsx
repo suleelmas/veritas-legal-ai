@@ -9,7 +9,53 @@ interface Reference {
 }
 
 interface AnalysisResultProps {
-  data: any; // JSON verisi
+  data?: any; // JSON verisi (eski format için)
+  result?: string;
+  gold?: string;
+  darkBlue?: string;
+  midBlue?: string;
+  lightText?: string;
+  language?: string;
+  activeResultTab?: 'summary' | 'detailed' | 'risks';
+  setActiveResultTab?: (tab: 'summary' | 'detailed' | 'risks') => void;
+  effectivePackage?: string;
+  isAdmin?: boolean;
+  parseAnalysisResult?: (text: string) => { summary: string; detailed: string };
+  extractRiskScore?: (text: string) => number;
+  getRiskColor?: (score: number) => string;
+  getRiskLevel?: (score: number) => string;
+  riskScore?: number | null;
+  legalCitations?: Array<{source: string; citation: string; relevance: number}>;
+  canViewDetailedAnalysis?: () => boolean;
+  canDownload?: () => boolean;
+  canAccessLegislationDetails?: () => boolean;
+  handleDownloadPDF?: () => Promise<void>;
+  handleDownloadWord?: () => void;
+  setShowLimitModal?: (show: boolean) => void;
+  detectLegislationReferences?: (text: string) => Array<{match: string; law: string; article: string}>;
+  fetchLegislationDetail?: (law: string, article: string) => void;
+  showLegislationModal?: boolean;
+  setShowLegislationModal?: (show: boolean) => void;
+  selectedLegislation?: {title: string; content: string} | null;
+  chatMessages?: Array<{role: 'user' | 'assistant'; content: string}>;
+  chatInput?: string;
+  setChatInput?: (input: string) => void;
+  chatLoading?: boolean;
+  handleChatSend?: () => Promise<void>;
+  ui?: any;
+  globalConflicts?: Array<{
+    article: string;
+    [key: string]: any;
+  }>;
+  isGlobalPackage?: boolean;
+  legalReferences?: Array<{
+    country: string;
+    [key: string]: any;
+  }>;
+  riskAssessments?: Array<{
+    description: string;
+    [key: string]: any;
+  }>;
 }
 
 // Ülke kodlarına göre bayrak emojileri
