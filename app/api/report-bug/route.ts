@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import FormData from 'form-data';
 
 // Vercel'in önbelleğe almasını engellemek için dinamik yapıyoruz
 export const dynamic = 'force-dynamic';
@@ -52,18 +53,57 @@ export async function POST(req: Request) {
                     `**E-posta:** ${body.email || 'Belirtilmedi'}\n` +
                     `────────────────────`;
 
-    // 3. Telegram'a gönderim
-    const telRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: message,
-        parse_mode: 'Markdown',
-      }),
-    });
+    // 3. Telegram'a gönderim - Görsel varsa sendPhoto, yoksa sendMessage
+    let telRes: Response;
+    let telData: any;
 
-    const telData = await telRes.json();
+    if (body.file) {
+      // Base64 görseli decode et
+      let base64Data = body.file;
+      
+      // data:image/png;base64, prefix'ini kaldır
+      if (base64Data.includes(',')) {
+        base64Data = base64Data.split(',')[1];
+      }
+      
+      // Base64'ü Buffer'a çevir
+      const imageBuffer = Buffer.from(base64Data, 'base64');
+      
+      // FormData oluştur
+      const telegramFormData = new FormData();
+      telegramFormData.append('photo', imageBuffer, {
+        filename: 'screenshot.png',
+        contentType: 'image/png',
+      });
+      telegramFormData.append('chat_id', chatId);
+      telegramFormData.append('caption', message);
+      telegramFormData.append('parse_mode', 'Markdown');
+
+      // FormData'yı stream olarak al ve fetch'e uygun hale getir
+      const formHeaders = telegramFormData.getHeaders();
+      
+      // sendPhoto endpoint'ine gönder
+      telRes = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+        method: 'POST',
+        headers: formHeaders,
+        body: telegramFormData as any,
+      });
+
+      telData = await telRes.json();
+    } else {
+      // Görsel yoksa normal mesaj gönder
+      telRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: message,
+          parse_mode: 'Markdown',
+        }),
+      });
+
+      telData = await telRes.json();
+    }
 
     if (!telRes.ok) {
       return NextResponse.json({ 
