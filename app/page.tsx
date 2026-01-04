@@ -1797,21 +1797,33 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
 
   const handleFeedbackSubmit = async (title: string, description: string, screenshot: File | null) => {
     try {
-      // FormData oluştur
-      const formData = new FormData();
-      formData.append('title', title);
-      formData.append('description', description);
-      formData.append('email', user?.email || 'Anonim');
-      
-      // Dosya varsa ekle
+      // Dosya varsa base64'e çevir
+      let screenshotBase64: string | null = null;
       if (screenshot) {
-        formData.append('file', screenshot);
+        const reader = new FileReader();
+        screenshotBase64 = await new Promise<string>((resolve, reject) => {
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(screenshot);
+        });
       }
 
-      // Telegram API'ye gönder
+      // JSON verisi hazırla
+      const requestBody = {
+        type: title,
+        title: title,
+        description: description,
+        email: user?.email || 'Anonim',
+        file: screenshotBase64
+      };
+
+      // API'ye JSON olarak gönder
       const response = await fetch('/api/report-bug', {
         method: 'POST',
-        body: formData
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody)
       });
 
       const result = await response.json();

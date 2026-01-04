@@ -5,10 +5,27 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json().catch(() => null);
+    // Content-Type'a göre veriyi al (FormData veya JSON)
+    const contentType = req.headers.get('content-type') || '';
+    let body: any = null;
+
+    if (contentType.includes('multipart/form-data') || contentType.includes('application/x-www-form-urlencoded')) {
+      // FormData olarak parse et
+      const formData = await req.formData();
+      body = {
+        type: formData.get('type')?.toString() || formData.get('title')?.toString() || null,
+        title: formData.get('title')?.toString() || null,
+        description: formData.get('description')?.toString() || null,
+        email: formData.get('email')?.toString() || null,
+        file: formData.get('file')
+      };
+    } else {
+      // JSON olarak parse et
+      body = await req.json().catch(() => null);
+    }
     
-    // 1. Veri kontrolü
-    if (!body || !body.description) {
+    // 1. Veri kontrolü - description veya title kontrolü
+    if (!body || (!body.description && !body.title)) {
       return NextResponse.json({ error: "Rapor içeriği boş gönderilemez." }, { status: 400 });
     }
 
@@ -24,10 +41,14 @@ export async function POST(req: Request) {
        }, { status: 500 });
     }
 
+    // type veya title'ı kullan (öncelik type'da)
+    const reportType = body.type || body.title || 'Bilinmiyor';
+    const description = body.description || '';
+
     const message = `🚨 **YENİ HATA BİLDİRİMİ** 🚨\n` +
                     `────────────────────\n` +
-                    `**Tür:** ${body.type || 'Bilinmiyor'}\n` +
-                    `**Açıklama:** ${body.description}\n` +
+                    `**Tür:** ${reportType}\n` +
+                    `**Açıklama:** ${description}\n` +
                     `**E-posta:** ${body.email || 'Belirtilmedi'}\n` +
                     `────────────────────`;
 
