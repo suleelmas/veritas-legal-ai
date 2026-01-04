@@ -1,6 +1,8 @@
 "use client";
 import React from 'react';
 
+type UserPackage = "free" | "basic" | "professional" | "enterprise" | "quantum_global" | null;
+
 interface Reference {
   law?: string;
   section?: string;
@@ -18,7 +20,7 @@ interface AnalysisResultProps {
   language?: string;
   activeResultTab?: 'summary' | 'detailed' | 'risks';
   setActiveResultTab?: (tab: 'summary' | 'detailed' | 'risks') => void;
-  effectivePackage?: string;
+  effectivePackage?: UserPackage;
   isAdmin?: boolean;
   parseAnalysisResult?: (text: string) => { summary: string; detailed: string };
   extractRiskScore?: (text: string) => number;
