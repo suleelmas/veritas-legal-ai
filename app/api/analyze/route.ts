@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createClient } from "@/utils/supabase/server";
+
+// Vercel timeout ayarları
+export const maxDuration = 300; // 5 dakika (maksimum)
+export const dynamic = 'force-dynamic';
 import { fetchYargitayKararlari } from '@/lib/fetchYargitayKararlari';
 import { fetchDanistayKararlari } from '@/lib/fetchDanistayKararlari';
 import { fetchAnayasaMahkemesiKararlari } from '@/lib/fetchAnayasaMahkemesiKararlari';
@@ -778,10 +782,25 @@ async function getRelevantDocuments(
 }
 
 export async function POST(req: Request) {
+  const startTime = Date.now();
+  console.log('[API /analyze] İstek alındı:', {
+    timestamp: new Date().toISOString(),
+    startTime
+  });
+  
   try {
     const supabase = await createClient();
     const { pdfText, targetLang, userSelectedCountry } = await req.json(); // userSelectedCountry: kullanıcı onayı
+    
+    console.log('[API /analyze] Request body parse edildi:', {
+      pdfTextLength: pdfText?.length || 0,
+      targetLang,
+      userSelectedCountry,
+      timestamp: new Date().toISOString()
+    });
+    
     if (!process.env.OPENAI_API_KEY) {
+      console.error('[API /analyze] OPENAI_API_KEY eksik!');
       return NextResponse.json({ reply: "API Key eksik!" }, { status: 500 });
     }
     const userKey = getUserKey(req);
@@ -1426,6 +1445,15 @@ ${contextText ? ' ' + sourcesText : ''}${dateConflictInstruction}${localizationI
       }
       
       // Jurisdiction detection sonucunu response'a ekle
+      const responseTime = Date.now() - startTime;
+      console.log('[API /analyze] Başarılı yanıt hazırlanıyor:', {
+        responseTimeMs: responseTime,
+        responseTimeSec: (responseTime / 1000).toFixed(2),
+        hasReply: !!formattedReply,
+        replyLength: formattedReply?.length || 0,
+        timestamp: new Date().toISOString()
+      });
+      
       return NextResponse.json({ 
         reply: formattedReply,
         globalConflicts: isGlobalPackage ? globalConflictsFree : null,
@@ -1448,7 +1476,19 @@ ${contextText ? ' ' + sourcesText : ''}${dateConflictInstruction}${localizationI
       return NextResponse.json({ reply: "Analiz hakkınız kalmadı. Ücretsiz hakkınızı kullandınız. Devam etmek için bir paket satın almalısınız." }, { status: 403 });
     }
   } catch (error: any) {
-    console.error("OpenAI/Supabase Hatası:", error);
-    return NextResponse.json({ reply: `Sistem hatası: ${error.message}` }, { status: 500 });
+    console.error("[API /analyze] DETAYLI HATA LOG:", {
+      errorMessage: error.message,
+      errorName: error.name,
+      errorStack: error.stack?.split('\n').slice(0, 10), // İlk 10 satır
+      timestamp: new Date().toISOString(),
+      errorType: error.constructor?.name
+    });
+    
+    // Daha açıklayıcı hata mesajı
+    const errorMessage = error.message || 'Bilinmeyen hata';
+    return NextResponse.json({ 
+      reply: `Sistem hatası: ${errorMessage}`,
+      error: errorMessage
+    }, { status: 500 });
   }
 }

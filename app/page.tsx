@@ -1377,21 +1377,56 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
       };
       const targetLang = langMap[language] || 'English';
 
-      // API'ye gönder
-      const res = await fetch('/api/analyze', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          pdfText: fullText,
-          targetLang: targetLang,
-          userSelectedCountry: selectedCountryForAnalysis && selectedCountryForAnalysis !== 'AUTO' ? selectedCountryForAnalysis : userSelectedCountry
-        })
+      // API'ye gönder - DETAYLI LOGLAMA
+      console.log('[handleAnalyze] API çağrısı başlatılıyor...', {
+        pdfTextLength: fullText.length,
+        targetLang,
+        userSelectedCountry: selectedCountryForAnalysis && selectedCountryForAnalysis !== 'AUTO' ? selectedCountryForAnalysis : userSelectedCountry,
+        timestamp: new Date().toISOString()
       });
 
-      const data = await res.json();
-      let analysisResult = data.reply || data.error || 'Analysis complete';
+      let res: Response;
+      try {
+        res = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            pdfText: fullText,
+            targetLang: targetLang,
+            userSelectedCountry: selectedCountryForAnalysis && selectedCountryForAnalysis !== 'AUTO' ? selectedCountryForAnalysis : userSelectedCountry
+          })
+        });
+
+        console.log('[handleAnalyze] API yanıtı alındı:', {
+          status: res.status,
+          statusText: res.statusText,
+          ok: res.ok,
+          timestamp: new Date().toISOString()
+        });
+
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error('[handleAnalyze] API hata yanıtı:', {
+            status: res.status,
+            statusText: res.statusText,
+            errorText: errorText.substring(0, 500) // İlk 500 karakter
+          });
+          throw new Error(`API hatası: ${res.status} ${res.statusText}`);
+        }
+
+        const data = await res.json();
+        console.log('[handleAnalyze] API JSON yanıtı parse edildi:', {
+          hasReply: !!data.reply,
+          hasError: !!data.error,
+          replyLength: data.reply?.length || 0,
+          hasJurisdiction: !!data.jurisdiction,
+          hasRiskScore: data.risk_score !== undefined,
+          timestamp: new Date().toISOString()
+        });
+
+        let analysisResult = data.reply || data.error || 'Analysis complete';
       
       // Jurisdiction detection sonucunu kontrol et
       if (data.jurisdiction && data.jurisdiction.needs_confirmation) {
@@ -1530,10 +1565,26 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
         setAnalysisCount(newCount);
       }
     } catch (err: any) {
-      console.error("Analiz hatası:", err);
-      setResult(err.message || (language === 'TR' ? "Analiz sırasında bir hata oluştu." : "An error occurred during analysis."));
+      console.error("[handleAnalyze] Analiz hatası - DETAYLI LOG:", {
+        errorMessage: err.message,
+        errorName: err.name,
+        errorStack: err.stack?.split('\n').slice(0, 5), // İlk 5 satır
+        timestamp: new Date().toISOString(),
+        file: file?.name,
+        fileSize: file?.size
+      });
+      
+      const errorMessage = err.message || (language === 'TR' 
+        ? "Analiz sırasında bir hata oluştu. Lütfen konsolu kontrol edin." 
+        : "An error occurred during analysis. Please check the console.");
+      
+      setResult(errorMessage);
       setAnalysisStatus('');
+      
+      // Kullanıcıya görsel uyarı
+      alert(errorMessage);
     } finally {
+      console.log('[handleAnalyze] İşlem tamamlandı, loading false yapılıyor');
       setLoading(false);
       setAnalysisStatus('');
     }
