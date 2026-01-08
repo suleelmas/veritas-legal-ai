@@ -326,7 +326,7 @@ export default function Home() {
       aboutText: "Veritas Q-AI, hukuk profesyonellerinin çalışma biçimini dönüştürmek için tasarlanmış ileri seviye bir analiz ekosistemidir. Karmaşık hukuk belgelerini (PDF), güncel mevzuat ve yüksek mahkeme içtihatları ışığında saniyeler içinde tarar.\n\nSadece bir kelime arama motoru değil, metnin hukuki mantığını kavrayan bir yardımcıdır. Sözleşmelerdeki gizli riskleri tespit eder, dava dosyalarındaki eksiklikleri raporlar ve avukatlara stratejik karar alma süreçlerinde veri temelli bir dayanak sunar. Veritas ile manuel dosya inceleme saatlerini saniyelere indirerek, adaletin hızıyla teknolojinin gücünü birleştiriyoruz.",
       googleBtn: "Google ile Giriş Yap", 
       select: "Dosya Seç", 
-      btn: "KUANTUM MOTORU İLE SİMÜLE ET", 
+      btn: "Kuantum ile Analizi Başlat", 
       upload: "PDF Belgesini Seçin", 
       download: "RAPORU İNDİR (.PDF)",
       resultTitle: "Analiz Sonucu",
@@ -369,8 +369,8 @@ export default function Home() {
       aboutTitle: "Quantum-Driven Legal Intelligence: Veritas Q-AI",
       aboutText: "Veritas Q-AI is not just a tool; it is a global legal ecosystem. Powered by a **Quantum Simulation Engine**, it analyzes complex documents across multiple jurisdictions simultaneously, delivering precision that classical AI cannot reach.\n\nVeritas Q-AI utilizes Quantum Entanglement Logic to cross-reference your documents with millions of live data points from Turkey, USA, UK, and Germany in real-time.\n\nBy simulating legal probabilities in a Multi-Jurisdictional Superposition, we detect hidden conflicts and risks before they become liabilities.",
       googleBtn: "Sign in with Google", 
-      select: "Select File", 
-      btn: "SIMULATE WITH QUANTUM ENGINE", 
+      select: "Choose File", 
+      btn: "Start Analysis with Quantum", 
       upload: "Select PDF Document", 
       download: "Download PDF",
       downloadWord: "Download Word",
@@ -440,7 +440,7 @@ export default function Home() {
       aboutText: "Veritas ist eine fortschrittliche KI-gestützte Rechtsanalytik-Plattform, die für Anwälte und Rechtsexperten entwickelt wurde. Sie analysiert komplexe PDF-Dokumente in Sekunden, identifiziert Rechtsgrundlagen und erstellt Risikobewertungen.",
       googleBtn: "Mit Google anmelden", 
       select: "Datei auswählen", 
-      btn: "ANALYSE STARTEN", 
+      btn: "Analyse mit Quantum starten", 
       upload: "PDF-Dokument auswählen", 
       download: "BERICHT HERUNTERLADEN (.PDF)",
       downloadWord: "ALS WORD HERUNTERLADEN",
@@ -581,7 +581,7 @@ export default function Home() {
               .from('profiles')
               .select('package_type, analysis_count, analysis_count_reset_date')
               .eq('id', userId)
-              .single();
+              .maybeSingle();
             
             if (!profileError) {
               profile = data;
@@ -714,16 +714,22 @@ export default function Home() {
     // Supabase'den güncel analiz sayısını çek (hata alsa bile devam et)
     if (user?.id) {
       try {
-        const { data: profile } = await supabase
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('analysis_count')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
+        
+        if (profileError) {
+          console.warn('[checkAnalysisLimit] Profile fetch error (ignored):', profileError);
+          return true; // Hata durumunda analiz yapılmasına izin ver
+        }
         
         if (profile) {
           const currentCount = profile.analysis_count || 0;
           return currentCount < limit;
         }
+        return true; // Profil yoksa analiz yapılmasına izin ver
       } catch (err) {
         // Sessizce devam et - profiles tablosu yoksa veya hata varsa
       }
@@ -1689,11 +1695,15 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
           let newCount = analysisCount + 1;
           
           try {
-            const { data: profile } = await supabase
+            const { data: profile, error: profileError } = await supabase
               .from('profiles')
               .select('analysis_count')
               .eq('id', userId)
-              .single();
+              .maybeSingle();
+            
+            if (profileError) {
+              console.warn('[handleAnalyze] Profile fetch error (ignored):', profileError);
+            }
             
             if (profile) {
               newCount = (profile.analysis_count || 0) + 1;
@@ -2947,7 +2957,7 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
                           borderBottom: (uploadMode as any) === 'single' ? `2px solid ${midBlue}` : 'none'
                         }}
                       >
-                        {language === 'TR' ? 'Tek Dosya Analizi' : 'Single Document'}
+                        {language === 'TR' ? 'Tek Belge Analizi' : language === 'EN' ? 'Single Document Analysis' : language === 'DE' ? 'Einzeldokument-Analyse' : language === 'FR' ? 'Analyse de document unique' : language === 'ES' ? 'Análisis de documento único' : language === 'IT' ? 'Analisi documento singolo' : 'Single Document'}
                       </button>
                       <button
                         onClick={() => {
@@ -2978,7 +2988,7 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
                         }}
                         title={(!userPackage || userPackage === 'free') ? (language === 'TR' ? 'Professional veya Global paket gerekli' : 'Professional or Global package required') : ''}
                       >
-                        {language === 'TR' ? 'Dosya Karşılaştır' : 'Compare Two Documents'}
+                        {language === 'TR' ? 'İki Belgeyi Karşılaştır' : language === 'EN' ? 'Compare Two Documents' : language === 'DE' ? 'Zwei Dokumente vergleichen' : language === 'FR' ? 'Comparer deux documents' : language === 'ES' ? 'Comparar dos documentos' : language === 'IT' ? 'Confronta due documenti' : 'Compare Two Documents'}
                         {(!userPackage || userPackage === 'free') && <span style={{ marginLeft: '8px' }}>🔒</span>}
                       </button>
                     </div>
@@ -2990,12 +3000,11 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
                           type="file" 
                           id="pdfInputFinal" 
                           accept=".pdf" 
-                          style={{ display: 'none' }} 
+                          style={{ position: 'absolute', width: '1px', height: '1px', opacity: 0, overflow: 'hidden' }} 
                           onChange={(e) => setFile(e.target.files?.[0] || null)} 
                         />
-                        <button
-                          id="selectFileButton"
-                          onClick={() => document.getElementById('pdfInputFinal')?.click()} 
+                        <label
+                          htmlFor="pdfInputFinal"
                           style={{ 
                             backgroundColor: '#ffffff',
                             background: '#ffffff',
@@ -3030,8 +3039,10 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
                             e.currentTarget.style.boxShadow = '0 4px 20px rgba(255, 255, 255, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.2)';
                           }}
                         >
-                          <span style={{ color: '#000000', fontWeight: 'bold' }}>{ui[language].selectFileForAnalysis || 'Analiz İçin Dosya Seçin'}</span>
-                        </button>
+                          <span style={{ color: '#000000', fontWeight: 'bold' }}>
+                            {language === 'TR' ? 'Dosya Seç' : language === 'EN' ? 'Choose File' : language === 'DE' ? 'Datei auswählen' : language === 'FR' ? 'Sélectionner un fichier' : ui[language].select || 'Select File'}
+                          </span>
+                        </label>
                         {file && <p style={{ marginTop: '20px', color: '#4ade80', fontWeight: 'bold', fontSize: '1rem' }}>● {file.name}</p>}
                       </>
                     )}
@@ -3058,11 +3069,11 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
                             type="file" 
                             id="pdfInputCompare1" 
                             accept=".pdf" 
-                            style={{ display: 'none' }} 
+                            style={{ position: 'absolute', width: '1px', height: '1px', opacity: 0, overflow: 'hidden' }} 
                             onChange={(e) => setFile(e.target.files?.[0] || null)} 
                           />
-                          <button
-                            onClick={() => document.getElementById('pdfInputCompare1')?.click()} 
+                          <label
+                            htmlFor="pdfInputCompare1"
                             style={{ 
                               width: '100%',
                               padding: '15px',
@@ -3073,7 +3084,9 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
                               border: 'none',
                               cursor: 'pointer',
                               fontSize: '14px',
-                              transition: 'all 0.3s'
+                              transition: 'all 0.3s',
+                              display: 'block',
+                              textAlign: 'center'
                             }}
                             onMouseEnter={(e) => {
                               e.currentTarget.style.background = '#d4c08a';
@@ -3084,8 +3097,8 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
                               e.currentTarget.style.transform = 'translateY(0)';
                             }}
                           >
-                            {language === 'TR' ? 'Dosya Seç' : 'Select File'}
-                          </button>
+                            {language === 'TR' ? 'Dosya Seç' : language === 'EN' ? 'Choose File' : language === 'DE' ? 'Datei auswählen' : language === 'FR' ? 'Sélectionner un fichier' : ui[language].select || 'Select File'}
+                          </label>
                           {file && (
                             <p style={{ marginTop: '15px', color: '#4ade80', fontWeight: 'bold', fontSize: '0.9rem', textAlign: 'center' }}>
                               ✓ {file.name}
@@ -3107,11 +3120,11 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
                             type="file" 
                             id="pdfInputCompare2" 
                             accept=".pdf" 
-                            style={{ display: 'none' }} 
+                            style={{ position: 'absolute', width: '1px', height: '1px', opacity: 0, overflow: 'hidden' }} 
                             onChange={(e) => setFile2(e.target.files?.[0] || null)} 
                           />
-                          <button
-                            onClick={() => document.getElementById('pdfInputCompare2')?.click()} 
+                          <label
+                            htmlFor="pdfInputCompare2"
                             style={{ 
                               width: '100%',
                               padding: '15px',
@@ -3122,7 +3135,9 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
                               border: 'none',
                               cursor: 'pointer',
                               fontSize: '14px',
-                              transition: 'all 0.3s'
+                              transition: 'all 0.3s',
+                              display: 'block',
+                              textAlign: 'center'
                             }}
                             onMouseEnter={(e) => {
                               e.currentTarget.style.background = '#d4c08a';
@@ -3133,8 +3148,8 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
                               e.currentTarget.style.transform = 'translateY(0)';
                             }}
                           >
-                            {language === 'TR' ? 'Dosya Seç' : 'Select File'}
-                          </button>
+                            {language === 'TR' ? 'Dosya Seç' : language === 'EN' ? 'Choose File' : language === 'DE' ? 'Datei auswählen' : language === 'FR' ? 'Sélectionner un fichier' : ui[language].select || 'Select File'}
+                          </label>
                           {file2 && (
                             <p style={{ marginTop: '15px', color: '#4ade80', fontWeight: 'bold', fontSize: '0.9rem', textAlign: 'center' }}>
                               ✓ {file2.name}
@@ -3448,15 +3463,13 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
                       }}
                     >
                       <span style={{ color: '#ffffff' }}>
-                        {(uploadMode as any) === 'compare' 
-                          ? (language === 'TR' ? 'Dosyaları Karşılaştır' : 'Compare Documents')
-                          : ui[language].btn
-                        }
-                        {isAnalyzing ? (language === 'TR' ? '🔍 Analiz Ediliyor...' : '🔍 Analyzing...') : 
-                         isLimitReached() ? (language === 'TR' ? 'Limit Doldu' : 'Limit Reached') : 
-                         uploadMode === 'compare' 
-                           ? (language === 'TR' ? 'Dosyaları Karşılaştır' : 'Compare Documents')
-                           : ui[language].btn}
+                        {isAnalyzing 
+                          ? (language === 'TR' ? '🔍 Analiz Ediliyor...' : '🔍 Analyzing...') 
+                          : isLimitReached() 
+                            ? (language === 'TR' ? 'Limit Doldu' : 'Limit Reached') 
+                            : (uploadMode as any) === 'compare' 
+                              ? (language === 'TR' ? 'Dosyaları Karşılaştır' : 'Compare Documents')
+                              : ui[language].btn}
                       </span>
                     </button>
                     
@@ -3855,6 +3868,7 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
                         isGlobalPackage={isGlobalPackage}
                         legalReferences={legalReferences}
                         riskAssessments={riskAssessments}
+                        isAdmin={isAdmin}
                       />
                     )}
                   </div>
