@@ -6,7 +6,7 @@ import { CASE_LAW_ROULETTE_DATA, JURISDICTION_STATS, SYSTEM_STATUS } from '@/lib
 
 type Tab = "analyze" | "pricing" | "about" | "history";
 
-interface SidebarProps {
+interface QuantumSidebarProps {
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
   gold: string;
@@ -27,7 +27,7 @@ interface SidebarProps {
   setRoiCurrency?: (currency: 'TR' | 'USD') => void;
 }
 
-export default function Sidebar({
+export default function QuantumSidebar({
   sidebarOpen,
   setSidebarOpen,
   gold,
@@ -46,7 +46,7 @@ export default function Sidebar({
   setContractCount,
   roiCurrency = 'USD',
   setRoiCurrency
-}: SidebarProps) {
+}: QuantumSidebarProps) {
   const router = useRouter();
   
   // Case-Law Roulette State
@@ -1064,6 +1064,7 @@ export default function Sidebar({
     </aside>
   );
 }
+
 
 
 

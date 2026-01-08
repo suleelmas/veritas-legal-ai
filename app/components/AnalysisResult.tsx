@@ -110,19 +110,25 @@ const parseReference = (ref: string | Reference): Reference => {
   return ref;
 };
 
-export default function AnalysisResult({ data }: AnalysisResultProps) {
+export default function AnalysisResult({ data, result, gold, darkBlue, midBlue, lightText }: AnalysisResultProps) {
+  // Önce result prop'unu kontrol et (ana analiz metni)
+  const displayResult = result || data;
+  
   // JSON verisinden references dizisini çıkar
   let references: (string | Reference)[] = [];
   
-  if (data) {
-    // Eğer data bir string ise JSON parse et
-    let parsedData = data;
-    if (typeof data === 'string') {
+  // result veya data'dan references çıkar
+  const sourceData = result || data;
+  
+  if (sourceData) {
+    // Eğer sourceData bir string ise JSON parse et
+    let parsedData = sourceData;
+    if (typeof sourceData === 'string') {
       try {
-        parsedData = JSON.parse(data);
+        parsedData = JSON.parse(sourceData);
       } catch (e) {
         // JSON değilse, string içinde references aramaya çalış
-        const refMatch = data.match(/references?[:\s]*\[(.*?)\]/is);
+        const refMatch = sourceData.match(/references?[:\s]*\[(.*?)\]/is);
         if (refMatch) {
           try {
             const refStr = '[' + refMatch[1] + ']';
@@ -136,8 +142,18 @@ export default function AnalysisResult({ data }: AnalysisResultProps) {
     
     // Parsed data'dan references al
     if (parsedData && typeof parsedData === 'object') {
-      if (Array.isArray(parsedData.references)) {
-        references = parsedData.references;
+      if (parsedData.references && typeof parsedData.references === 'object') {
+        // references bir obje ise, içindeki array'leri birleştir
+        if (Array.isArray(parsedData.references)) {
+          references = parsedData.references;
+        } else {
+          // Obje ise, tüm array değerlerini birleştir
+          Object.values(parsedData.references).forEach((refArray: any) => {
+            if (Array.isArray(refArray)) {
+              references = references.concat(refArray);
+            }
+          });
+        }
       } else if (Array.isArray(parsedData.reference)) {
         references = parsedData.reference;
       } else if (parsedData.references && typeof parsedData.references === 'string') {
@@ -150,35 +166,76 @@ export default function AnalysisResult({ data }: AnalysisResultProps) {
     }
   }
   
-  // Eğer references yoksa, hiçbir şey gösterme
-  if (!references || references.length === 0) {
-    return null;
-  }
+  const goldColor = gold || "#c7b079";
+  const darkBlueColor = darkBlue || "#182332";
+  const midBlueColor = midBlue || "#232d3c";
+  const lightTextColor = lightText || "#ffffff";
   
-  const gold = "#c7b079";
-  const darkBlue = "#182332";
-  const midBlue = "#232d3c";
-  
+  // Ana analiz metnini göster (result prop'u varsa)
   return (
-    <div style={{
-      marginTop: '60px',
-      padding: '40px',
-      background: midBlue,
-      borderRadius: '20px',
-      border: `2px solid ${gold}44`,
-    }}>
-      <h2 style={{
-        color: gold,
-        fontSize: '1.8rem',
-        fontWeight: 'bold',
-        marginBottom: '30px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '12px',
-      }}>
-        <span>📚</span>
-        <span>Hukuki Referanslar</span>
-      </h2>
+    <div className="block min-h-[200px]" style={{ marginTop: '60px' }}>
+      {/* Ana Analiz Sonucu */}
+      {displayResult && (
+        <div style={{
+          padding: '40px',
+          background: midBlueColor,
+          borderRadius: '20px',
+          border: `2px solid ${goldColor}44`,
+          marginBottom: references.length > 0 ? '40px' : '0',
+        }}>
+          <h2 style={{
+            color: goldColor,
+            fontSize: '1.8rem',
+            fontWeight: 'bold',
+            marginBottom: '30px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+          }}>
+            <span>📊</span>
+            <span>Analiz Sonucu</span>
+          </h2>
+          
+          <div 
+            className="block min-h-[200px] text-black"
+            style={{
+              color: lightTextColor,
+              fontSize: '1rem',
+              lineHeight: '1.8',
+              whiteSpace: 'pre-wrap',
+              wordWrap: 'break-word',
+              padding: '20px',
+              background: darkBlueColor,
+              borderRadius: '12px',
+              border: `1px solid ${goldColor}33`,
+            }}
+          >
+            {typeof displayResult === 'string' ? displayResult : JSON.stringify(displayResult, null, 2)}
+          </div>
+        </div>
+      )}
+      
+      {/* Hukuki Referanslar (eğer varsa) */}
+      {references && references.length > 0 && (
+  
+        <div style={{
+          padding: '40px',
+          background: midBlueColor,
+          borderRadius: '20px',
+          border: `2px solid ${goldColor}44`,
+        }}>
+          <h2 style={{
+            color: goldColor,
+            fontSize: '1.8rem',
+            fontWeight: 'bold',
+            marginBottom: '30px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+          }}>
+            <span>📚</span>
+            <span>Hukuki Referanslar</span>
+          </h2>
       
       <div style={{
         display: 'flex',
@@ -197,20 +254,20 @@ export default function AnalysisResult({ data }: AnalysisResultProps) {
               key={index}
               style={{
                 padding: '20px',
-                background: darkBlue,
+                background: darkBlueColor,
                 borderRadius: '12px',
-                border: `1px solid ${gold}33`,
+                border: `1px solid ${goldColor}33`,
                 display: 'flex',
                 alignItems: 'center',
                 gap: '16px',
                 transition: 'all 0.3s ease',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = gold;
+                e.currentTarget.style.borderColor = goldColor;
                 e.currentTarget.style.transform = 'translateX(4px)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = `${gold}33`;
+                e.currentTarget.style.borderColor = `${goldColor}33`;
                 e.currentTarget.style.transform = 'translateX(0)';
               }}
             >
@@ -219,7 +276,7 @@ export default function AnalysisResult({ data }: AnalysisResultProps) {
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
                   <span style={{
-                    color: gold,
+                    color: goldColor,
                     fontSize: '1.3rem',
                     fontWeight: 'bold',
                   }}>
@@ -233,10 +290,10 @@ export default function AnalysisResult({ data }: AnalysisResultProps) {
                         color: 'white',
                         fontSize: '1.2rem',
                         fontWeight: '900',
-                        background: `${gold}22`,
+                        background: `${goldColor}22`,
                         padding: '4px 10px',
                         borderRadius: '6px',
-                        border: `1px solid ${gold}44`,
+                        border: `1px solid ${goldColor}44`,
                       }}>
                         {section.includes('-') ? `§§ ${section}` : `§ ${section}`}
                       </span>
@@ -259,6 +316,8 @@ export default function AnalysisResult({ data }: AnalysisResultProps) {
           );
         })}
       </div>
+    </div>
+      )}
     </div>
   );
 }

@@ -3,8 +3,8 @@ import { NextResponse } from 'next/server';
 // Vercel'in önbelleğe almasını engellemek için dinamik yapıyoruz
 export const dynamic = 'force-dynamic';
 
-// Maksimum işlem süresi (60 saniye)
-export const maxDuration = 60;
+// Maksimum işlem süresi (geçici olarak 10 saniye)
+export const maxDuration = 10;
 
 // Telegram'ın maksimum dosya boyutu (10MB)
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes

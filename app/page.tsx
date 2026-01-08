@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import PricingCard from "./components/PricingCard";
 import Header from "./components/Header";
-import Sidebar from "./components/Sidebar";
+import QuantumSidebar from "./components/QuantumSidebar";
 import AnalysisResult from "./components/AnalysisResult";
 import ComparisonResult from "./components/ComparisonResult";
 import BetaBanner from "./components/BetaBanner";
@@ -574,15 +574,22 @@ export default function Home() {
         }
         
         try {
-          // Profiles tablosundan paket bilgisini çek
-          const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('package_type, analysis_count, analysis_count_reset_date')
-            .eq('id', userId)
-            .single();
-          
-          if (profileError && profileError.code !== 'PGRST116') {
-            console.error('Profile fetch error:', profileError);
+          // Profiles tablosundan paket bilgisini çek (hata alsa bile devam et)
+          let profile: any = null;
+          try {
+            const { data, error: profileError } = await supabase
+              .from('profiles')
+              .select('package_type, analysis_count, analysis_count_reset_date')
+              .eq('id', userId)
+              .single();
+            
+            if (!profileError) {
+              profile = data;
+            }
+            // Hata olsa bile sessizce devam et (404 veya başka hatalar)
+          } catch (profileFetchError) {
+            // Sessizce devam et - profiles tablosu yoksa veya hata varsa
+            profile = null;
           }
           
           // Admin ise quantum_global paketini zorla ayarla
@@ -704,7 +711,7 @@ export default function Home() {
       return analysisCount < limit;
     }
     
-    // Supabase'den güncel analiz sayısını çek
+    // Supabase'den güncel analiz sayısını çek (hata alsa bile devam et)
     if (user?.id) {
       try {
         const { data: profile } = await supabase
@@ -718,7 +725,7 @@ export default function Home() {
           return currentCount < limit;
         }
       } catch (err) {
-        console.error('Limit check error:', err);
+        // Sessizce devam et - profiles tablosu yoksa veya hata varsa
       }
     }
     
@@ -727,18 +734,18 @@ export default function Home() {
   
   // Usage Reset fonksiyonu
   const handleUsageReset = async () => {
-    if (adminTestMode) {
-      setAnalysisCount(0);
-      if (user?.id) {
-        try {
-          await supabase
-            .from('profiles')
-            .update({ analysis_count: 0 })
-            .eq('id', user.id);
-        } catch (err) {
-          console.error('Reset error:', err);
+      if (adminTestMode) {
+        setAnalysisCount(0);
+        if (user?.id) {
+          try {
+            await supabase
+              .from('profiles')
+              .update({ analysis_count: 0 })
+              .eq('id', user.id);
+          } catch (err) {
+            // Sessizce devam et - profiles tablosu yoksa veya hata varsa
+          }
         }
-      }
       localStorage.setItem('freeAnalysisCount', '0');
       if (user?.id) {
         localStorage.setItem(`analysisCount_${user.id}`, '0');
@@ -1191,16 +1198,18 @@ export default function Home() {
   }, [loading, language]);
 
   const handleAuth = async () => {
-    // Dinamik olarak mevcut domain'i kullan (production'da veritasq.ai, development'ta localhost)
-    // Önce environment variable'ı kontrol et, yoksa window.location.origin kullan
-    let baseUrl = 'https://veritasq.ai'; // Default production URL
+    // Dinamik olarak mevcut domain'i kullan (localhost veya production)
+    let baseUrl: string;
     
     if (typeof window !== 'undefined') {
-      // Browser'da çalışıyorsa mevcut origin'i kullan
+      // Browser'da çalışıyorsa mevcut origin'i kullan (localhost:3000 veya veritasq.ai)
       baseUrl = window.location.origin;
     } else if (process.env.NEXT_PUBLIC_SITE_URL) {
       // Server-side'da environment variable varsa onu kullan
       baseUrl = process.env.NEXT_PUBLIC_SITE_URL;
+    } else {
+      // Fallback: Eğer hiçbiri yoksa, varsayılan olarak localhost kullan (development için)
+      baseUrl = 'http://localhost:3000';
     }
     
     const redirectUrl = `${baseUrl}/auth/callback`;
@@ -1252,9 +1261,116 @@ export default function Home() {
     }
   };
 
-  const handleAnalyze = async () => {
+  const handleCompare = async () => {
+    if (!file || !file2) return;
+    
+    setLoading(true);
+    setResult("");
+    setComparisonResult(null);
+    
+    try {
+      // PDF'lerden metin çıkarma
+      const pdfjsLib = await import('pdfjs-dist');
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+      
+      // İlk dosya
+      const arrayBuffer1 = await file.arrayBuffer();
+      const pdf1 = await pdfjsLib.getDocument({ data: arrayBuffer1 }).promise;
+      let fullText1 = '';
+      for (let i = 1; i <= pdf1.numPages; i++) {
+        const page = await pdf1.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map((item: any) => item.str).join(' ');
+        fullText1 += pageText + '\n';
+      }
+      
+      // İkinci dosya
+      const arrayBuffer2 = await file2.arrayBuffer();
+      const pdf2 = await pdfjsLib.getDocument({ data: arrayBuffer2 }).promise;
+      let fullText2 = '';
+      for (let i = 1; i <= pdf2.numPages; i++) {
+        const page = await pdf2.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map((item: any) => item.str).join(' ');
+        fullText2 += pageText + '\n';
+      }
+      
+      // Dil kodunu belirle
+      const langMap: any = {
+        'TR': 'Türkçe',
+        'EN': 'English',
+        'FR': 'Français',
+        'DE': 'Deutsch',
+        'RU': 'Русский',
+        'ZH': '中文',
+        'AR': 'العربية'
+      };
+      const targetLang = langMap[language] || 'English';
+      
+      // API'ye gönder
+      const res = await fetch('/api/compare', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          pdfText1: fullText1,
+          pdfText2: fullText2,
+          targetLang: targetLang,
+          userPackage: effectivePackage,
+          isGlobalPackage: effectivePackage === 'enterprise' || effectivePackage === 'quantum_global'
+        })
+      });
+
+      const data = await res.json();
+      
+      if (!res.ok) {
+        if (data.requiresUpgrade) {
+          alert(data.error || (language === 'TR' ? 'Paket yükseltmesi gerekli' : 'Package upgrade required'));
+          // setActiveTab('pricing'); // YORUM SATIRINA ALINDI - Redirect yapmasın
+          return;
+        }
+        throw new Error(data.error || 'Comparison failed');
+      }
+      
+      setResult(data.reply || 'Comparison complete');
+      setComparisonResult(data);
+      setAnalysisStatus('');
+    } catch (error: any) {
+      console.error('Comparison error:', error);
+      alert(error.message || (language === 'TR' ? 'Karşılaştırma sırasında bir hata oluştu.' : 'An error occurred during comparison.'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAnalyze = async (e?: React.MouseEvent<HTMLButtonElement>) => {
+    console.log('========================================');
+    console.log('🚀 ANALİZ BAŞLADI - FONKSİYON ÇAĞRILDI!');
+    console.log('========================================');
+    
+    // userId'yi fonksiyonun başında bir kez tanımla (tüm kullanımlar için)
+    const userId = user?.id;
+    
+    // Sayfa yenilenmesini engelle
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      console.log('[handleAnalyze] preventDefault ve stopPropagation çağrıldı');
+    }
+    
+    console.log('[handleAnalyze] İlk kontroller başlıyor...', {
+      uploadMode,
+      hasFile: !!file,
+      hasFile2: !!file2,
+      isAdmin,
+      userCredits,
+      userPackage
+    });
+    
     // Compare mode kontrolü
-    if (uploadMode === 'compare') {
+    if ((uploadMode as any) === 'compare') {
+      console.log('[handleAnalyze] Compare mode aktif');
       if (!file || !file2) {
         alert(language === 'TR' ? 'Lütfen karşılaştırma için iki dosya seçin.' : 'Please select both documents for comparison.');
         return;
@@ -1265,7 +1381,7 @@ export default function Home() {
         alert(language === 'TR' 
           ? 'Dosya karşılaştırma özelliği Professional veya Global paket gerektirir.' 
           : 'Document comparison requires Professional or Global package.');
-        setActiveTab('pricing');
+        // setActiveTab('pricing'); // YORUM SATIRINA ALINDI - Redirect yapmasın
         return;
       }
       
@@ -1274,25 +1390,36 @@ export default function Home() {
       return;
     }
     
-    if (!file) return;
+    if (!file) {
+      console.log('[handleAnalyze] Dosya seçilmemiş, çıkılıyor');
+      return;
+    }
     
+    console.log('[handleAnalyze] Dosya kontrolü geçti, limit kontrolleri başlıyor...');
+    
+    // TEST MODU: Tüm kontrolleri atla, direkt analiz yap
     // Admin kontrolü - Admin ise limit bypass
     if (!isAdmin) {
-      // Kredi kontrolü (Pay-as-you-go için)
-      if (userCredits <= 0 && !userPackage) {
-        setShowCreditModal(true);
-        return;
-      }
+      console.log('[handleAnalyze] Admin değil, limit kontrolleri yapılıyor...');
+      // Kredi kontrolü (Pay-as-you-go için) - TEST MODU: Atla
+      // if (userCredits <= 0 && !userPackage) {
+      //   setShowCreditModal(true);
+      //   return;
+      // }
       
-      // Limit kontrolü (Supabase'den - Subscription için)
-    const canAnalyze = await checkAnalysisLimit();
-    if (!canAnalyze) {
-      setShowLimitModal(true);
-      return;
-      }
+      // Limit kontrolü (Supabase'den - Subscription için) - TEST MODU: Atla
+      // const canAnalyze = await checkAnalysisLimit();
+      // if (!canAnalyze) {
+      //   setShowLimitModal(true);
+      //   return;
+      // }
+      console.log('[handleAnalyze] TEST MODU: Limit kontrolleri atlandı, analiz devam ediyor');
+    } else {
+      console.log('[handleAnalyze] Admin kullanıcı, limit kontrolleri atlandı');
     }
     
     setLoading(true);
+    setIsAnalyzing(true);
     setResult("");
     try {
       // PDF'den metin çıkarma - GÜÇLENDİRİLMİŞ HATA YÖNETİMİ
@@ -1385,146 +1512,219 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
         timestamp: new Date().toISOString()
       });
 
+      console.log('[handleAnalyze] FETCH ÖNCESİ - Request body hazırlanıyor...');
+      const requestBody = {
+        pdfText: fullText,
+        targetLang: targetLang,
+        userSelectedCountry: selectedCountryForAnalysis && selectedCountryForAnalysis !== 'AUTO' ? selectedCountryForAnalysis : userSelectedCountry,
+        userId: userId, // UUID from auth.users
+        userEmail: user?.email || null, // Email for notifications
+        fileName: file?.name || 'document.pdf'
+      };
+      console.log('[handleAnalyze] FETCH ÖNCESİ - Request body:', {
+        pdfTextLength: requestBody.pdfText.length,
+        targetLang: requestBody.targetLang,
+        userSelectedCountry: requestBody.userSelectedCountry,
+        userId: requestBody.userId,
+        userEmail: requestBody.userEmail,
+        fileName: requestBody.fileName
+      });
+
       let res: Response;
+      console.log('[handleAnalyze] FETCH ÇAĞRISI BAŞLIYOR...');
+      
+      // Absolute URL kullan (development ve production için)
+      const apiUrl = typeof window !== 'undefined' 
+        ? `${window.location.origin}/api/analyze`
+        : '/api/analyze';
+      
+      console.log('[handleAnalyze] API URL:', apiUrl);
+      console.log('[handleAnalyze] Request Method: POST');
+      console.log('[handleAnalyze] Request Body Length:', JSON.stringify(requestBody).length);
+      
       try {
-        res = await fetch('/api/analyze', {
-          method: 'POST',
+        res = await fetch(apiUrl, {
+          method: 'POST', // Açıkça POST belirtildi
           headers: {
             'Content-Type': 'application/json',
+            'Accept': 'text/event-stream, application/json', // Streaming için
           },
-          body: JSON.stringify({
-            pdfText: fullText,
-            targetLang: targetLang,
-            userSelectedCountry: selectedCountryForAnalysis && selectedCountryForAnalysis !== 'AUTO' ? selectedCountryForAnalysis : userSelectedCountry
-          })
+          body: JSON.stringify(requestBody),
+          cache: 'no-store', // Cache'i devre dışı bırak
         });
-
-        console.log('[handleAnalyze] API yanıtı alındı:', {
+        
+        console.log('[handleAnalyze] Fetch tamamlandı, Response:', {
           status: res.status,
           statusText: res.statusText,
           ok: res.ok,
+          headers: Object.fromEntries(res.headers.entries())
+        });
+        console.log('[handleAnalyze] FETCH SONRASI - Response alındı:', {
+          status: res.status,
+          statusText: res.statusText,
+          ok: res.ok,
+          headers: Object.fromEntries(res.headers.entries()),
           timestamp: new Date().toISOString()
         });
+      } catch (fetchError: any) {
+        console.error('[handleAnalyze] FETCH HATASI DETAYLI:', {
+          error: fetchError,
+          message: fetchError?.message,
+          stack: fetchError?.stack,
+          name: fetchError?.name,
+          apiUrl: apiUrl,
+          timestamp: new Date().toISOString()
+        });
+        // Network hatası veya bağlantı hatası
+        setResult(language === 'TR' 
+          ? `Bağlantı hatası: ${fetchError?.message || 'API\'ye ulaşılamadı'}. Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin.` 
+          : `Connection error: ${fetchError?.message || 'Could not reach API'}. Please check your internet connection and try again.`);
+        setLoading(false);
+        setIsAnalyzing(false);
+        return; // Sayfa yenilenmesini engelle, sadece return et
+      }
 
-        if (!res.ok) {
-          const errorText = await res.text();
-          console.error('[handleAnalyze] API hata yanıtı:', {
-            status: res.status,
-            statusText: res.statusText,
-            errorText: errorText.substring(0, 500) // İlk 500 karakter
-          });
-          throw new Error(`API hatası: ${res.status} ${res.statusText}`);
+      console.log('[handleAnalyze] API yanıtı alındı:', {
+        status: res.status,
+        statusText: res.statusText,
+        ok: res.ok,
+        timestamp: new Date().toISOString()
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('[handleAnalyze] API hata yanıtı DETAYLI:', {
+          status: res.status,
+          statusText: res.statusText,
+          errorText: errorText.substring(0, 1000), // İlk 1000 karakter
+          headers: Object.fromEntries(res.headers.entries()),
+          url: apiUrl,
+          timestamp: new Date().toISOString()
+        });
+        
+        // Hata mesajını göster ama sayfa yenileme
+        const errorMessage = language === 'TR' 
+          ? `API hatası (${res.status}): ${res.statusText}. ${errorText.substring(0, 200)}` 
+          : `API error (${res.status}): ${res.statusText}. ${errorText.substring(0, 200)}`;
+        setResult(errorMessage);
+        setLoading(false);
+        setIsAnalyzing(false);
+        return; // Sayfa yenilenmesini engelle, throw etme
+      }
+
+      // Compare mode gibi direkt JSON okuma
+      console.log('[handleAnalyze] Compare mode gibi direkt JSON okuma başlatılıyor...');
+      const data = await res.json();
+      
+      console.log('[handleAnalyze] JSON yanıtı alındı:', {
+        hasReply: !!data.reply,
+        hasAnalysis: !!data.analysis,
+        replyLength: data.reply?.length || 0,
+        analysisLength: data.analysis?.length || 0
+      });
+      
+      // Compare mode gibi sonucu set et
+      const resultText = data.reply || data.analysis || 'Analysis complete';
+      console.log('[handleAnalyze] Backend yanıtı DETAYLI:', {
+        hasReply: !!data.reply,
+        hasAnalysis: !!data.analysis,
+        replyLength: data.reply?.length || 0,
+        analysisLength: data.analysis?.length || 0,
+        replyPreview: data.reply?.substring(0, 200) || 'YOK',
+        analysisPreview: data.analysis?.substring(0, 200) || 'YOK'
+      });
+      setResult(resultText);
+      
+      console.log('[handleAnalyze] Sonuç set edildi, uzunluk:', resultText.length, 'İlk 200 karakter:', resultText.substring(0, 200));
+      
+      // Analiz sayısını artır (compare mode'da yok ama burada var)
+      // userId zaten fonksiyonun başında tanımlı
+      if (userId) {
+        try {
+          const newCount = analysisCount + 1;
+          setAnalysisCount(newCount);
+          // Supabase'e kaydet (hata alsa bile devam et)
+          try {
+            await supabase
+              .from('profiles')
+              .update({ analysis_count: newCount })
+              .eq('id', userId);
+          } catch (updateError) {
+            // Sessizce devam et
+          }
+        } catch (err) {
+          // Sessizce devam et
         }
-
-        const data = await res.json();
-        console.log('[handleAnalyze] API JSON yanıtı parse edildi:', {
-          hasReply: !!data.reply,
-          hasError: !!data.error,
-          replyLength: data.reply?.length || 0,
-          hasJurisdiction: !!data.jurisdiction,
-          hasRiskScore: data.risk_score !== undefined,
-          timestamp: new Date().toISOString()
-        });
-
-        let analysisResult = data.reply || data.error || 'Analysis complete';
-      
-      // Jurisdiction detection sonucunu kontrol et
-      if (data.jurisdiction && data.jurisdiction.needs_confirmation) {
-        // Kullanıcı onayı gerekiyor - state'e kaydet
-        setJurisdictionConfirmation({
-          detected_country: data.jurisdiction.detected_country,
-          confidence: data.jurisdiction.confidence,
-          cross_border: data.jurisdiction.cross_border,
-          secondary_countries: data.jurisdiction.secondary_countries,
-          scores: data.jurisdiction.scores,
-          show: true
-        });
       }
       
-      // Otomatik tespit edilen ülkeyi göster
-      if (data.jurisdiction && !selectedCountryForAnalysis) {
-        setSelectedCountryForAnalysis(data.jurisdiction.detected_country as 'TR' | 'US' | 'UK' | 'DE');
-      }
+      /* STREAMING KODU - KALDIRILDI (ReadableStream is already locked hatası nedeniyle)
+       * Streaming kodu aşağıda yorum satırında, gerekirse tekrar açılabilir
+       * Ancak şu an Compare mode gibi direkt JSON okuma kullanılıyor
+       */
       
-      // Hukuki kısaltmaları yerelleştir (İngilizce için)
-      // testMode === false (Global) veya language === 'EN' durumunda yerelleştir
+      // Hukuki kısaltmaları yerelleştir (İngilizce için) - Compare mode'da yok ama burada var
       const isEnglish = language === 'EN' || (testMode === false);
-      if (isEnglish) {
-        analysisResult = localizeLegalAcronyms(analysisResult, true);
+      if (isEnglish && resultText) {
+        const localizedResult = localizeLegalAcronyms(resultText, true);
+        // Eğer yerelleştirme sonucu değiştiyse, sonucu güncelle
+        if (localizedResult !== resultText) {
+          setResult(localizedResult);
+        }
       }
       
-      setResult(analysisResult);
-      setAnalysisStatus(''); // Status'u temizle
-      
-      // API'den gelen risk_score ve legal_citations verilerini kullan
-      if (data.risk_score !== undefined) {
-        setRiskScore(data.risk_score);
-      } else {
-        // Fallback: Metinden çıkar
-        const extractedScore = extractRiskScore(analysisResult);
+      // Risk score'u metinden çıkar (fallback) - Compare mode'da yok ama burada var
+      const extractedScore = extractRiskScore(resultText);
+      if (extractedScore !== null) {
         setRiskScore(extractedScore);
       }
       
-      // Legal citations
-      if (data.legal_citations && Array.isArray(data.legal_citations)) {
-        setLegalCitations(data.legal_citations);
-      }
-      
-      // Global Conflicts (sadece Global paket için)
-      setIsGlobalPackage(data.isGlobalPackage || false);
-      if (data.globalConflicts && Array.isArray(data.globalConflicts) && data.isGlobalPackage) {
-        setGlobalConflicts(data.globalConflicts);
-      } else {
-        setGlobalConflicts([]);
-      }
-      
-      // Legal References & Bibliography
-      if (data.legalReferences && Array.isArray(data.legalReferences)) {
-        setLegalReferences(data.legalReferences);
-      } else {
-        setLegalReferences([]);
-      }
-      
-      // Risk Assessments
-      if (data.riskAssessments && Array.isArray(data.riskAssessments)) {
-        setRiskAssessments(data.riskAssessments);
-      } else {
-        setRiskAssessments([]);
-      }
-      
-      // Analiz sayısını artır ve Supabase'e kaydet
-      const userId = user?.id;
+      // Analiz sayısını artır ve Supabase'e kaydet - Compare mode'da yok ama burada var
+      // userId zaten yukarıda tanımlı (satır 1627)
       const analysisTitle = file.name.substring(0, 50) + (file.name.length > 50 ? '...' : '');
-      const analysisSummary = analysisResult.substring(0, 200) + (analysisResult.length > 200 ? '...' : '');
+      const analysisSummary = resultText.substring(0, 200) + (resultText.length > 200 ? '...' : '');
       
       if (userId) {
         try {
-          // Analiz sayısını artır
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('analysis_count')
-            .eq('id', userId)
-            .single();
+          // Analiz sayısını artır (hata alsa bile devam et)
+          let newCount = analysisCount + 1;
           
-          const newCount = (profile?.analysis_count || 0) + 1;
-          
-          await supabase
-            .from('profiles')
-            .update({ analysis_count: newCount })
-            .eq('id', userId);
+          try {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('analysis_count')
+              .eq('id', userId)
+              .single();
+            
+            if (profile) {
+              newCount = (profile.analysis_count || 0) + 1;
+              
+              try {
+                await supabase
+                  .from('profiles')
+                  .update({ analysis_count: newCount })
+                  .eq('id', userId);
+              } catch (updateError) {
+                // Sessizce devam et - profiles tablosu yoksa veya hata varsa
+              }
+            }
+          } catch (profileError) {
+            // Sessizce devam et - profiles tablosu yoksa veya hata varsa
+          }
           
           setAnalysisCount(newCount);
           
           // Enterprise kullanıcıları için analizi Supabase'e kaydet
           if (effectivePackage === 'enterprise') {
+            const finalRiskScore = riskScore || null;
+            
             const { data: newAnalysis, error: analysisError } = await supabase
               .from('analyses')
               .insert({
                 user_id: userId,
                 file_name: file.name,
-                analysis_result: analysisResult,
+                analysis_result: resultText,
                 analysis_summary: analysisSummary,
-                risk_score: data.risk_score !== undefined ? data.risk_score : (riskScore || null)
+                risk_score: finalRiskScore
               })
               .select()
               .single();
@@ -1565,30 +1765,32 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
         setAnalysisCount(newCount);
       }
     } catch (err: any) {
-      console.error("[handleAnalyze] Analiz hatası - DETAYLI LOG:", {
-        errorMessage: err.message,
-        errorName: err.name,
-        errorStack: err.stack?.split('\n').slice(0, 5), // İlk 5 satır
-        timestamp: new Date().toISOString(),
-        file: file?.name,
-        fileSize: file?.size
+      console.error("[handleAnalyze] GENEL ANALİZ HATASI DETAYLI:", {
+        error: err,
+        message: err?.message,
+        stack: err?.stack,
+        name: err?.name,
+        timestamp: new Date().toISOString()
       });
       
-      const errorMessage = err.message || (language === 'TR' 
-        ? "Analiz sırasında bir hata oluştu. Lütfen konsolu kontrol edin." 
-        : "An error occurred during analysis. Please check the console.");
-      
+      // Hata mesajını göster ama sayfa yenileme
+      const errorMessage = err?.message || (language === 'TR' ? 'Analiz sırasında bir hata oluştu.' : 'An error occurred during analysis.');
       setResult(errorMessage);
+      
+      // Loading state'lerini temizle
+      setLoading(false);
+      setIsAnalyzing(false);
       setAnalysisStatus('');
       
-      // Kullanıcıya görsel uyarı
-      alert(errorMessage);
+      // Sayfa yenilenmesini engelle - return ile çık
+      return;
     } finally {
-      console.log('[handleAnalyze] İşlem tamamlandı, loading false yapılıyor');
+      console.log('[handleAnalyze] Finally bloğu çalışıyor, state temizleniyor');
       setLoading(false);
+      setIsAnalyzing(false);
       setAnalysisStatus('');
     }
-  };
+  }; // handleAnalyze fonksiyonu kapanışı
 
   const handleDownloadPDF = async () => {
     if (!reportRef.current) return;
@@ -1763,89 +1965,6 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
     };
   }, []);
 
-  const handleCompare = async () => {
-    if (!file || !file2) return;
-    
-    setLoading(true);
-    setResult("");
-    setComparisonResult(null);
-    
-    try {
-      // PDF'lerden metin çıkarma
-      const pdfjsLib = await import('pdfjs-dist');
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
-      
-      // İlk dosya
-      const arrayBuffer1 = await file.arrayBuffer();
-      const pdf1 = await pdfjsLib.getDocument({ data: arrayBuffer1 }).promise;
-      let fullText1 = '';
-      for (let i = 1; i <= pdf1.numPages; i++) {
-        const page = await pdf1.getPage(i);
-        const textContent = await page.getTextContent();
-        const pageText = textContent.items.map((item: any) => item.str).join(' ');
-        fullText1 += pageText + '\n';
-      }
-      
-      // İkinci dosya
-      const arrayBuffer2 = await file2.arrayBuffer();
-      const pdf2 = await pdfjsLib.getDocument({ data: arrayBuffer2 }).promise;
-      let fullText2 = '';
-      for (let i = 1; i <= pdf2.numPages; i++) {
-        const page = await pdf2.getPage(i);
-        const textContent = await page.getTextContent();
-        const pageText = textContent.items.map((item: any) => item.str).join(' ');
-        fullText2 += pageText + '\n';
-      }
-      
-      // Dil kodunu belirle
-      const langMap: any = {
-        'TR': 'Türkçe',
-        'EN': 'English',
-        'FR': 'Français',
-        'DE': 'Deutsch',
-        'RU': 'Русский',
-        'ZH': '中文',
-        'AR': 'العربية'
-      };
-      const targetLang = langMap[language] || 'English';
-      
-      // API'ye gönder
-      const res = await fetch('/api/compare', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          pdfText1: fullText1,
-          pdfText2: fullText2,
-          targetLang: targetLang,
-          userPackage: effectivePackage,
-          isGlobalPackage: effectivePackage === 'enterprise' || effectivePackage === 'quantum_global'
-        })
-      });
-
-      const data = await res.json();
-      
-      if (!res.ok) {
-        if (data.requiresUpgrade) {
-          alert(data.error || (language === 'TR' ? 'Paket yükseltmesi gerekli' : 'Package upgrade required'));
-          setActiveTab('pricing');
-          return;
-        }
-        throw new Error(data.error || 'Comparison failed');
-      }
-      
-      setResult(data.reply || 'Comparison complete');
-      setComparisonResult(data);
-      setAnalysisStatus('');
-    } catch (error: any) {
-      console.error('Comparison error:', error);
-      alert(error.message || (language === 'TR' ? 'Karşılaştırma sırasında bir hata oluştu.' : 'An error occurred during comparison.'));
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleFeedbackSubmit = async (title: string, description: string, screenshot: File | null) => {
     try {
       // Dosya varsa base64'e çevir (boyut kontrolü ve küçültme ile)
@@ -1993,7 +2112,7 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
       />
 
       <div style={{ display: 'flex', paddingTop: '0' }}>
-        <Sidebar
+        <QuantumSidebar
           sidebarOpen={sidebarOpen}
           setSidebarOpen={setSidebarOpen}
           gold={gold}
@@ -2817,15 +2936,15 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
                         }}
                         style={{
                           padding: '12px 24px',
-                          background: uploadMode === 'single' ? gold : 'transparent',
-                          color: uploadMode === 'single' ? '#000000' : gold,
+                          background: (uploadMode as any) === 'single' ? gold : 'transparent',
+                          color: (uploadMode as any) === 'single' ? '#000000' : gold,
                           border: `2px solid ${gold}`,
                           borderRadius: '10px 10px 0 0',
                           cursor: 'pointer',
                           fontWeight: 'bold',
                           fontSize: '15px',
                           transition: 'all 0.3s',
-                          borderBottom: uploadMode === 'single' ? `2px solid ${midBlue}` : 'none'
+                          borderBottom: (uploadMode as any) === 'single' ? `2px solid ${midBlue}` : 'none'
                         }}
                       >
                         {language === 'TR' ? 'Tek Dosya Analizi' : 'Single Document'}
@@ -2845,15 +2964,15 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
                         }}
                         style={{
                           padding: '12px 24px',
-                          background: uploadMode === 'compare' ? gold : 'transparent',
-                          color: uploadMode === 'compare' ? '#000000' : gold,
+                          background: (uploadMode as any) === 'compare' ? gold : 'transparent',
+                          color: (uploadMode as any) === 'compare' ? '#000000' : gold,
                           border: `2px solid ${gold}`,
                           borderRadius: '10px 10px 0 0',
                           cursor: 'pointer',
                           fontWeight: 'bold',
                           fontSize: '15px',
                           transition: 'all 0.3s',
-                          borderBottom: uploadMode === 'compare' ? `2px solid ${midBlue}` : 'none',
+                          borderBottom: (uploadMode as any) === 'compare' ? `2px solid ${midBlue}` : 'none',
                           opacity: (!userPackage || userPackage === 'free') ? 0.5 : 1,
                           position: 'relative'
                         }}
@@ -2865,7 +2984,7 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
                     </div>
 
                     {/* Single Document Mode */}
-                    {uploadMode === 'single' && (
+                    {(uploadMode as any) === 'single' && (
                       <>
                         <input 
                           type="file" 
@@ -2918,7 +3037,7 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
                     )}
 
                     {/* Compare Mode */}
-                    {uploadMode === 'compare' && (
+                    {(uploadMode as any) === 'compare' && (
                       <div style={{
                         display: 'grid',
                         gridTemplateColumns: '1fr 1fr',
@@ -3064,22 +3183,23 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
                               onClick={(e) => {
                                 e.preventDefault();
                                 setLimitWarningDismissed(true);
-                                setActiveTab('pricing');
-                                if (window.location.pathname !== '/') {
-                                  router.push('/#pricing');
-                                  setTimeout(() => {
-                                    window.location.href = '/#pricing';
-                                  }, 100);
-                                } else {
-                                  setTimeout(() => {
-                                    const pricingElement = document.getElementById('pricing');
-                                    if (pricingElement) {
-                                      pricingElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                    } else {
-                                      window.location.href = '/#pricing';
-                                    }
-                                  }, 200);
-                                }
+                                // setActiveTab('pricing'); // YORUM SATIRINA ALINDI - Redirect yapmasın
+                                // if (window.location.pathname !== '/') {
+                                //   router.push('/#pricing'); // YORUM SATIRINA ALINDI
+                                //   setTimeout(() => {
+                                //     window.location.href = '/#pricing'; // YORUM SATIRINA ALINDI
+                                //   }, 100);
+                                // } else {
+                                setTimeout(() => {
+                                  const pricingElement = document.getElementById('pricing');
+                                  if (pricingElement) {
+                                    pricingElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                  }
+                                  // } else {
+                                  //   window.location.href = '/#pricing'; // YORUM SATIRINA ALINDI
+                                  // }
+                                }, 200);
+                                // }
                               }}
                             style={{
                               padding: '8px 16px',
@@ -3163,22 +3283,23 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
                           <button
                             onClick={(e) => {
                               e.preventDefault();
-                              setActiveTab('pricing');
-                              if (window.location.pathname !== '/') {
-                                router.push('/#pricing');
-                                setTimeout(() => {
-                                  window.location.href = '/#pricing';
-                                }, 100);
-                              } else {
-                                setTimeout(() => {
-                                  const pricingElement = document.getElementById('pricing');
-                                  if (pricingElement) {
-                                    pricingElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                  } else {
-                                    window.location.href = '/#pricing';
-                                  }
-                                }, 200);
-                              }
+                              // setActiveTab('pricing'); // YORUM SATIRINA ALINDI - Redirect yapmasın
+                              // if (window.location.pathname !== '/') {
+                              //   router.push('/#pricing'); // YORUM SATIRINA ALINDI
+                              //   setTimeout(() => {
+                              //     window.location.href = '/#pricing'; // YORUM SATIRINA ALINDI
+                              //   }, 100);
+                              // } else {
+                              setTimeout(() => {
+                                const pricingElement = document.getElementById('pricing');
+                                if (pricingElement) {
+                                  pricingElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                }
+                                // } else {
+                                //   window.location.href = '/#pricing'; // YORUM SATIRINA ALINDI
+                                // }
+                              }, 200);
+                              // }
                             }}
                             style={{
                               padding: '8px 16px',
@@ -3269,10 +3390,15 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
                     </div>
 
                     <button 
-                      onClick={handleAnalyze}
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleAnalyze(e);
+                      }}
                       disabled={
-                        (uploadMode === 'single' && !file) || 
-                        (uploadMode === 'compare' && (!file || !file2)) || 
+                        ((uploadMode as any) === 'single' && !file) || 
+                        ((uploadMode as any) === 'compare' && (!file || !file2)) || 
                         loading || 
                         isAnalyzing || 
                         isLimitReached()
@@ -3288,12 +3414,12 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
                         fontWeight: '900',
                         fontSize: '16px',
                         cursor: (
-                          (uploadMode === 'single' && file) || 
-                          (uploadMode === 'compare' && file && file2)
+                          ((uploadMode as any) === 'single' && file) || 
+                          ((uploadMode as any) === 'compare' && file && file2)
                         ) && !loading && !isAnalyzing && !isLimitReached() ? 'pointer' : 'not-allowed',
                         opacity: (
-                          (uploadMode === 'single' && file) || 
-                          (uploadMode === 'compare' && file && file2)
+                          ((uploadMode as any) === 'single' && file) || 
+                          ((uploadMode as any) === 'compare' && file && file2)
                         ) && !loading && !isAnalyzing && !isLimitReached() ? 1 : 0.6,
                         boxShadow: '0 4px 12px rgba(59, 130, 246, 0.4)',
                         transition: 'all 0.2s ease',
@@ -3302,7 +3428,7 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
                       }}
                       onMouseEnter={(e) => {
                         if (
-                          ((uploadMode === 'single' && file) || (uploadMode === 'compare' && file && file2)) && 
+                          (((uploadMode as any) === 'single' && file) || ((uploadMode as any) === 'compare' && file && file2)) && 
                           !loading && !isAnalyzing && !isLimitReached()
                         ) {
                           e.currentTarget.style.backgroundColor = '#2563eb'; // Hover: bg-blue-700
@@ -3312,7 +3438,7 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
                       }}
                       onMouseLeave={(e) => {
                         if (
-                          ((uploadMode === 'single' && file) || (uploadMode === 'compare' && file && file2)) && 
+                          (((uploadMode as any) === 'single' && file) || ((uploadMode as any) === 'compare' && file && file2)) && 
                           !loading && !isAnalyzing && !isLimitReached()
                         ) {
                           e.currentTarget.style.backgroundColor = '#3b82f6';
@@ -3322,7 +3448,7 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
                       }}
                     >
                       <span style={{ color: '#ffffff' }}>
-                        {uploadMode === 'compare' 
+                        {(uploadMode as any) === 'compare' 
                           ? (language === 'TR' ? 'Dosyaları Karşılaştır' : 'Compare Documents')
                           : ui[language].btn
                         }
@@ -3677,7 +3803,7 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
                         </div>
                       </div>
                     )}
-                    {comparisonResult && uploadMode === 'compare' ? (
+                    {comparisonResult && (uploadMode as any) === 'compare' ? (
                       <ComparisonResult
                         result={result}
                         differences={comparisonResult.differences}

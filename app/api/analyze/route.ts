@@ -1,50 +1,53 @@
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
-import { createClient } from "@/utils/supabase/server";
+import { streamText } from 'ai';
+import { openai } from '@ai-sdk/openai';
+import OpenAI from 'openai';
+import { supabase } from "@/lib/supabase";
+import PDFParser from 'pdf2json';
 
-// Vercel timeout ayarları
-export const maxDuration = 300; // 5 dakika (maksimum)
+// Runtime configuration for Next.js App Router
+export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-import { fetchYargitayKararlari } from '@/lib/fetchYargitayKararlari';
-import { fetchDanistayKararlari } from '@/lib/fetchDanistayKararlari';
-import { fetchAnayasaMahkemesiKararlari } from '@/lib/fetchAnayasaMahkemesiKararlari';
-import { fetchKVKKKararlari } from '@/lib/fetchKVKKKararlari';
-import { fetchTBMM } from '@/lib/fetchTBMM';
-import { fetchMBS } from '@/lib/fetchMBS';
-import { fetchCongressGov } from '@/lib/fetchCongressGov';
-import { fetchSCOTUS } from '@/lib/fetchSCOTUS';
-import { fetchCourtListener } from '@/lib/fetchCourtListener';
-import { fetchOpenJurist } from '@/lib/fetchOpenJurist';
-import { fetchGovInfo, fetchUSCode, fetchFederalRegister } from '@/lib/fetchGovInfo';
-import { fetchLibraryOfCongress } from '@/lib/fetchLibraryOfCongress';
-import { fetchStateLaws } from '@/lib/fetchStateLaws';
-import { fetchUKLegislation } from '@/lib/fetchUKLegislation';
-import { fetchUKCaseLaw, getUKCaseMetadata } from '@/lib/fetchUKCaseLaw';
-import { fetchGermanLegislation, parseGermanCitation } from '@/lib/fetchGermanLegislation';
-import { fetchGermanCaseLaw, getGermanCaseMetadata } from '@/lib/fetchGermanCaseLaw';
-import { upsertDocument } from '@/lib/upsertDocument';
-import { formatAnalysisWithCitations, generateCitationFromMetadata } from '@/lib/citationFormatter';
-import { applyWeightedRanking, getWeightedDocuments, isCommercialContract } from '@/lib/weightedSearch';
-import { detectJurisdiction, type JurisdictionResult } from '@/lib/jurisdictionDetection';
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// GET handler for debugging (404 hatasını önlemek için)
+export async function GET(req: Request) {
+  console.log('[API] GET /api/analyze çağrıldı - Bu endpoint sadece POST kabul eder');
+  return NextResponse.json({ 
+    error: 'Method not allowed',
+    message: 'This endpoint only accepts POST requests',
+    allowedMethods: ['POST']
+  }, { status: 405 });
+}
 
-// Admin Email Listesi - Limit kontrolünden muaf tutulacak kullanıcılar
-const ADMIN_EMAILS = ['elmas7853@gmail.com'];
+// Telegram Notification Helper
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "8415963295:AAEgRJ3QX2ZBVsIh5lxiXhFOf_-7WTpIOdc";
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || "8418884482";
 
-// Kritik anahtar kelimeler - bunlar için canlı veri çekilecek
-const CRITICAL_KEYWORDS_TR = [
-  'KVKK', 'TBK', 'HMK', 'İİK', 'AYM', 'Yargıtay', 'Danıştay', 
-  'Anayasa', 'Kanun', 'Yönetmelik', 'Tüzük', 'Tebliğ', 'Karar',
-  'TBMM', 'Türkiye Büyük Millet Meclisi', 'MBS', 'Mevzuat Bilgi Sistemi',
-  'Tasarı', 'Kanun Tasarısı', '2024', '2025', 'son karar', 'güncel', 'yeni mevzuat'
-];
+async function sendTelegramNotification(message: string, isCritical: boolean = false) {
+  try {
+    const telegramUrl = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
+    const emoji = isCritical ? "🚨" : "📊";
+    const formattedMessage = `${emoji} ${message}`;
+    
+    const response = await fetch(telegramUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: TELEGRAM_CHAT_ID,
+        text: formattedMessage,
+        parse_mode: 'HTML'
+      })
+    });
+    
+    if (!response.ok) {
+      console.error('Telegram notification failed:', await response.text());
+    }
+  } catch (error) {
+    console.error('Telegram notification error:', error);
+  }
+}
 
-const CRITICAL_KEYWORDS_EN = [
-  'SCOTUS', 'Supreme Court', 'Congress', 'Federal', 'Act', 'Law',
-  'UK', 'United Kingdom', 'England', 'legislation.gov.uk', 'Statutory Instrument', 'SI',
-  '2024', '2025', 'recent', 'latest', 'current legislation', 'case law'
-];
+// PDF Parse modülü artık standart import ile yükleniyor
 
 function getUserKey(req: Request) {
   const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "";
@@ -52,1443 +55,700 @@ function getUserKey(req: Request) {
   return `${ip}_${ua}`;
 }
 
-// Kritik anahtar kelime kontrolü
-function hasCriticalKeywords(text: string, targetLang: string): boolean {
-  const keywords = targetLang === 'TR' || targetLang === 'Turkish' 
-    ? CRITICAL_KEYWORDS_TR 
-    : CRITICAL_KEYWORDS_EN;
-  const upperText = text.toUpperCase();
-  return keywords.some(keyword => upperText.includes(keyword.toUpperCase()));
-}
+async function performLegalAnalysis(pdfText: string, targetLang: string, onFinish?: (text: string) => Promise<void>) {
+  console.log('[performLegalAnalysis] ========================================');
+  console.log('[performLegalAnalysis] FONKSİYON ÇAĞRILDI!');
+  console.log('[performLegalAnalysis] PDF metin uzunluğu:', pdfText?.length || 0);
+  console.log('[performLegalAnalysis] Target lang:', targetLang);
+  console.log('[performLegalAnalysis] PDF metin ilk 200 karakter:', pdfText?.substring(0, 200) || 'BOŞ');
+  console.log('[performLegalAnalysis] ========================================');
+  
+  const analysisPrompt = `Sen bir yardımcı hukuk asistanısın ve verilen metne göre nesnel analizler yaparsın. Aşağıdaki hukuki metni derinlemesine ve kapsamlı bir şekilde analiz et. Analizini yaparken tüm yasal çerçeveleri, risk faktörlerini, uyum gerekliliklerini, potansiyel yasal sonuçları, yargı içtihatlarını ve akademik görüşleri göz önünde bulundur.
 
-// Tarih parse fonksiyonu - farklı formatları handle eder
-function parseDate(dateStr: string | undefined | null): Date | null {
-  if (!dateStr) return null;
-  
-  try {
-    // ISO format (2024-01-15)
-    if (dateStr.match(/^\d{4}-\d{2}-\d{2}/)) {
-      return new Date(dateStr);
-    }
-    
-    // DD/MM/YYYY veya DD-MM-YYYY
-    if (dateStr.match(/^\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/)) {
-      const parts = dateStr.split(/[\/\-]/);
-      if (parts.length === 3) {
-        const day = parseInt(parts[0]);
-        const month = parseInt(parts[1]) - 1;
-        const year = parseInt(parts[2].length === 2 ? '20' + parts[2] : parts[2]);
-        return new Date(year, month, day);
-      }
-    }
-    
-    // YYYY/MM/DD
-    if (dateStr.match(/^\d{4}[\/\-]\d{2}[\/\-]\d{2}/)) {
-      return new Date(dateStr.replace(/\//g, '-'));
-    }
-    
-    // Default Date constructor
-    const parsed = new Date(dateStr);
-    if (!isNaN(parsed.getTime())) {
-      return parsed;
-    }
-  } catch {
-    // Parse hatası durumunda null döndür
-  }
-  
-  return null;
-}
+=== KAPSAMLI HUKUK KÜTÜPHANESİ VE ANALİZ ÇERÇEVESİ ===
 
-// Belge tarihini al (metadata'dan veya created_at'ten)
-function getDocumentDate(doc: any): Date | null {
-  // Önce metadata'daki date veya updated alanını kontrol et
-  const metadataDate = doc.metadata?.date || doc.metadata?.updated;
-  if (metadataDate) {
-    const parsed = parseDate(metadataDate);
-    if (parsed) return parsed;
-  }
-  
-  // Sonra created_at'i kontrol et
-  if (doc.created_at) {
-    const parsed = parseDate(doc.created_at);
-    if (parsed) return parsed;
-  }
-  
-  return null;
-}
+Analizinde MUTLAKA ve ÇOK DETAYLI şekilde şu yasal düzenlemeleri, hukuk sistemlerini ve yasal alanları göz önünde bulundur:
 
-// Belge benzerliği kontrolü (aynı konu/başlık için)
-function areDocumentsSimilar(doc1: any, doc2: any): boolean {
-  const content1 = (doc1.content || '').substring(0, 200).toUpperCase();
-  const content2 = (doc2.content || '').substring(0, 200).toUpperCase();
-  
-  // İlk 200 karakterin %70'i benzer ise aynı belge sayılır
-  const similarity = calculateSimilarity(content1, content2);
-  return similarity > 0.7;
-}
+1. BGB (Bürgerliches Gesetzbuch - Almanya Medeni Kanunu):
+   - Tüm ilgili maddeleri, alt maddeleri (Absätze), paragrafları ve hükümleri belirt
+   - Sözleşme hukuku (Vertragsrecht): BGB § 145-157 (Angebot und Annahme), BGB § 241-304 (Schuldverhältnisse), BGB § 305-310 (Allgemeine Geschäftsbedingungen)
+   - Borçlar hukuku: BGB § 275-304 (Leistungsstörungen), BGB § 433-480 (Kaufvertrag), BGB § 535-580a (Miete, Pacht)
+   - Tazminat hukuku: BGB § 280 (Schadensersatz wegen Pflichtverletzung), BGB § 823 (Schadensersatzpflicht), BGB § 826 (Sittenwidrige vorsätzliche Schädigung)
+   - Haksız fiil hukuku: BGB § 823-853 (Deliktsrecht)
+   - Genel hükümler: BGB § 1-240 (Allgemeiner Teil)
+   - Alman hukuk sistemine özgü yükümlülükleri, hakları, yaptırımları ve içtihatları analiz et
+   - BGH (Bundesgerichtshof) kararları ve Alman yargı içtihatlarını değerlendir
 
-// Basit benzerlik hesaplama (Jaccard benzeri)
-function calculateSimilarity(str1: string, str2: string): number {
-  const words1 = new Set(str1.split(/\s+/).filter(w => w.length > 3));
-  const words2 = new Set(str2.split(/\s+/).filter(w => w.length > 3));
-  
-  const intersection = new Set([...words1].filter(w => words2.has(w)));
-  const union = new Set([...words1, ...words2]);
-  
-  return union.size > 0 ? intersection.size / union.size : 0;
-}
+2. UCC (Uniform Commercial Code - ABD Birleşik Ticaret Kanunu):
+   - Tüm ilgili bölümler (Article 1-11), maddeler, alt maddeler ve yorumları referans al
+   - Article 1: Genel Hükümler (General Provisions) - UCC 1-201, 1-302, 1-303
+   - Article 2: Satış Sözleşmeleri (Sales) - UCC 2-201 (Statute of Frauds), UCC 2-207 (Additional Terms), UCC 2-314 (Implied Warranty), UCC 2-315 (Fitness for Particular Purpose), UCC 2-601 (Perfect Tender Rule)
+   - Article 2A: Kiralama (Leases) - UCC 2A-101 ve devamı
+   - Article 3: Kambiyo Senetleri (Negotiable Instruments) - UCC 3-101 ve devamı
+   - Article 4: Banka Mevduatları ve Tahsilat (Bank Deposits and Collections) - UCC 4-101 ve devamı
+   - Article 4A: Fon Transferleri (Fund Transfers) - UCC 4A-101 ve devamı
+   - Article 5: Akreditifler (Letters of Credit) - UCC 5-101 ve devamı
+   - Article 6: Toplu Satışlar (Bulk Sales) - UCC 6-101 ve devamı
+   - Article 7: Belge Başlıkları (Documents of Title) - UCC 7-101 ve devamı
+   - Article 8: Menkul Kıymetler (Investment Securities) - UCC 8-101 ve devamı
+   - Article 9: Güvenlik Hakları (Secured Transactions) - UCC 9-101, UCC 9-203 (Attachment), UCC 9-308 (Perfection), UCC 9-609 (Default)
+   - Article 10: Etkin Tarih Hükümleri (Effective Date and Repealer)
+   - Article 11: Etkilenmeyen İşlemler (Effective Date and Transition Provisions)
+   - ABD ticaret hukukuna özgü gereklilikleri, yorumları ve federal/eyalet içtihatlarını belirt
+   - Uniform Law Commission yorumlarını ve Restatement of Law referanslarını değerlendir
 
-// Tarih çelişkisi çözme: Aynı konu için en güncel tarihli olanı seç
-function resolveDateConflicts(documents: Array<any>): Array<any> {
-  const resolved: Array<any> = [];
-  const processed = new Set<number>();
-  
-  for (let i = 0; i < documents.length; i++) {
-    if (processed.has(i)) continue;
-    
-    const doc = documents[i];
-    const similarDocs = [doc];
-    
-    // Benzer belgeleri bul
-    for (let j = i + 1; j < documents.length; j++) {
-      if (processed.has(j)) continue;
-      
-      if (areDocumentsSimilar(doc, documents[j])) {
-        similarDocs.push(documents[j]);
-        processed.add(j);
-      }
-    }
-    
-    // Benzer belgeler arasında en güncel tarihli olanı seç
-    if (similarDocs.length > 1) {
-      similarDocs.sort((a, b) => {
-        const dateA = getDocumentDate(a);
-        const dateB = getDocumentDate(b);
-        
-        if (!dateA && !dateB) return 0;
-        if (!dateA) return 1; // Tarihi olmayan en sona
-        if (!dateB) return -1;
-        
-        return dateB.getTime() - dateA.getTime(); // En güncel önce
-      });
-      
-      // En güncel olanı al ve diğerlerini atla
-      const latest = similarDocs[0];
-      latest.metadata = {
-        ...latest.metadata,
-        resolvedFromConflict: true,
-        conflictCount: similarDocs.length,
-        originalDate: getDocumentDate(latest)?.toISOString()
-      };
-      resolved.push(latest);
-    } else {
-      resolved.push(doc);
-    }
-    
-    processed.add(i);
-  }
-  
-  return resolved;
-}
+3. KVKK (Kişisel Verilerin Korunması Kanunu - Türkiye, 6698 sayılı Kanun):
+   - Tüm ilgili maddeleri, yükümlülükleri, yaptırımları ve idari para cezalarını detaylı analiz et
+   - KVKK m.3: Tanımlar (kişisel veri, özel nitelikli kişisel veri, veri sorumlusu, veri işleyen, açık rıza)
+   - KVKK m.4: Genel İlkeler (hukuka ve dürüstlük kurallarına uygunluk, doğru ve gerektiğinde güncel olma, belirli açık ve meşru amaçlar için işleme)
+   - KVKK m.5: Kişisel verilerin işlenme şartları (açık rıza, kanunlarda açıkça öngörülme, sözleşmenin kurulması veya ifası)
+   - KVKK m.6: Özel nitelikli kişisel verilerin işlenme şartları (sağlık, cinsel hayat, biyometrik veriler)
+   - KVKK m.7: Silme, yok etme veya anonim hale getirme
+   - KVKK m.8: Veri sorumlusunun aydınlatma yükümlülüğü
+   - KVKK m.9: Kişisel verilerin yurt dışına aktarılması
+   - KVKK m.10: Veri sahibinin hakları (bilgi talep etme, düzeltme, silme, itiraz etme)
+   - KVKK m.11: Başvuru hakkı
+   - KVKK m.12: Veri güvenliğine ilişkin yükümlülükler
+   - KVKK m.13: Veri ihlali bildirimi
+   - KVKK m.14: Veri Koruma Kurulu
+   - KVKK m.15-18: Yaptırımlar ve idari para cezaları (2024 güncel tutarları ile)
+   - KVKK Yönetmeliği ve KVKK Kurulu kararlarını referans al
+   - Türk hukuk sistemindeki içtihatları ve KVKK Kurulu uygulamalarını değerlendir
 
-// Veritabanındaki en son güncelleme tarihini kontrol et
-async function isDatabaseStale(supabase: any, days: number = 1): Promise<boolean> {
-  try {
-    const { data } = await supabase
-      .from('documents')
-      .select('metadata')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    
-    if (!data) return true;
-    
-    const lastUpdate = data.metadata?.updated || data.metadata?.date;
-    if (!lastUpdate) return true;
-    
-    const lastUpdateDate = parseDate(lastUpdate);
-    if (!lastUpdateDate) return true;
-    
-    const daysSinceUpdate = (Date.now() - lastUpdateDate.getTime()) / (1000 * 60 * 60 * 24);
-    return daysSinceUpdate > days;
-  } catch {
-    return true;
-  }
-}
+4. GDPR (General Data Protection Regulation - AB Genel Veri Koruma Yönetmeliği, Regulation (EU) 2016/679):
+   - Tüm ilgili maddeleri (Articles), gereklilikleri, yaptırımları ve yönergeleri değerlendir
+   - GDPR Art. 4: Tanımlar (Definitions)
+   - GDPR Art. 5: Veri işleme ilkeleri (Principles relating to processing of personal data)
+   - GDPR Art. 6: İşleme için yasal dayanak (Lawfulness of processing) - 6(1)(a) Consent, 6(1)(b) Contract, 6(1)(c) Legal obligation, 6(1)(f) Legitimate interests
+   - GDPR Art. 7: Rıza koşulları (Conditions for consent)
+   - GDPR Art. 8: Çocukların rızası (Conditions applicable to child's consent)
+   - GDPR Art. 9: Özel veri kategorileri (Processing of special categories of personal data)
+   - GDPR Art. 12-23: Veri sahibi hakları (Rights of the data subject) - Bilgi edinme, erişim, düzeltme, silme ("right to be forgotten"), işlemeye itiraz, veri taşınabilirliği
+   - GDPR Art. 24-31: Veri sorumlusu ve veri işleyen yükümlülükleri
+   - GDPR Art. 32: Güvenlik işleme (Security of processing)
+   - GDPR Art. 33: Veri ihlali bildirimi (Notification of a personal data breach to the supervisory authority)
+   - GDPR Art. 34: Veri sahibine bildirim (Communication of a personal data breach to the data subject)
+   - GDPR Art. 35: Veri koruma etki değerlendirmesi (Data protection impact assessment)
+   - GDPR Art. 36: Ön istişare (Prior consultation)
+   - GDPR Art. 37-39: Veri koruma görevlisi (Data protection officer)
+   - GDPR Art. 44-49: Üçüncü ülkelere veya uluslararası örgütlere aktarım (Transfers of personal data)
+   - GDPR Art. 77-84: Yaptırımlar ve tazminat (Remedies, liability and penalties) - Art. 83: 20 milyon EUR veya küresel cirosun %4'üne kadar idari para cezası
+   - GDPR Recitals (Gerekçeler) ve EDPB (European Data Protection Board) yönergelerini referans al
+   - AB Adalet Divanı (CJEU) kararlarını ve ulusal veri koruma otoritelerinin kararlarını değerlendir
 
-// Canlı veri çekme (sadece kritik durumlarda)
-async function fetchLiveData(
-  pdfText: string, 
-  targetLang: string, 
-  supabase: any
-): Promise<Array<{ content: string; metadata: any }>> {
-  const liveDocs: Array<{ content: string; metadata: any }> = [];
-  
-  try {
-    if (targetLang === 'TR' || targetLang === 'Turkish') {
-      // Türkçe kaynaklar
-      if (pdfText.toUpperCase().includes('YARGITAY') || pdfText.toUpperCase().includes('YARGI')) {
-        const decisions = await fetchYargitayKararlari();
-        for (const decision of decisions.slice(0, 2)) {
-          const content = `${decision.title}${decision.content ? '\n' + decision.content : ''}`;
-          liveDocs.push({
-            content,
-            metadata: { source: 'yargitay', date: decision.date, live: true }
-          });
-          // Hemen kaydet
-          await upsertDocument(content, {
-            source: 'yargitay',
-            date: decision.date || new Date().toISOString().split('T')[0],
-            updated: new Date().toISOString(),
-            type: 'karar'
-          }, supabase);
-        }
-      }
-      
-      if (pdfText.toUpperCase().includes('DANIŞTAY') || pdfText.toUpperCase().includes('İDARİ')) {
-        const decisions = await fetchDanistayKararlari();
-        for (const decision of decisions.slice(0, 2)) {
-          const content = `${decision.title}${decision.content ? '\n' + decision.content : ''}`;
-          liveDocs.push({
-            content,
-            metadata: { source: 'danistay', date: decision.date, live: true }
-          });
-          await upsertDocument(content, {
-            source: 'danistay',
-            date: decision.date || new Date().toISOString().split('T')[0],
-            updated: new Date().toISOString(),
-            type: 'karar'
-          }, supabase);
-        }
-      }
-      
-      if (pdfText.toUpperCase().includes('KVKK') || pdfText.toUpperCase().includes('KİŞİSEL VERİ')) {
-        const decisions = await fetchKVKKKararlari();
-        for (const decision of decisions.slice(0, 2)) {
-          const content = `${decision.title}${decision.content ? '\n' + decision.content : ''}`;
-          liveDocs.push({
-            content,
-            metadata: { source: 'kvkk', date: decision.date, live: true }
-          });
-          await upsertDocument(content, {
-            source: 'kvkk',
-            date: decision.date || new Date().toISOString().split('T')[0],
-            updated: new Date().toISOString(),
-            type: 'karar'
-          }, supabase);
-        }
-      }
-      
-      if (pdfText.toUpperCase().includes('TBMM') || pdfText.toUpperCase().includes('TÜRKİYE BÜYÜK MİLLET MECLİSİ') || pdfText.toUpperCase().includes('KANUN TASARISI') || pdfText.toUpperCase().includes('TASARI')) {
-        const laws = await fetchTBMM();
-        for (const law of laws.slice(0, 2)) {
-          const content = `${law.title}${law.content ? '\n' + law.content : ''}`;
-          liveDocs.push({
-            content,
-            metadata: { source: 'tbmm', date: law.date, live: true }
-          });
-          await upsertDocument(content, {
-            source: 'tbmm',
-            date: law.date || new Date().toISOString().split('T')[0],
-            updated: new Date().toISOString(),
-            type: law.title.includes('Tasarı') ? 'tasarı' : 'kanun'
-          }, supabase);
-        }
-      }
-      
-      if (pdfText.toUpperCase().includes('MBS') || pdfText.toUpperCase().includes('MEVZUAT BİLGİ SİSTEMİ') || pdfText.toUpperCase().includes('MEVZUAT')) {
-        const regulations = await fetchMBS();
-        for (const regulation of regulations.slice(0, 2)) {
-          const content = `${regulation.title}${regulation.content ? '\n' + regulation.content : ''}`;
-          liveDocs.push({
-            content,
-            metadata: { source: 'mbs', date: regulation.date, live: true }
-          });
-          await upsertDocument(content, {
-            source: 'mbs',
-            date: regulation.date || new Date().toISOString().split('T')[0],
-            updated: new Date().toISOString(),
-            type: 'mevzuat'
-          }, supabase);
-        }
-      }
-    } else {
-      // İngilizce kaynaklar
-      if (pdfText.toUpperCase().includes('SCOTUS') || pdfText.toUpperCase().includes('SUPREME COURT')) {
-        const decisions = await fetchSCOTUS();
-        for (const decision of decisions.slice(0, 2)) {
-          const content = `${decision.title}${decision.content ? '\n' + decision.content : ''}`;
-          liveDocs.push({
-            content,
-            metadata: { source: 'scotus', date: decision.date, live: true }
-          });
-          await upsertDocument(content, {
-            source: 'scotus',
-            date: decision.date || new Date().toISOString().split('T')[0],
-            updated: new Date().toISOString(),
-            type: 'supreme_court_decision',
-            country: 'US',
-            level: 'Federal', // Federal seviye
-            court: 'U.S. Supreme Court'
-          }, supabase);
-        }
-      }
-      
-      if (pdfText.toUpperCase().includes('CONGRESS') || pdfText.toUpperCase().includes('FEDERAL')) {
-        const bills = await fetchCongressGov();
-        for (const bill of bills.slice(0, 2)) {
-          const content = `${bill.title}${bill.content ? '\n' + bill.content : ''}`;
-          liveDocs.push({
-            content,
-            metadata: { source: 'congress', date: bill.date, live: true, country: 'US' }
-          });
-          await upsertDocument(content, {
-            source: 'congress',
-            date: bill.date || new Date().toISOString().split('T')[0],
-            updated: new Date().toISOString(),
-            type: 'federal_legislation',
-            country: 'US',
-            level: 'Federal' // Federal seviye
-          }, supabase);
-        }
-      }
-      
-      // GovInfo - US Code ve Federal Register
-      if (pdfText.toUpperCase().includes('US CODE') || pdfText.toUpperCase().includes('UNITED STATES CODE')) {
-        const usCode = await fetchUSCode();
-        for (const code of usCode.slice(0, 2)) {
-          const content = `${code.title}${code.content ? '\n' + code.content : ''}`;
-          liveDocs.push({
-            content,
-            metadata: { source: 'uscode', date: code.date, live: true, country: 'US' }
-          });
-          await upsertDocument(content, {
-            source: 'uscode',
-            date: code.date || new Date().toISOString().split('T')[0],
-            updated: new Date().toISOString(),
-            type: 'federal_code',
-            country: 'US'
-          }, supabase);
-        }
-      }
-      
-      if (pdfText.toUpperCase().includes('FEDERAL REGISTER')) {
-        const fr = await fetchFederalRegister();
-        for (const doc of fr.slice(0, 2)) {
-          const content = `${doc.title}${doc.content ? '\n' + doc.content : ''}`;
-          liveDocs.push({
-            content,
-            metadata: { source: 'federalregister', date: doc.date, live: true, country: 'US' }
-          });
-          await upsertDocument(content, {
-            source: 'federalregister',
-            date: doc.date || new Date().toISOString().split('T')[0],
-            updated: new Date().toISOString(),
-            type: 'federal_register',
-            country: 'US',
-            level: 'Federal' // Federal seviye
-          }, supabase);
-        }
-      }
-      
-      // Library of Congress
-      if (pdfText.toUpperCase().includes('LIBRARY OF CONGRESS') || pdfText.toUpperCase().includes('LOC')) {
-        const loc = await fetchLibraryOfCongress();
-        for (const doc of loc.slice(0, 2)) {
-          const content = `${doc.title}${doc.content ? '\n' + doc.content : ''}`;
-          liveDocs.push({
-            content,
-            metadata: { source: 'loc', date: doc.date, live: true, country: 'US' }
-          });
-          await upsertDocument(content, {
-            source: 'loc',
-            date: doc.date || new Date().toISOString().split('T')[0],
-            updated: new Date().toISOString(),
-            type: 'federal_legislation',
-            country: 'US',
-            level: 'Federal' // Federal seviye
-          }, supabase);
-        }
-      }
-      
-      // Eyalet yasaları
-      if (pdfText.toUpperCase().includes('NEW YORK') || pdfText.toUpperCase().includes('NY STATE') ||
-          pdfText.toUpperCase().includes('CALIFORNIA') || pdfText.toUpperCase().includes('CA STATE') ||
-          pdfText.toUpperCase().includes('DELAWARE') || pdfText.toUpperCase().includes('DE STATE')) {
-        const stateLaws = await fetchStateLaws(['ny', 'ca', 'de']);
-        for (const law of stateLaws.slice(0, 2)) {
-          const content = `${law.title}${law.content ? '\n' + law.content : ''}`;
-          const state = law.title.includes('NY') ? 'ny' : law.title.includes('CA') ? 'ca' : 'de';
-          liveDocs.push({
-            content,
-            metadata: { source: state, date: law.date, live: true, country: 'US' }
-          });
-          await upsertDocument(content, {
-            source: state,
-            date: law.date || new Date().toISOString().split('T')[0],
-            updated: new Date().toISOString(),
-            type: 'state_legislation',
-            country: 'US',
-            state: state.toUpperCase(), // 'NY', 'CA', 'DE'
-            level: 'State' // Eyalet seviyesi
-          }, supabase);
-        }
-      }
-      
-      // UK Legislation (legislation.gov.uk)
-      if (pdfText.toUpperCase().includes('UK') || pdfText.toUpperCase().includes('UNITED KINGDOM') || 
-          pdfText.toUpperCase().includes('ENGLAND') || pdfText.toUpperCase().includes('STATUTORY INSTRUMENT') ||
-          pdfText.toUpperCase().includes('SI ') || pdfText.toUpperCase().includes(' ACT ')) {
-        const ukLegislation = await fetchUKLegislation(5);
-        for (const item of ukLegislation) {
-          const content = `${item.title}${item.content ? '\n' + item.content : ''}`;
-          
-          // Jurisdiction ve Retained EU Law bilgilerini metadata'ya ekle
-          const jurisdiction = (item as any).jurisdiction || 'UK';
-          const retainedEULaw = (item as any).retained_eu_law || false;
-          
-          liveDocs.push({
-            content,
-            metadata: { 
-              source: 'uk', 
-              date: item.date, 
-              live: true, 
-              country: 'UK',
-              jurisdiction: jurisdiction,
-              retained_eu_law: retainedEULaw
-            }
-          });
-          await upsertDocument(content, {
-            source: 'uk',
-            date: item.date || new Date().toISOString().split('T')[0],
-            updated: new Date().toISOString(),
-            type: item.title.includes('SI') ? 'statutory_instrument' : 'act',
-            country: 'UK',
-            level: 'National',
-            jurisdiction: jurisdiction,
-            retained_eu_law: retainedEULaw
-          }, supabase);
-        }
-      }
-      
-      // UK Case Law (The National Archives - Caselaw)
-      if (pdfText.toUpperCase().includes('UK') || pdfText.toUpperCase().includes('UNITED KINGDOM') ||
-          pdfText.toUpperCase().includes('HIGH COURT') || pdfText.toUpperCase().includes('COURT OF APPEAL') ||
-          pdfText.toUpperCase().includes('EWHC') || pdfText.toUpperCase().includes('EWCA') ||
-          pdfText.toUpperCase().includes('CASE LAW') || pdfText.toUpperCase().includes('PRECEDENT')) {
-        const ukCases = await fetchUKCaseLaw(5);
-        for (const caseItem of ukCases) {
-          const content = `${caseItem.title}${caseItem.content ? '\n' + caseItem.content : ''}`;
-          
-          // UK Case metadata'sını çıkar
-          const caseMetadata = getUKCaseMetadata(caseItem.title, caseItem.content);
-          
-          liveDocs.push({
-            content,
-            metadata: { 
-              source: 'uk_case', 
-              date: caseItem.date, 
-              live: true, 
-              country: 'UK',
-              court: caseMetadata.court,
-              jurisdiction: caseMetadata.jurisdiction,
-              neutral_citation: caseMetadata.neutral_citation,
-              type: 'case_law'
-            }
-          });
-          await upsertDocument(content, {
-            source: 'uk_case',
-            date: caseItem.date || new Date().toISOString().split('T')[0],
-            updated: new Date().toISOString(),
-            type: 'case_law',
-            country: 'UK',
-            level: 'National',
-            court: caseMetadata.court,
-            jurisdiction: caseMetadata.jurisdiction,
-            neutral_citation: caseMetadata.neutral_citation
-          }, supabase);
-        }
-      }
-      
-      // German Legislation (Gesetze im Internet)
-      if (pdfText.match(/[äöüßÄÖÜ]|BGB|HGB|AktG|StGB|Deutschland|Germany|German/i)) {
-        const germanLegislation = await fetchGermanLegislation(5);
-        for (const item of germanLegislation) {
-          const content = `${item.title}${item.content ? '\n' + item.content : ''}`;
-          
-          // Alman hukukuna özgü citation parse
-          const citation = parseGermanCitation(content);
-          
-          liveDocs.push({
-            content,
-            metadata: { 
-              source: 'gesetze_im_internet', 
-              date: item.date, 
-              live: true, 
-              country: 'DE',
-              language: 'DE',
-              law_code: citation.law_code || item.title.match(/(BGB|HGB|AktG|StGB)/)?.[0],
-              paragraph: citation.paragraph
-            }
-          });
-          await upsertDocument(content, {
-            source: 'gesetze_im_internet',
-            date: item.date || new Date().toISOString().split('T')[0],
-            updated: new Date().toISOString(),
-            type: item.title.includes('BGB') ? 'bgb' : item.title.includes('HGB') ? 'hgb' : 
-                  item.title.includes('AktG') ? 'aktg' : item.title.includes('StGB') ? 'stgb' : 'other',
-            country: 'DE',
-            language: 'DE',
-            level: 'National',
-            law_code: citation.law_code || item.title.match(/(BGB|HGB|AktG|StGB)/)?.[0],
-            paragraph: citation.paragraph
-          }, supabase);
-        }
-      }
-      
-      // German Case Law (Rechtsprechung im Internet)
-      if (pdfText.match(/[äöüßÄÖÜ]|BGH|BVerfG|Bundesgerichtshof|Bundesverfassungsgericht|Deutschland|Germany/i)) {
-        const germanCases = await fetchGermanCaseLaw(5);
-        for (const caseItem of germanCases) {
-          const content = `${caseItem.title}${caseItem.content ? '\n' + caseItem.content : ''}`;
-          
-          // German Case metadata'sını çıkar
-          const caseMetadata = getGermanCaseMetadata(caseItem.title, caseItem.content);
-          
-          liveDocs.push({
-            content,
-            metadata: { 
-              source: 'rechtsprechung_im_internet', 
-              date: caseItem.date, 
-              live: true, 
-              country: 'DE',
-              language: 'DE',
-              court: caseMetadata.court,
-              case_number: caseMetadata.case_number,
-              type: 'case_law'
-            }
-          });
-          await upsertDocument(content, {
-            source: 'rechtsprechung_im_internet',
-            date: caseItem.date || new Date().toISOString().split('T')[0],
-            updated: new Date().toISOString(),
-            type: 'case_law',
-            country: 'DE',
-            language: 'DE',
-            level: 'National',
-            court: caseMetadata.court,
-            case_number: caseMetadata.case_number
-          }, supabase);
-        }
-      }
-    }
-  } catch (error) {
-    console.error('Live fetch error:', error);
-  }
-  
-  return liveDocs;
-}
+5. CISG (United Nations Convention on Contracts for the International Sale of Goods - BM Uluslararası Mal Satımına İlişkin Sözleşmeler Hakkında Sözleşme, 1980):
+   - CISG Art. 1-6: Uygulama alanı ve genel hükümler
+   - CISG Art. 14-24: Sözleşmenin kurulması (Formation of the contract)
+   - CISG Art. 25-88: Satıcı ve alıcının yükümlülükleri (Obligations of the seller and buyer)
+   - CISG Art. 45-52: Satıcının sözleşmeyi ihlal etmesi durumunda alıcının hakları
+   - CISG Art. 61-65: Alıcının sözleşmeyi ihlal etmesi durumunda satıcının hakları
+   - CISG Art. 74-77: Tazminat (Damages)
+   - CISG Art. 78: Faiz (Interest)
+   - CISG Art. 79-80: Mücbir sebep (Exemptions)
+   - CISG'in uygulanabilirliği, çekilme hükümleri ve uluslararası içtihatları değerlendir
 
-async function getRelevantDocuments(
-  pdfText: string, 
-  targetLang: string = 'TR', 
-  limit: number = 5,
-  onStatusUpdate?: (status: string) => void,
-  detectedCountry?: string | null,
-  secondaryCountries?: string[],
-  isGlobalPackage: boolean = false
-): Promise<{ documents: Array<any>, usedLiveFetch: boolean }> {
-  try {
-    const supabase = await createClient();
-    let usedLiveFetch = false;
-    
-    // Adım A: Vector Search - Önce veritabanından ara
-    onStatusUpdate?.('Güncel mevzuat veritabanı taranıyor...');
-    
-    // PDF metninden embedding oluştur - Ülkeye göre model seç
-    // Almanca için multilingual model (text-embedding-3-small multilingual desteği)
-    const isUS = targetLang === 'EN' || targetLang === 'English';
-    const isGerman = pdfText.match(/[äöüßÄÖÜ]|BGB|HGB|AktG|StGB|BGH|BVerfG|Deutschland/i);
-    const embeddingModel = isUS ? 'text-embedding-3-large' : 'text-embedding-3-small'; // Multilingual support
-    
-    const embeddingResp = await fetch('https://api.openai.com/v1/embeddings', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-        'Content-Type': 'application/json'
+6. Türk Borçlar Kanunu (TBK - 6098 sayılı Kanun):
+   - TBK m.1-48: Genel Hükümler
+   - TBK m.49-118: Sözleşmelerin Kurulması (İcap, kabul, sözleşme özgürlüğü)
+   - TBK m.119-206: Sözleşmelerin Hükümsüzlüğü (İptal, butlan, eksiklik)
+   - TBK m.207-320: Borçların İfası ve İfa Edilmemesi
+   - TBK m.321-420: Borçların Sona Ermesi
+   - TBK m.421-480: Özel Borç İlişkileri (Satış, kira, hizmet sözleşmeleri)
+   - TBK m.481-650: Haksız Fiil ve Sebepsiz Zenginleşme
+   - TBK m.650-700: Tazminat Hukuku
+   - Yargıtay içtihatlarını ve Türk hukuk doktrinini referans al
+
+7. Türk Ticaret Kanunu (TTK - 6102 sayılı Kanun):
+   - TTK m.1-150: Ticari İşletme
+   - TTK m.151-400: Ticari İşler, Ticari Defterler
+   - TTK m.401-800: Şirketler Hukuku (Kollektif, komandit, limited, anonim şirketler)
+   - TTK m.801-1200: Kıymetli Evrak Hukuku
+   - TTK m.1201-1530: Deniz Ticareti
+   - TTK m.1531-1600: Sigorta Hukuku
+   - Yargıtay ticaret dairesi kararlarını değerlendir
+
+8. Rekabet Hukuku:
+   - AB Rekabet Hukuku: TFEU Art. 101 (Kartel yasakları), TFEU Art. 102 (Hakim durumun kötüye kullanılması)
+   - Türk Rekabet Hukuku: 4054 sayılı Rekabetin Korunması Hakkında Kanun
+   - Sherman Act (ABD), Clayton Act (ABD)
+   - Rekabet Kurulu kararları ve AB Komisyonu kararlarını referans al
+
+9. Fikri Mülkiyet Hukuku:
+   - Telif Hukuku: Bern Sözleşmesi, WIPO Copyright Treaty
+   - Marka Hukuku: Paris Sözleşmesi, Madrid Protokolü, Türk Markalar Kanunu (6769 sayılı)
+   - Patent Hukuku: Paris Sözleşmesi, PCT, Türk Patent ve Marka Kurumu mevzuatı
+   - Ticari Sır ve Know-How koruması
+
+10. Tüketici Hukuku:
+    - AB Tüketici Hakları Direktifi (2011/83/EU)
+    - Türk Tüketicinin Korunması Hakkında Kanun (6502 sayılı)
+    - Mesafeli Sözleşmeler Yönetmeliği
+    - Tüketici Hakem Heyetleri ve Tüketici Mahkemeleri uygulamaları
+
+11. İş Hukuku ve Çalışma Mevzuatı:
+    - AB İş Hukuku Direktifleri (Çalışma Süresi, İş Sağlığı ve Güvenliği)
+    - Türk İş Kanunu (4857 sayılı)
+    - Toplu İş Sözleşmesi, Grev ve Lokavt Kanunu (6356 sayılı)
+    - İş Sağlığı ve Güvenliği Kanunu (6331 sayılı)
+
+12. Çevre Hukuku:
+    - AB Çevre Direktifleri
+    - Türk Çevre Kanunu (2872 sayılı)
+    - Atık Yönetimi, Hava Kalitesi, Su Kirliliği mevzuatı
+
+13. Vergi Hukuku (İlgiliyse):
+    - Gelir Vergisi Kanunu, Kurumlar Vergisi Kanunu
+    - KDV Kanunu, Özel Tüketim Vergisi Kanunu
+    - Çifte Vergilendirmeyi Önleme Anlaşmaları
+
+14. Uluslararası Ticaret Hukuku:
+    - INCOTERMS 2020 (FOB, CIF, EXW, DDP vb.)
+    - UCP 600 (Akreditif Kuralları)
+    - URDG 758 (Teminat Mektupları Kuralları)
+    - ICC Yönergeleri ve Model Sözleşmeleri
+
+15. Elektronik Ticaret ve Dijital Hukuk:
+    - eIDAS Yönetmeliği (AB - Elektronik Kimlik ve Güvenilir Hizmetler)
+    - Elektronik Ticaretin Düzenlenmesi Hakkında Kanun (6563 sayılı)
+    - Elektronik İmza Kanunu (5070 sayılı)
+    - Dijital Hizmetler Yasası (DSA - AB), Dijital Piyasalar Yasası (DMA - AB)
+
+16. Finansal Hizmetler ve Sermaye Piyasaları:
+    - MiFID II (Markets in Financial Instruments Directive)
+    - PSD2 (Payment Services Directive)
+    - Türk Sermaye Piyasası Kanunu (6362 sayılı)
+    - Bankacılık Kanunu (5411 sayılı)
+
+=== ANALİZ METODOLOJİSİ VE DERİNLİK GEREKSİNİMLERİ ===
+
+Analizini şu metodoloji ile yap:
+
+1. METİN ANALİZİ:
+   - Belgenin türünü, amacını, taraflarını ve hukuki niteliğini tespit et
+   - Sözleşme türü, tek taraflı hukuki işlem, çok taraflı anlaşma, genel işlem koşulları, yönetmelik, politika vb. belirle
+   - Belgedeki tüm hukuki kavramları, terimleri ve teknik ifadeleri analiz et
+   - Belgedeki muğlak, eksik veya riskli ifadeleri tespit et
+
+2. YASAL UYUMLULUK ANALİZİ:
+   - Her yasal düzenleme açısından uyumluluk durumunu değerlendir
+   - Zorunlu hükümler, yasaklar, izinler ve koşullu izinleri belirle
+   - Eksik yükümlülükleri, ihlal risklerini ve yaptırımları tespit et
+   - Çapraz referanslar yap (bir düzenlemedeki hükmün diğer düzenlemelerle ilişkisi)
+
+3. RİSK ANALİZİ:
+   - Her riski şiddet (yüksek/orta/düşük), olasılık ve etki açısından değerlendir
+   - Riskin hukuki, mali, operasyonel ve itibar boyutlarını analiz et
+   - Riskin gerçekleşmesi durumunda ortaya çıkabilecek tazminat talepleri, idari para cezaları, yasal yaptırımlar, sözleşme feshi, yasaklama gibi sonuçları belirt
+   - Riskin aciliyetini ve zamanlamasını değerlendir
+
+4. EYLEM PLANI:
+   - Her eylemi öncelik, uygulanabilirlik, maliyet ve zamanlama açısından değerlendir
+   - Eylemin yasal dayanağını, uygulama adımlarını ve sorumlu tarafları belirt
+   - Eylemin tamamlanmaması durumunda ortaya çıkabilecek sonuçları açıkla
+
+Yanıtın MUTLAKA şu JSON yapısında olmalı (başka hiçbir metin ekleme, sadece geçerli JSON):
+{
+  "summary": "Belgenin kapsamlı ve detaylı özeti ve genel hukuki değerlendirmesi. En az 500-700 kelime olmalı. Belgenin türü, tarafları, temel hukuki konuları, risk alanları, uyum durumu, önemli yasal referanslar ve genel değerlendirme hakkında kapsamlı bilgi içermeli. Belgenin hukuki geçerliliği, yürürlüğü ve uygulanabilirliği hakkında görüş belirtilmeli.",
+  "document_type": "Belgenin hukuki türü (sözleşme, genel işlem koşulları, politika, yönetmelik, tek taraflı işlem vb.)",
+  "parties": ["Belgedeki tarafların listesi ve rolleri"],
+  "applicable_laws": ["Belgeye uygulanabilir yasal düzenlemelerin listesi"],
+  "risk_cards": [
+    {
+      "title": "Risk başlığı (spesifik, açıklayıcı ve teknik)",
+      "severity": "yüksek|orta|düşük",
+      "probability": "yüksek|orta|düşük",
+      "impact": "yüksek|önemli|orta|düşük",
+      "description": "Riskin detaylı ve kapsamlı açıklaması. Riskin nedenleri, kökeni, hukuki dayanakları, potansiyel sonuçları, etkilenen taraflar, zamanlama ve aciliyet durumu içermeli. En az 200-300 kelime olmalı.",
+      "affected_articles": {
+        "BGB": ["Spesifik BGB madde numarası, alt madde ve detaylı açıklama (örn: BGB § 280 I - Schadensersatz wegen Pflichtverletzung: Borçlunun sözleşmeden doğan yükümlülüğünü ihlal etmesi durumunda alacaklının tazminat talep edebilme hakkı)"],
+        "UCC": ["Spesifik UCC bölüm/madde referansları ve detaylı açıklama (örn: UCC Article 2-207 - Additional Terms in Acceptance: Kabul beyanındaki ek şartların sözleşmeye dahil olma koşulları)"],
+        "KVKK": ["Spesifik KVKK madde numaraları, hükümler ve detaylı açıklama (örn: KVKK m.5 - Kişisel verilerin işlenme şartları: Açık rıza, kanuni zorunluluk, sözleşmenin kurulması/ifası gibi yasal dayanaklar)"],
+        "GDPR": ["Spesifik GDPR madde numaraları, gereklilikler ve detaylı açıklama (örn: GDPR Art. 6(1)(a) - Consent as legal basis: Veri sahibinin açık ve bilgilendirilmiş rızası)"],
+        "CISG": ["Spesifik CISG maddeleri ve açıklamaları (varsa)"],
+        "TBK": ["Spesifik TBK maddeleri ve açıklamaları (varsa)"],
+        "TTK": ["Spesifik TTK maddeleri ve açıklamaları (varsa)"],
+        "Other": ["Diğer ilgili yasal düzenlemeler, direktifler, yönetmelikler ve açıklamaları (varsa)"]
       },
-      body: JSON.stringify({
-        input: pdfText.substring(0, 8000),
-        model: embeddingModel
-      })
+      "potential_consequences": "Bu riskin gerçekleşmesi durumunda ortaya çıkabilecek hukuki, mali, operasyonel, itibar ve stratejik sonuçlar. Tazminat miktarları, idari para cezaları, yasal yaptırımlar, sözleşme feshi, yasaklama, lisans iptali gibi spesifik sonuçları belirt. En az 150 kelime.",
+      "mitigation_suggestions": "Riskin azaltılması, önlenmesi veya yönetilmesi için detaylı, uygulanabilir ve ölçülebilir öneriler. Önerilerin uygulanma adımları, maliyeti, zamanlaması ve beklenen etkisi belirtilmeli. En az 100 kelime.",
+      "case_law_references": ["İlgili yargı kararları, içtihatlar ve akademik görüşler (varsa)"],
+      "urgency": "acil|önemli|normal|düşük",
+      "timeline": "Riskin gerçekleşme zamanlaması ve aciliyet durumu"
+    }
+  ],
+  "references": {
+    "BGB": ["İlgili BGB maddeleri, alt maddeleri, paragrafları ve detaylı açıklamaları. Her madde için madde numarası, başlık, içerik özeti ve belgeye uygulanabilirliği belirtilmeli."],
+    "UCC": ["İlgili UCC bölüm/maddeleri, alt maddeleri ve detaylı açıklamaları. Her bölüm için Article numarası, başlık, içerik özeti ve belgeye uygulanabilirliği belirtilmeli."],
+    "KVKK": ["İlgili KVKK maddeleri, yönetmelik hükümleri, KVKK Kurulu kararları ve detaylı açıklamaları. Her madde için madde numarası, başlık, içerik özeti, yaptırımlar ve belgeye uygulanabilirliği belirtilmeli."],
+    "GDPR": ["İlgili GDPR maddeleri, Recitals, EDPB yönergeleri, CJEU kararları ve detaylı açıklamaları. Her madde için Article numarası, başlık, içerik özeti, yaptırımlar ve belgeye uygulanabilirliği belirtilmeli."],
+    "CISG": ["İlgili CISG maddeleri ve açıklamaları (varsa)"],
+    "TBK": ["İlgili TBK maddeleri, Yargıtay içtihatları ve açıklamaları (varsa)"],
+    "TTK": ["İlgili TTK maddeleri, Yargıtay içtihatları ve açıklamaları (varsa)"],
+    "Other": ["Diğer ilgili yasal düzenlemeler, uluslararası sözleşmeler, direktifler, yönetmelikler, içtihatlar ve referanslar (varsa)"]
+  },
+  "action_plan": [
+    {
+      "priority": "yüksek|orta|düşük",
+      "action": "Yapılması gereken eylem (spesifik, uygulanabilir, ölçülebilir ve detaylı). Eylemin adımları, gereksinimleri ve beklenen sonuçları belirtilmeli.",
+      "legal_basis": "Hangi yasal düzenleme, spesifik madde ve hükmü bu eylemi gerektiriyor. Madde numarası, başlık ve ilgili hüküm detaylı belirtilmeli.",
+      "deadline_note": "Zamanlama notu, aciliyet durumu, önerilen tamamlanma süresi ve gecikme durumunda ortaya çıkabilecek sonuçlar (varsa)",
+      "responsible_party": "Bu eylemin sorumlusu olması gereken taraf, birim veya kişi. Sorumluluk alanı ve yetkileri belirtilmeli (varsa)",
+      "implementation_steps": ["Eylemin uygulanması için gereken adımların listesi"],
+      "estimated_cost": "Eylemin tahmini maliyeti veya kaynak gereksinimi (varsa)",
+      "expected_outcome": "Eylemin tamamlanması durumunda beklenen sonuç ve fayda"
+    }
+  ],
+  "compliance_status": {
+    "overall": "uyumlu|kısmen_uyumlu|uyumsuz",
+    "details": "Genel uyum durumunun detaylı, kapsamlı açıklaması. Her yasal düzenleme açısından uyumluluk seviyesi, eksiklikler, ihlaller ve iyileştirme alanları belirtilmeli. En az 200 kelime.",
+    "critical_issues": ["Yüksek öncelikli uyum sorunlarının detaylı listesi. Her sorun için açıklama, etki ve aciliyet belirtilmeli."],
+    "recommendations": ["Genel öneriler, iyileştirme alanları ve en iyi uygulamalar. Her öneri için açıklama ve beklenen fayda belirtilmeli."],
+    "compliance_score": {
+      "BGB": "uyumlu|kısmen_uyumlu|uyumsuz",
+      "UCC": "uyumlu|kısmen_uyumlu|uyumsuz",
+      "KVKK": "uyumlu|kısmen_uyumlu|uyumsuz",
+      "GDPR": "uyumlu|kısmen_uyumlu|uyumsuz",
+      "Overall": "uyumlu|kısmen_uyumlu|uyumsuz"
+    }
+  },
+  "legal_opinion": {
+    "validity": "Belgenin hukuki geçerliliği ve yürürlüğü hakkında görüş",
+    "enforceability": "Belgenin uygulanabilirliği ve yaptırım gücü hakkında görüş",
+    "recommendations": "Belgenin iyileştirilmesi veya yeniden düzenlenmesi için öneriler",
+    "alternative_approaches": "Alternatif hukuki yaklaşımlar veya sözleşme yapıları (varsa)"
+  }
+}
+
+ÖNEMLİ TALİMATLAR VE GEREKSİNİMLER:
+- Analizini ${targetLang} dilinde yap
+- Tüm risk kartlarında, referanslarda ve eylem planında ilgili yasal düzenlemelerin SPESİFİK madde numaralarını, alt maddelerini ve paragraflarını belirt
+- Her yasal referans için kapsamlı, bilgilendirici ve teknik açıklamalar ekle
+- Risk değerlendirmelerini objektif, kapsamlı ve detaylı yap
+- Eylem planındaki önerileri uygulanabilir, spesifik, ölçülebilir ve adım adım formüle et
+- Yargı içtihatlarını, akademik görüşleri ve uygulama örneklerini referans al
+- Yanıtını JSON formatında döndür, ek açıklama, önsöz, sonuç metni, markdown formatı veya başka herhangi bir metin ekleme
+- JSON formatında hata olmamasına dikkat et (tırnak işaretleri, virgüller, köşeli parantezler, süslü parantezler doğru olmalı)
+- Tüm string değerlerde özel karakterleri (tırnak, ters eğik çizgi, yeni satır) düzgün escape et
+- Array'lerde en az bir örnek ver, boş array yerine ilgili örnekler ekle
+- Her alanı doldur, "varsa" notu olan alanlar için bile ilgili bilgileri eklemeye çalış
+- Analiz derinliğini maksimuma çıkar, yüzeysel değerlendirmeler yapma
+
+Analiz edilecek metin:
+PLACEHOLDER_PDF_TEXT`;
+
+  // PDF metnini temizle ve kontrol et
+  const cleanedPdfText = pdfText.trim();
+  if (!cleanedPdfText || cleanedPdfText.length < 10) {
+    console.error('[performLegalAnalysis] PDF metni çok kısa veya boş:', cleanedPdfText.length);
+    throw new Error('PDF metni çok kısa veya boş');
+  }
+  
+  // PDF metnini kısalt (OpenAI token limiti için) - Güvenlik taramasını azaltmak için
+  const maxPdfLength = 8000; // 12000'den 8000'e düşürüldü
+  const truncatedPdfText = cleanedPdfText.length > maxPdfLength 
+    ? cleanedPdfText.substring(0, maxPdfLength) + '\n\n[... Metin kısaltıldı, tam analiz için tam metni gönderin ...]'
+    : cleanedPdfText;
+  
+  // Prompt'u güncelle - PDF metnini kısaltılmış versiyonla değiştir
+  const finalAnalysisPrompt = analysisPrompt.replace('PLACEHOLDER_PDF_TEXT', truncatedPdfText);
+  
+  // Prompt uzunluğunu kontrol et
+  const promptLength = finalAnalysisPrompt.length;
+  console.log('[performLegalAnalysis] Prompt uzunluğu:', promptLength, 'PDF metin uzunluğu:', cleanedPdfText.length, 'Kısaltılmış PDF uzunluğu:', truncatedPdfText.length);
+  
+  // Compare mode'daki gibi direkt JSON döndür (streaming olmadan)
+  try {
+    console.log('[performLegalAnalysis] Eski OpenAI SDK ile analiz başlatılıyor (Compare mode gibi)...');
+    const openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    
+    const response = await openaiClient.chat.completions.create({
+      model: "gpt-4o-mini", // Güvenlik/politika takılmasını önlemek için mini model kullanılıyor
+      messages: [
+        {
+          role: "system",
+          content: `Sen bir yardımcı hukuk asistanısın ve verilen metne göre nesnel analizler yaparsın. Analizini sadece ${targetLang} dilinde yap. Mümkün olduğunca spesifik yasal madde referansları, yargı içtihatları ve akademik görüşler ver. Analizini derinlemesine ve kapsamlı yap.`
+        },
+        { role: "user", content: finalAnalysisPrompt }
+      ],
+      temperature: 0.2,
+      // stream: false - Compare mode gibi direkt JSON döndür
     });
-    const embeddingData = await embeddingResp.json();
-    if (!embeddingResp.ok || !embeddingData.data) {
-      return { documents: [], usedLiveFetch: false };
+    
+    console.log('[performLegalAnalysis] OpenAI yanıtı başarıyla alındı');
+    
+    const analysisResult = response.choices[0]?.message?.content || 'Analysis complete';
+    
+    console.log('[performLegalAnalysis] YANIT DETAYLI:', {
+      yanitUzunlugu: analysisResult.length,
+      ilk200Karakter: analysisResult.substring(0, 200),
+      son200Karakter: analysisResult.substring(Math.max(0, analysisResult.length - 200)),
+      tamYanit: analysisResult
+    });
+    
+    // onFinish callback'ini çağır
+    if (onFinish && analysisResult) {
+      console.log('[performLegalAnalysis] onFinish çağrılıyor, text uzunluğu:', analysisResult.length);
+      await onFinish(analysisResult);
     }
-    const queryEmbedding = embeddingData.data[0].embedding;
-
-    let dbDocuments: any[] = [];
     
-    // Supabase'de benzer belgeleri bul
-    try {
-      const { data: documents } = await supabase.rpc('match_documents', {
-        query_embedding: queryEmbedding,
-        match_threshold: 0.7,
-        match_count: limit
-      });
-        if (documents) {
-          if (targetLang === 'EN' || targetLang === 'English') {
-            // ABD ve UK kaynakları: country metadata'sına göre filtrele
-            let filteredDocs = documents.filter((doc: any) => 
-              doc.metadata?.country === 'US' || doc.metadata?.country === 'UK' ||
-              ['congress', 'scotus', 'courtlistener', 'openjurist', 'govinfo', 'loc', 
-               'ny', 'ca', 'de', 'federalregister', 'uscode', 'uk', 'uk_case', 'uk_high_court', 'uk_court_of_appeal'].includes(doc.metadata?.source?.toLowerCase())
-            );
-            
-            // Jurisdiction filtreleme (UK için)
-            // Eğer belgede belirli bir bölge (England & Wales, Scotland, Northern Ireland) geçiyorsa
-            const pdfUpper = pdfText.toUpperCase();
-            const hasJurisdiction = pdfUpper.includes('ENGLAND') || pdfUpper.includes('WALES') || 
-                                   pdfUpper.includes('SCOTLAND') || pdfUpper.includes('NORTHERN IRELAND');
-            
-            if (hasJurisdiction) {
-              let targetJurisdiction: string | undefined;
-              
-              if (pdfUpper.includes('SCOTLAND') || pdfUpper.includes('SCOTS')) {
-                targetJurisdiction = 'Scotland';
-              } else if (pdfUpper.includes('NORTHERN IRELAND') || pdfUpper.includes('NI ')) {
-                targetJurisdiction = 'Northern Ireland';
-              } else if (pdfUpper.includes('ENGLAND') || pdfUpper.includes('WALES')) {
-                targetJurisdiction = 'England & Wales';
-              }
-              
-              if (targetJurisdiction) {
-                // UK dokümanları için jurisdiction'a göre filtrele
-                filteredDocs = filteredDocs.filter((doc: any) => {
-                  if (doc.metadata?.country === 'UK') {
-                    // Eğer dokümanın jurisdiction'ı belirtilmişse, eşleşmeli
-                    // Eğer belirtilmemişse (UK-wide), dahil et
-                    return !doc.metadata?.jurisdiction || doc.metadata.jurisdiction === targetJurisdiction;
-                  }
-                  return true; // UK dışı kaynakları dahil et
-                });
-              }
-            }
-            
-            dbDocuments = filteredDocs;
-          } else {
-            // Türkiye kaynakları: Global paket değilse ABD ve UK kaynaklarını filtrele
-            if (isGlobalPackage) {
-              // Global paket: Tüm ülkelerden veri çek (TR, US, UK, DE)
-              dbDocuments = documents; // Filtreleme yapma, tüm ülkelerden veri al
-            } else {
-              // Normal paket: Sadece Türkiye kaynakları
-              dbDocuments = documents.filter((doc: any) => 
-                doc.metadata?.country !== 'US' && doc.metadata?.country !== 'UK' && doc.metadata?.country !== 'DE' &&
-                doc.metadata?.source !== 'congress' && 
-                doc.metadata?.source !== 'scotus' &&
-                doc.metadata?.source !== 'courtlistener' &&
-                doc.metadata?.source !== 'openjurist' &&
-                doc.metadata?.source !== 'govinfo' &&
-                doc.metadata?.source !== 'loc' &&
-                doc.metadata?.source !== 'uk' &&
-                doc.metadata?.source !== 'gesetze_im_internet' &&
-                doc.metadata?.source !== 'rechtsprechung_im_internet' &&
-                !['ny', 'ca', 'de', 'federalregister', 'uscode'].includes(doc.metadata?.source?.toLowerCase())
-              );
-            }
-          }
-        }
-    } catch (rpcError) {
-      console.log('RPC function not found, using direct query');
-      const sources: string[] = [];
-      if (targetLang === 'EN' || targetLang === 'English') {
-        // ABD ve UK kaynakları
-        sources.push('congress', 'scotus', 'courtlistener', 'openjurist', 'govinfo', 'loc', 
-                     'ny', 'ca', 'de', 'federalregister', 'uscode', 'uk');
-      } else {
-        // Türkiye kaynakları - Global paket için tüm ülkelerden veri çek
-        if (isGlobalPackage) {
-          sources.push('resmigazete', 'yargitay', 'danistay', 'anayasa', 'kvkk', 'tbmm', 'mbs',
-                       'congress', 'scotus', 'courtlistener', 'openjurist', 'govinfo', 'loc',
-                       'ny', 'ca', 'de', 'federalregister', 'uscode', 'uk', 'uk_case',
-                       'gesetze_im_internet', 'rechtsprechung_im_internet');
-        } else {
-          sources.push('resmigazete', 'yargitay', 'danistay', 'anayasa', 'kvkk', 'tbmm', 'mbs');
-        }
-      }
-      
-      const { data: recentDocs } = await supabase
-        .from('documents')
-        .select('content, metadata')
-        .in('metadata->>source', sources)
-        .order('created_at', { ascending: false })
-        .limit(limit * 2);
-      
-      dbDocuments = recentDocs || [];
-    }
-
-    // Adım B: Real-time Fetch - Kritik durumlarda canlı veri çek
-    const needsLiveFetch = hasCriticalKeywords(pdfText, targetLang) || await isDatabaseStale(supabase, 1);
-    
-    let liveDocuments: any[] = [];
-    if (needsLiveFetch) {
-      onStatusUpdate?.('Dış kaynaklardan canlı doğrulama yapılıyor...');
-      usedLiveFetch = true;
-      liveDocuments = await fetchLiveData(pdfText, targetLang, supabase);
-    }
-
-    // Adım C: Context Merger - Veritabanı ve canlı verileri birleştir
-    const allDocuments = [...liveDocuments, ...dbDocuments];
-    
-    // Tarih çelişkilerini çöz: Aynı konu için en güncel tarihli olanı seç
-    const resolvedDocuments = resolveDateConflicts(allDocuments);
-    
-    // Adım D: Ağırlıklı Sıralama - Ticari sözleşmelerde UCC ve Delaware Law'a öncelik
-    const isCommercial = isCommercialContract(pdfText);
-    let finalDocuments;
-    
-    if (isCommercial && (targetLang === 'EN' || targetLang === 'English')) {
-      // Ticari sözleşmeler için ağırlıklı sıralama
-      const weighted = applyWeightedRanking(resolvedDocuments, pdfText);
-      finalDocuments = getWeightedDocuments(weighted).slice(0, limit);
-    } else {
-      // Normal sıralama
-      finalDocuments = resolvedDocuments
-        .sort((a, b) => {
-          // Live fetch edilenler öncelikli
-          if (a.metadata?.live && !b.metadata?.live) return -1;
-          if (!a.metadata?.live && b.metadata?.live) return 1;
-          
-          // Tarihe göre sırala (en güncel önce)
-          const dateA = getDocumentDate(a);
-          const dateB = getDocumentDate(b);
-          
-          if (!dateA && !dateB) return 0;
-          if (!dateA) return 1; // Tarihi olmayan en sona
-          if (!dateB) return -1;
-          
-          return dateB.getTime() - dateA.getTime();
-        })
-        .slice(0, limit);
-    }
-
-    return { documents: finalDocuments, usedLiveFetch };
-  } catch (err) {
-    console.error('Document search error:', err);
-    return { documents: [], usedLiveFetch: false };
+    // Compare mode gibi direkt JSON döndür
+    return NextResponse.json({ 
+      reply: analysisResult,
+      analysis: analysisResult
+    });
+  } catch (error: any) {
+    console.error('[performLegalAnalysis] OpenAI hatası:', {
+      error: error,
+      message: error?.message,
+      stack: error?.stack
+    });
+    throw error;
   }
 }
 
 export async function POST(req: Request) {
-  const startTime = Date.now();
-  console.log('[API /analyze] İstek alındı:', {
-    timestamp: new Date().toISOString(),
-    startTime
-  });
+  console.log('========================================');
+  console.log('[API] POST /api/analyze çağrıldı - ROUTE ÇALIŞIYOR!');
+  console.log('[API] Request method:', req.method);
+  console.log('[API] Request URL:', req.url);
+  console.log('[API] Request headers:', Object.fromEntries(req.headers.entries()));
+  console.log('========================================');
   
   try {
-    const supabase = await createClient();
-    const { pdfText, targetLang, userSelectedCountry } = await req.json(); // userSelectedCountry: kullanıcı onayı
-    
-    console.log('[API /analyze] Request body parse edildi:', {
-      pdfTextLength: pdfText?.length || 0,
+    console.log('[API] Request body parse ediliyor...');
+    const { pdfText, pdfBase64, targetLang, userEmail, userId, fileName } = await req.json();
+    console.log('[API] Request body parse edildi!');
+    console.log('[API] Request body alındı:', {
+      hasPdfText: !!pdfText,
+      hasPdfBase64: !!pdfBase64,
       targetLang,
-      userSelectedCountry,
-      timestamp: new Date().toISOString()
+      userEmail,
+      userId,
+      fileName
     });
+
+    // Eğer pdfBase64 geliyorsa, önce PDF'i parse et
+    let finalPdfText = pdfText;
+    if (pdfBase64 && !pdfText) {
+      try {
+        const buffer = Buffer.from(pdfBase64, 'base64');
+        const pdfParser = new PDFParser(null, true);
+        
+        // Promise wrapper for pdf2json (event-based API)
+        const extractedText = await new Promise<string>((resolve, reject) => {
+          pdfParser.on("pdfParser_dataError", (errData: any) => {
+            reject(new Error(errData.parserError || 'PDF parse hatası'));
+          });
+          
+          pdfParser.on("pdfParser_dataReady", (pdfData: any) => {
+            try {
+              // Extract text from all pages
+              const textParts: string[] = [];
+              if (pdfData.Pages && Array.isArray(pdfData.Pages)) {
+                pdfData.Pages.forEach((page: any) => {
+                  if (page.Texts && Array.isArray(page.Texts)) {
+                    page.Texts.forEach((textObj: any) => {
+                      if (textObj.R && Array.isArray(textObj.R)) {
+                        textObj.R.forEach((r: any) => {
+                          if (r.T) {
+                            // Decode URI-encoded text
+                            textParts.push(decodeURIComponent(r.T));
+                          }
+                        });
+                      }
+                    });
+                  }
+                });
+              }
+              resolve(textParts.join(' '));
+            } catch (extractError: any) {
+              reject(new Error(`Text extraction hatası: ${extractError.message}`));
+            }
+          });
+          
+          pdfParser.parseBuffer(buffer);
+        });
+        
+        finalPdfText = extractedText;
+      } catch (parseError: any) {
+        console.error("PDF parse hatası:", parseError);
+        return NextResponse.json({ reply: `PDF parse hatası: ${parseError.message}. Lütfen PDF metnini direkt olarak gönderin.` }, { status: 400 });
+      }
+    }
     
+    if (!finalPdfText) {
+      return NextResponse.json({ reply: "PDF metni bulunamadı!" }, { status: 400 });
+    }
     if (!process.env.OPENAI_API_KEY) {
-      console.error('[API /analyze] OPENAI_API_KEY eksik!');
       return NextResponse.json({ reply: "API Key eksik!" }, { status: 500 });
     }
+    
+    // ADMIN BYPASS: Belirli email için tüm kontrolleri atla
+    const adminEmail = process.env.ADMIN_EMAIL || '';
+    const isAdmin = userEmail && adminEmail && userEmail.toLowerCase() === adminEmail.toLowerCase();
+    
     const userKey = getUserKey(req);
     
-    // 1. JURISDICTION DETECTION - Analiz öncesi yargı alanı tespiti
-    let jurisdictionResult: JurisdictionResult | null = null;
-    let detectedCountry: string | null = null;
-    
-    try {
-      jurisdictionResult = await detectJurisdiction(pdfText, {
-        useVectorConfirmation: true,
-        minConfidence: 'low'
-      });
+    // Helper function to save analysis and send notifications
+    const saveAnalysisAndNotify = async (analysisResult: string, fileName: string = 'document.pdf', userIdParam?: string) => {
+      // Use userIdParam if provided, otherwise fall back to userId from request
+      const finalUserId = userIdParam || userId;
       
-      // Kullanıcı seçimi varsa onu kullan, yoksa tespit edileni kullan
-      detectedCountry = userSelectedCountry || jurisdictionResult.primary_country;
-      
-      // Eğer çapraz kontrol varsa, secondary countries'i de dahil et
-      if (jurisdictionResult.cross_border && jurisdictionResult.secondary_countries) {
-        // Her iki ülkenin veritabanını da kullan
-        console.log(`Cross-border detected: Primary: ${detectedCountry}, Secondary: ${jurisdictionResult.secondary_countries.join(', ')}`);
-      }
-    } catch (jurisdictionError) {
-      console.error('Jurisdiction detection error:', jurisdictionError);
-      // Hata durumunda targetLang'a göre varsayılan ülke
-      detectedCountry = (targetLang === 'EN' || targetLang === 'English') ? 'US' : 'TR';
-    }
-    
-    // 0. ADMIN KONTROLÜ - Session'dan email al ve admin kontrolü yap (getRelevantDocuments'tan ÖNCE)
-    const { data: { session } } = await supabase.auth.getSession();
-    const isAdmin = session?.user?.email && ADMIN_EMAILS.includes(session.user.email);
-    
-    // 0.1. KULLANICI PAKET KONTROLÜ - Global paket kontrolü (getRelevantDocuments'tan ÖNCE)
-    // Admin email kontrolü - Veritabanına bakmadan direkt GLOBAL plan ve isAdmin=true
-    let userPackage = 'free';
-    let isGlobalPackage = false;
-    
-    if (isAdmin) {
-      // Admin email ise veritabanına bakmadan direkt GLOBAL plan ver
-      userPackage = 'quantum_global';
-      isGlobalPackage = true;
-    } else if (session?.user?.id) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('package_type')
-        .eq('id', session.user.id)
-        .maybeSingle();
-      
-      userPackage = profile?.package_type || 'free';
-      // Global paket kontrolü: 'enterprise' veya 'quantum_global' olabilir
-      isGlobalPackage = (userPackage === 'enterprise' || userPackage === 'quantum_global') ? true : false;
-    }
-    
-    // 2. Hibrit veri çekme - Vector DB + Live Fetch
-    // Detected country'ye göre filtreleme yapılacak
-    // Global paket için tüm ülkelerden veri çek
-    const { documents: relevantDocs, usedLiveFetch } = await getRelevantDocuments(
-      pdfText, 
-      targetLang,
-      isGlobalPackage ? 10 : 5, // Global paket için daha fazla doküman
-      undefined, // onStatusUpdate
-      detectedCountry, // Detected country
-      jurisdictionResult?.secondary_countries, // Secondary countries (cross-border)
-      isGlobalPackage // Global paket kontrolü
-    );
-    
-    let contextText = '';
-    if (relevantDocs.length > 0) {
-      const langPrefix = (targetLang === 'EN' || targetLang === 'English') 
-        ? 'Relevant Current Legislation and Decisions (sorted by date, most recent first):' 
-        : 'İlgili Güncel Mevzuat ve Kararlar (tarihe göre sıralı, en güncel önce):';
-      contextText = `\n\n${langPrefix}\n`;
-      relevantDocs.forEach((doc: any, idx: number) => {
-        const source = doc.metadata?.source || 'bilinmeyen';
-        const liveTag = doc.metadata?.live ? ' [LIVE]' : '';
-        const docDate = getDocumentDate(doc);
-        const dateStr = docDate ? ` (${docDate.toISOString().split('T')[0]})` : '';
-        const conflictNote = doc.metadata?.resolvedFromConflict 
-          ? ` [RESOLVED: Selected most recent from ${doc.metadata.conflictCount} conflicting versions]`
-          : '';
-        
-        // Bluebook citation ekle (ABD kaynakları için)
-        let citation = '';
-        if (targetLang === 'EN' || targetLang === 'English') {
-          citation = generateCitationFromMetadata(doc.metadata);
-          if (citation) {
-            citation = ` [${citation}]`;
+      try {
+        // Parse analysis result to check for critical risks
+        let parsedResult: any = null;
+        try {
+          parsedResult = typeof analysisResult === 'string' ? JSON.parse(analysisResult) : analysisResult;
+        } catch (e) {
+          // If not JSON, try to extract JSON from string
+          const jsonStart = analysisResult.indexOf('{');
+          const jsonEnd = analysisResult.lastIndexOf('}') + 1;
+          if (jsonStart !== -1 && jsonEnd > jsonStart) {
+            parsedResult = JSON.parse(analysisResult.substring(jsonStart, jsonEnd));
           }
         }
-        
-        const weightNote = doc.weight && doc.weight > 1.1 ? ` [WEIGHT: ${doc.weight.toFixed(2)}x]` : '';
-        
-        // Brexit/Retained EU Law notu (UK kaynakları için)
-        let brexitNote = '';
-        if (doc.metadata?.country === 'UK' && doc.metadata?.retained_eu_law) {
-          brexitNote = ' [⚠️ RETAINED EU LAW - Brexit sonrası kontrol edilmiştir]';
-        }
-        
-        // Jurisdiction notu (UK kaynakları için)
-        let jurisdictionNote = '';
-        if (doc.metadata?.jurisdiction && doc.metadata?.jurisdiction !== 'UK') {
-          jurisdictionNote = ` [${doc.metadata.jurisdiction}]`;
-        }
-        
-        contextText += `${idx + 1}. [${source}${liveTag}${citation}${dateStr}${weightNote}${brexitNote}${jurisdictionNote}${conflictNote}] ${doc.content.substring(0, 500)}...\n`;
-      });
-    }
 
-    // 1. KREDİ KONTROLÜ (Admin değilse)
-    let creditRow = null;
-    let usedDisks = null;
+        // Check for critical risks
+        const hasCriticalRisk = parsedResult?.risk_cards?.some((card: any) => 
+          (card.severity?.toLowerCase().indexOf('yüksek') !== -1 || 
+           card.severity?.toLowerCase().indexOf('high') !== -1 ||
+           card.severity?.toLowerCase().indexOf('kritik') !== -1 ||
+           card.severity?.toLowerCase().indexOf('critical') !== -1) &&
+          (card.impact?.toLowerCase().indexOf('kritik') !== -1 ||
+           card.impact?.toLowerCase().indexOf('critical') !== -1)
+        );
+
+        // Save to database if finalUserId exists (UUID from auth.users)
+        if (finalUserId) {
+          try {
+            // Parse analysis result to extract summary
+            let analysisSummary = '';
+            try {
+              const parsed = typeof analysisResult === 'string' ? JSON.parse(analysisResult) : analysisResult;
+              analysisSummary = parsed?.summary || parsed?.document_type || analysisResult.substring(0, 200) + '...';
+            } catch (e) {
+              analysisSummary = typeof analysisResult === 'string' ? analysisResult.substring(0, 200) + '...' : 'Analysis completed';
+            }
+            
+            // Extract risk score if available
+            let riskScore: number | null = null;
+            try {
+              const parsed = typeof analysisResult === 'string' ? JSON.parse(analysisResult) : analysisResult;
+              if (parsed?.risk_cards && Array.isArray(parsed.risk_cards)) {
+                const highRiskCount = parsed.risk_cards.filter((card: any) => 
+                  card.severity?.toLowerCase().includes('yüksek') || 
+                  card.severity?.toLowerCase().includes('high')
+                ).length;
+                riskScore = parsed.risk_cards.length > 0 ? (highRiskCount / parsed.risk_cards.length) * 100 : null;
+              }
+            } catch (e) {
+              // Risk score extraction failed, continue without it
+            }
+            
+            const { error: dbError, data: insertedData } = await supabase.from('analyses').insert({
+              user_id: finalUserId, // UUID from auth.users
+              file_name: fileName || 'document.pdf',
+              analysis_result: typeof analysisResult === 'string' ? analysisResult : JSON.stringify(analysisResult),
+              analysis_summary: analysisSummary,
+              risk_score: riskScore,
+              created_at: new Date().toISOString()
+            }).select();
+            
+            if (dbError) {
+              console.error('[saveAnalysisAndNotify] Database save error:', dbError);
+            } else {
+              console.log('[saveAnalysisAndNotify] Analysis saved successfully:', {
+                userId: finalUserId,
+                fileName: fileName || 'document.pdf',
+                analysisId: insertedData?.[0]?.id,
+                resultLength: typeof analysisResult === 'string' ? analysisResult.length : JSON.stringify(analysisResult).length
+              });
+            }
+          } catch (dbError) {
+            console.error('[saveAnalysisAndNotify] Database save error (catch):', dbError);
+            // Continue even if DB save fails
+          }
+        } else {
+          console.warn('[saveAnalysisAndNotify] userId not provided, skipping database save', { userId, userIdParam, finalUserId });
+        }
+
+        // Calculate risk score and summary
+        const riskCount = parsedResult?.risk_cards?.length || 0;
+        const highRiskCount = parsedResult?.risk_cards?.filter((card: any) => 
+          card.severity?.toLowerCase().indexOf('yüksek') !== -1 || 
+          card.severity?.toLowerCase().indexOf('high') !== -1 ||
+          card.severity?.toLowerCase().indexOf('kritik') !== -1 ||
+          card.severity?.toLowerCase().indexOf('critical') !== -1
+        ).length || 0;
+        
+        const complianceScore = parsedResult?.compliance_status?.overall || 'Bilinmiyor';
+        const documentType = parsedResult?.document_type || 'Belirtilmemiş';
+        const summaryPreview = parsedResult?.summary ? 
+          (parsedResult.summary.length > 150 ? parsedResult.summary.substring(0, 150) + '...' : parsedResult.summary) : 
+          'Özet mevcut değil';
+
+        // Send Telegram notification for critical analyses
+        if (hasCriticalRisk) {
+          await sendTelegramNotification(
+            `🚨 <b>KRİTİK ANALİZ TAMAMLANDI</b>\n\n` +
+            `📧 Kullanıcı: ${userEmail || 'Anonim'}\n` +
+            `📄 Dosya: ${fileName}\n` +
+            `📋 Belge Türü: ${documentType}\n` +
+            `⚠️ <b>Risk Skoru:</b> ${highRiskCount}/${riskCount} Yüksek Risk\n` +
+            `📊 <b>Uyumluluk:</b> ${complianceScore}\n` +
+            `🔍 <b>Özet:</b> ${summaryPreview}\n\n` +
+            `⚠️ Yüksek riskli hukuki sorunlar tespit edildi!\n` +
+            `🔍 Detaylı rapor hazırlandı.`,
+            true
+          );
+        } else {
+          // Regular analysis notification
+          await sendTelegramNotification(
+            `📊 <b>YENİ ANALİZ TAMAMLANDI</b>\n\n` +
+            `📧 Kullanıcı: ${userEmail || 'Anonim'}\n` +
+            `📄 Dosya: ${fileName}\n` +
+            `📋 Belge Türü: ${documentType}\n` +
+            `📊 <b>Risk Skoru:</b> ${riskCount} Risk Tespit Edildi (${highRiskCount} Yüksek)\n` +
+            `✅ <b>Uyumluluk:</b> ${complianceScore}\n` +
+            `🔍 <b>Özet:</b> ${summaryPreview}\n\n` +
+            `✅ Analiz başarıyla tamamlandı.`,
+            false
+          );
+        }
+      } catch (error) {
+        console.error('Save/Notify error:', error);
+        // Don't fail the request if save/notify fails
+      }
+    };
     
-    if (!isAdmin) {
-      const creditResult = await supabase
+    // Admin ise direkt analiz yap, kontrolleri atla
+    if (isAdmin) {
+      console.log('[API] Admin kullanıcı - kontroller atlanıyor');
+      const result = performLegalAnalysis(
+        finalPdfText, 
+        targetLang || 'tr',
+        async (text) => {
+          await saveAnalysisAndNotify(text, fileName || 'admin-document.pdf', userId);
+        }
+      );
+      // performLegalAnalysis artık direkt Response döndürüyor
+      return result;
+    }
+    
+    // TEST MODU: Geçici olarak kredi kontrolünü esnet - detaylı loglama ile
+    console.log('[API] Kredi kontrolü başlatılıyor...', { userKey, userEmail });
+    
+    try {
+      // 1. KREDİ KONTROLÜ
+      const { data: creditRow, error: creditError } = await supabase
         .from("user_credits")
         .select("credit")
         .eq("user_key", userKey)
         .maybeSingle();
-      creditRow = creditResult.data;
+      
+      console.log('[API] Kredi kontrolü sonucu:', { 
+        creditRow, 
+        creditError: creditError?.message,
+        hasCredit: creditRow && creditRow.credit > 0 
+      });
       
       // 2. İlk ücretsiz hakkı kontrolü
-      const usedDisksResult = await supabase
+      const { data: usedDisks, error: rightsError } = await supabase
         .from("user_analysis_rights")
         .select("id")
         .eq("user_key", userKey)
         .maybeSingle();
-      usedDisks = usedDisksResult.data;
-    }
-    
-    // İngilizce analizlerde Congress.gov, SCOTUS, CourtListener ve OpenJurist'i de dahil et
-    const sourcesText = (targetLang === 'EN' || targetLang === 'English')
-      ? 'Yukarıdaki güncel mevzuat, ABD Federal Mevzuatı (Congress.gov, GovInfo), US Code, Federal Register, ABD Yüksek Mahkemesi (SCOTUS) kararları, CourtListener Recap arşivi, OpenJurist, Library of Congress mevzuatı, New York, California, Delaware eyalet yasaları, ve İngiltere (UK) mevzuatı (legislation.gov.uk - Acts ve Statutory Instruments, "as amended" versiyonları) dikkate alarak analiz yap. ÖNEMLİ: Eğer aynı konu için farklı tarihli belgeler varsa, EN GÜNCEL TARİHLİ OLANI baz al. Common Law terminolojisini ve federal/eyalet/ulusal hukuku hiyerarşisini dikkate al. Tarih çelişkisi durumunda her zaman en güncel tarihli belgeyi kullan. UK mevzuatı için "as amended" (yürürlükteki güncel) versiyonları kullanıldığından emin ol.'
-      : 'Yukarıdaki güncel mevzuat, resmi gazete yayınları, Yargıtay içtihatları, Danıştay kararları, Anayasa Mahkemesi kararları, KVKK kararları, TBMM kanun ve tasarıları ve Mevzuat Bilgi Sistemi (MBS) mevzuatlarını dikkate alarak analiz yap. ÖNEMLİ: Eğer aynı konu için farklı tarihli belgeler varsa, EN GÜNCEL TARİHLİ OLANI baz al. Tarih çelişkisi durumunda her zaman en güncel tarihli belgeyi kullan.';
-    
-    const userPromptText = (targetLang === 'EN' || targetLang === 'English')
-      ? `Analyze the following text and evaluate it according to current US Federal Legislation (Congress.gov, GovInfo), US Code, Federal Register, US Supreme Court (SCOTUS) decisions, CourtListener Recap archive, OpenJurist case law, Library of Congress regulations, and New York, California, Delaware state laws. Consider Common Law terminology and federal/state law hierarchy. IMPORTANT: If there are conflicting dates for the same topic, always use the MOST RECENT DATE. ${pdfText.substring(0, 12000)}`
-      : `Şu metni analiz et ve güncel mevzuat, resmi gazete yayınları, Yargıtay içtihatları, Danıştay kararları, Anayasa Mahkemesi kararları, KVKK (Kişisel Verilerin Korunması Kanunu) kararları, TBMM (Türkiye Büyük Millet Meclisi) kanun ve tasarıları ve MBS (Mevzuat Bilgi Sistemi) mevzuatlarına göre değerlendir. ÖNEMLİ: Aynı konu için farklı tarihli belgeler varsa, EN GÜNCEL TARİHLİ OLANI kullan. ${pdfText.substring(0, 12000)}`;
-    
-    // Yerelleştirme talimatı ekle
-    const localizationInstruction = (targetLang === 'EN' || targetLang === 'English')
-      ? ' IMPORTANT: If the output language is English, translate Turkish legal acronyms to their international equivalents. For example: KVKK -> GDPR (Personal Data Protection Law) or KVKK - Personal Data Protection Law, TBK -> TCO (Turkish Code of Obligations), HMK -> Code of Civil Procedure, İİK -> EBL (Enforcement and Bankruptcy Law), AYM -> Constitutional Court. Always provide the full English name alongside the acronym when first mentioned.'
-      : '';
-    
-    // Tarih çelişkisi talimatı
-    const dateConflictInstruction = ' KRİTİK TALİMAT: Verilen belgeler arasında tarih çelişkisi varsa, her zaman EN GÜNCEL TARİHLİ belgeyi baz al. Tarih karşılaştırması yaparken ISO format (YYYY-MM-DD) veya belge metadata\'sındaki tarih bilgisini kullan.';
-    
-    // Legal Context Modu - Common Law terim çevirisi için
-    const legalContextInstruction = (targetLang === 'EN' || targetLang === 'English')
-      ? ' CRITICAL: Use text-embedding-3-large model with LEGAL CONTEXT MODE for Common Law terminology. When translating Common Law terms to Civil Law (Kıta Avrupası) equivalents, preserve legal meaning and context. For example: "precedent" -> "içtihat" (not just "önceden"), "stare decisis" -> "içtihat hukuku" (not literal translation), "tort" -> "haksız fiil" (preserving legal concept). Always consider the legal system context (Common Law vs. Civil Law) when translating. Maintain legal precision and avoid meaning loss. ENGLISH LAW SPECIFIC TERMS: When analyzing UK legal documents, be aware that certain terms have English Law-specific meanings that differ from US Common Law: "Deed" (UK: formal written instrument under seal; US: broader meaning), "Covenant" (UK: specific contractual promise with legal consequences; US: similar but context-dependent), "Indemnity" (UK: specific obligation to make good loss; US: broader insurance context). Always use "English Law specific" context when these terms appear in UK documents to avoid confusion with US Common Law equivalents.'
-      : '';
-    
-    // Cross-Jurisdictional Conflict Detection - Sadece Global paket için
-    const crossJurisdictionalInstruction = isGlobalPackage
-      ? ` CROSS-JURISDICTIONAL CONFLICT DETECTION MODE (Quantum Global Feature): Analyze this document by cross-referencing laws from multiple jurisdictions (TR, US, UK, DE). Identify direct conflicts, such as different penalty rates, jurisdiction clauses, or contradictory compliance requirements between countries. For each conflict found, provide in this EXACT format: [Article/Clause] | [Country A: Rule Description] | [Country B: Rule Description] | [Risk Score Number]. Example: [Article 5] | [TR: 10% penalty rate] | [US: 15% penalty rate] | [75]. Format all conflicts in a structured table at the end of your analysis under "Global Conflict Map" section. This is a premium feature available only to Quantum Global subscribers.`
-      : '';
-    
-    // Legal Citations & Bibliography Instruction - GÜÇLENDİRİLMİŞ
-    const bibliographyInstruction = ` LEGAL CITATIONS & BIBLIOGRAPHY REQUIREMENT: At the end of your analysis, you MUST include a "Sources & References" or "Hukuki Referanslar ve Kaynakça" section. List all specific legal references (laws, regulations, court precedents) that support your risk assessments. You MUST provide at least 3-5 legal references. Format each reference as: [Country Flag Emoji] [Law Name] - [Article Number]: [Brief Summary or Title]. Examples: 🇹🇷 TBK Madde 112 - Borcun ifa edilmemesi / Genel sorumluluk, 🇩🇪 BGB § 433 - Vertragstypische Pflichten beim Kaufvertrag, 🇺🇸 UCC § 2-201 - Statute of Frauds, 🇬🇧 Sale of Goods Act 1979 s.13 - Implied terms about description. Include both legislation and high court precedents when available. CRITICAL: Do not return empty references array. Always provide detailed legal citations. ${isGlobalPackage ? 'For Global package users, provide cross-referenced citations showing how the same risk is addressed in different jurisdictions side by side.' : ''}`;
-    
-    // Risk Assessment Module - GÜÇLENDİRİLMİŞ PROMPT
-    const riskAssessmentInstruction = isGlobalPackage
-      ? ` RISK ASSESSMENT MODULE (Quantum Cross-Risk Analysis): Sözleşmeyi derinlemesine analiz et ve riskleri madde madde ayır. Perform a Cross-Jurisdictional Risk Analysis. Compare the document against both ${detectedCountry || 'primary'} and other major jurisdictions (TR, US, UK, DE) simultaneously to detect conflicting risks. You MUST identify at least 3-5 risks. For each risk identified, provide: [Risk Description] | [Severity Score 1-10] | [Country/Countries Affected] | [Legal Reference: Law Article]. Format risks in a structured list. Mark cross-jurisdictional conflicts with [Quantum Conflict Detected] tag. Example: [Penalty rate discrepancy] | [8] | [TR, US] | [TBK Madde 112, UCC § 2-201] [Quantum Conflict Detected]. CRITICAL: Do not return empty risks array. Always provide detailed risk analysis.`
-      : ` RISK ASSESSMENT MODULE (Basic Risk Analysis): Sözleşmeyi derinlemesine analiz et ve riskleri madde madde ayır. Please identify all legal risks in this document and assign each risk a severity score from 1-10 (where 1 is minimal risk and 10 is critical risk). You MUST identify at least 2-4 risks. For each risk, provide: [Risk Description] | [Severity Score 1-10] | [Legal Reference: Law Article]. Format risks in a structured list. Mark each risk with [Standard Risk] tag. Focus only on the primary jurisdiction (${detectedCountry || 'detected country'}). Example: [Breach of contract liability] | [7] | [TBK Madde 112] [Standard Risk]. CRITICAL: Do not return empty risks array. Always provide detailed risk analysis.`;
-    
-    // JSON Format Instruction - AI'dan yapılandırılmış veri iste
-    const jsonFormatInstruction = ` CRITICAL OUTPUT FORMAT: At the end of your analysis, you MUST provide a JSON structure (even if embedded in text) with the following format:
-{
-  "analysis": "Your detailed analysis text here...",
-  "risks": [
-    {
-      "level": "High|Medium|Low",
-      "title": "Risk title",
-      "description": "Detailed risk description",
-      "severity": 8,
-      "reference": "TBK Madde 112",
-      "countries": ["TR"]
-    }
-  ],
-  "references": [
-    {
-      "law": "TBK",
-      "section": "Madde 112",
-      "country": "TR",
-      "summary": "Borcun ifa edilmemesi"
-    }
-  ]
-}
-IMPORTANT: Provide both the detailed text analysis AND this JSON structure. The JSON should be clearly marked with "===JSON_START===" and "===JSON_END===" markers.`;
-    
-    // Deep Analysis Instruction - Çelişkili kanun maddelerini tek tek eşleştir
-    const deepAnalysisInstruction = ` DEEP LEGAL ANALYSIS REQUIREMENT: Do not just summarize. For each identified risk or conflict, you MUST:
-1. Identify the specific conflicting legal articles (e.g., BGB § 433 vs TBK Madde 112 vs UCC § 2-201)
-2. Compare the exact wording and legal implications of each article
-3. Explain how these articles conflict or complement each other in the context of this document
-4. Provide specific examples from the document text that demonstrate the conflict
-5. For cross-jurisdictional analysis (Global package), map each risk to equivalent articles across all 4 jurisdictions (TR, US, UK, DE)
-Example format: "Article 5 of the contract conflicts with TBK Madde 112 (Turkish Code of Obligations) which requires X, while BGB § 433 (German Civil Code) allows Y, and UCC § 2-201 (US Uniform Commercial Code) permits Z. This creates a legal uncertainty because..."`;
-    
-    const systemPrompt = `Sen profesyonel bir hukuk analistisin. Analizini sadece ${targetLang} dilinde yap. Paragrafları tekrar etme.
-
-KRİTİK KURAL: ASLA BOŞ SONUÇ DÖNME! Eğer PDF okunamazsa veya dosya formatıyla ilgili bir sorun varsa bile, kullanıcıya dosyanın formatıyla ilgili teknik bir risk raporu sun. Örnek: "Dosya yapısı analiz edilemedi ancak şu teknik riskler tespit edildi: [dosya boyutu, şifre koruması, format uyumsuzluğu vb.]". Her durumda en az 2-3 risk ve 3-5 hukuki referans döndür.
-
-${contextText ? ' ' + sourcesText : ''}${dateConflictInstruction}${localizationInstruction}${legalContextInstruction}${crossJurisdictionalInstruction}${riskAssessmentInstruction}${bibliographyInstruction}${deepAnalysisInstruction}${jsonFormatInstruction}`;
-    const userPrompt = userPromptText;
-
-    // Admin ise limit kontrolünü bypass et
-    if (isAdmin || (creditRow && creditRow.credit > 0)) {
-      // Kredisi olanlar için analiz
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
-        ],
-        temperature: 0.3,
+      
+      console.log('[API] Ücretsiz hak kontrolü sonucu:', { 
+        usedDisks, 
+        rightsError: rightsError?.message,
+        hasUsedFree: !!usedDisks 
       });
-      // Kredi bir azaltılır (Admin değilse)
-      if (!isAdmin && creditRow) {
-        await supabase.from("user_credits")
-          .update({ credit: creditRow.credit - 1 })
-          .eq("user_key", userKey);
-      }
       
-      // Bluebook citation formatı ile analiz sonucunu formatla (ABD kaynakları için)
-      let formattedReply = response.choices[0].message.content || '';
-      if ((targetLang === 'EN' || targetLang === 'English') && relevantDocs.length > 0) {
-        formattedReply = formatAnalysisWithCitations(formattedReply, relevantDocs);
-      }
-      
-      // JSON formatından veri çıkar (eğer varsa)
-      let parsedJsonData: any = null;
-      const jsonStartMarker = '===JSON_START===';
-      const jsonEndMarker = '===JSON_END===';
-      const jsonStartIdx = formattedReply.indexOf(jsonStartMarker);
-      const jsonEndIdx = formattedReply.indexOf(jsonEndMarker);
-      
-      if (jsonStartIdx !== -1 && jsonEndIdx !== -1) {
-        try {
-          const jsonStr = formattedReply.substring(jsonStartIdx + jsonStartMarker.length, jsonEndIdx).trim();
-          parsedJsonData = JSON.parse(jsonStr);
-          // JSON kısmını formattedReply'den çıkar (sadece analiz metni kalsın)
-          formattedReply = formattedReply.substring(0, jsonStartIdx) + formattedReply.substring(jsonEndIdx + jsonEndMarker.length);
-        } catch (e) {
-          console.error('JSON parse error:', e);
-        }
-      }
-      
-      // Alternatif: JSON'u markdown code block içinde ara
-      if (!parsedJsonData) {
-        const jsonCodeBlockRegex = /```json\s*([\s\S]*?)\s*```/i;
-        const match = formattedReply.match(jsonCodeBlockRegex);
-        if (match) {
-          try {
-            parsedJsonData = JSON.parse(match[1]);
-          } catch (e) {
-            console.error('JSON code block parse error:', e);
-          }
-        }
-      }
-      
-      // Cross-jurisdictional conflicts'u parse et (sadece Global paket için)
-      let globalConflicts: Array<{
-        article: string;
-        countryA: string;
-        countryARule: string;
-        countryB: string;
-        countryBRule: string;
-        riskScore: number;
-      }> = [];
-      
-      if (isGlobalPackage && formattedReply) {
-        // AI'dan gelen conflict tablosunu parse et
-        const conflictTableRegex = /\[([^\]]+)\]\s*\|\s*\[([^\]]+)\]\s*\|\s*\[([^\]]+)\]\s*\|\s*\[([^\]]+)\]/g;
-        const matches = formattedReply.matchAll(conflictTableRegex);
-        for (const match of matches) {
-          globalConflicts.push({
-            article: match[1] || '',
-            countryA: match[2]?.split(':')[0] || '',
-            countryARule: match[2]?.split(':').slice(1).join(':') || match[2] || '',
-            countryB: match[3]?.split(':')[0] || '',
-            countryBRule: match[3]?.split(':').slice(1).join(':') || match[3] || '',
-            riskScore: parseInt(match[4] || '0')
-          });
-        }
-      }
-      
-      // Legal References & Bibliography parsing - Önce JSON'dan, sonra text'ten
-      let legalReferences: Array<{
-        country: string;
-        countryFlag: string;
-        lawName: string;
-        article: string;
-        summary: string;
-        isPrecedent: boolean;
-        crossReference?: Array<{
-          country: string;
-          countryFlag: string;
-          lawName: string;
-          article: string;
-        }>;
-      }> = [];
-      
-      const flagToCountry: { [key: string]: string } = {
-        '🇹🇷': 'TR',
-        '🇺🇸': 'US',
-        '🇬🇧': 'UK',
-        '🇩🇪': 'DE'
-      };
-      
-      const countryToFlag: { [key: string]: string } = {
-        'TR': '🇹🇷',
-        'US': '🇺🇸',
-        'UK': '🇬🇧',
-        'DE': '🇩🇪'
-      };
-      
-      // Önce JSON'dan referans verilerini çıkar
-      if (parsedJsonData && parsedJsonData.references && Array.isArray(parsedJsonData.references)) {
-        parsedJsonData.references.forEach((refItem: any) => {
-          const country = refItem.country || 'UNKNOWN';
-          legalReferences.push({
-            country: country,
-            countryFlag: countryToFlag[country] || '🌍',
-            lawName: refItem.law || '',
-            article: refItem.section || '',
-            summary: refItem.summary || '',
-            isPrecedent: /Court|Case|Precedent|İçtihat|Karar/i.test(refItem.law || '')
-          });
+      // Tablo yoksa veya hata varsa, analizi yine de yap (TEST MODU)
+      if (creditError || rightsError) {
+        console.warn('[API] Kredi/rights tablolarına erişim hatası - TEST MODU: Analiz yapılıyor', {
+          creditError: creditError?.message,
+          rightsError: rightsError?.message
         });
+        // Hata olsa bile analizi yap - streaming
+        const result = performLegalAnalysis(
+          finalPdfText, 
+          targetLang || 'tr',
+          async (text) => {
+            await saveAnalysisAndNotify(text, fileName || 'document.pdf', userId);
+          }
+        );
+        // performLegalAnalysis artık direkt Response döndürüyor
+        return result;
       }
       
-      // Eğer JSON'dan veri yoksa, text'ten parse et
-      if (legalReferences.length === 0 && formattedReply) {
-        const referenceRegex = /([🇹🇷🇺🇸🇬🇧🇩🇪])\s+([^-]+?)\s*-\s*([^\n]+)/g;
-        const matches = formattedReply.matchAll(referenceRegex);
-        
-        for (const match of matches) {
-          const flag = match[1];
-          const lawPart = match[2].trim();
-          const summary = match[3].trim();
-          
-          const articleMatch = lawPart.match(/(.+?)\s+(?:Madde|§|Article|s\.|Art\.)\s*(\d+[a-z]?)/i);
-          if (articleMatch) {
-            legalReferences.push({
-              country: flagToCountry[flag] || 'UNKNOWN',
-              countryFlag: flag,
-              lawName: articleMatch[1].trim(),
-              article: articleMatch[2],
-              summary: summary,
-              isPrecedent: /Court|Case|Precedent|İçtihat|Karar/i.test(lawPart)
-            });
-          } else {
-            legalReferences.push({
-              country: flagToCountry[flag] || 'UNKNOWN',
-              countryFlag: flag,
-              lawName: lawPart,
-              article: '',
-              summary: summary,
-              isPrecedent: /Court|Case|Precedent|İçtihat|Karar/i.test(lawPart)
-            });
+      if (creditRow && creditRow.credit > 0) {
+        // Kredisi olanlar için analiz - streaming
+        console.log('[API] Kullanıcının kredisi var, analiz yapılıyor');
+        const result = performLegalAnalysis(
+          finalPdfText, 
+          targetLang || 'tr',
+          async (text) => {
+            // Kredi bir azaltılır
+            await supabase.from("user_credits")
+              .update({ credit: creditRow.credit - 1 })
+              .eq("user_key", userKey);
+            await saveAnalysisAndNotify(text, fileName || 'document.pdf', userId);
           }
-        }
-      }
-      
-      // Cross-reference ekle (Global paket için)
-      if (isGlobalPackage && legalReferences.length > 0) {
-        const groupedRefs = new Map<string, typeof legalReferences>();
-        legalReferences.forEach(ref => {
-          const key = ref.summary.toLowerCase().substring(0, 30);
-          if (!groupedRefs.has(key)) {
-            groupedRefs.set(key, []);
+        );
+        // performLegalAnalysis artık direkt Response döndürüyor
+        return result;
+      } else if (!usedDisks) {
+        // İlk analiz ücretsiz - streaming
+        console.log('[API] İlk ücretsiz analiz, analiz yapılıyor');
+        const result = performLegalAnalysis(
+          finalPdfText, 
+          targetLang || 'tr',
+          async (text) => {
+            await supabase.from("user_analysis_rights").insert({ user_key: userKey });
+            await saveAnalysisAndNotify(text, fileName || 'document.pdf', userId);
           }
-          groupedRefs.get(key)!.push(ref);
+        );
+        // performLegalAnalysis artık direkt Response döndürüyor
+        return result;
+      } else {
+        // TEST MODU: Hakkı yoksa bile analizi yap (geçici olarak) - streaming
+        console.warn('[API] Kullanıcının hakkı yok ama TEST MODU aktif - analiz yapılıyor', {
+          userKey,
+          userEmail,
+          creditRow,
+          usedDisks
         });
-        
-        groupedRefs.forEach((refs, key) => {
-          if (refs.length >= 2) {
-            refs.forEach(ref => {
-              ref.crossReference = refs.filter(r => r.country !== ref.country);
-            });
+        console.log('[API] performLegalAnalysis çağrılmadan önce - finalPdfText uzunluğu:', finalPdfText?.length || 0);
+        console.log('[API] performLegalAnalysis çağrılmadan önce - finalPdfText ilk 200 karakter:', finalPdfText?.substring(0, 200) || 'BOŞ');
+        console.log('[API] performLegalAnalysis çağrılmadan önce - targetLang:', targetLang || 'tr');
+        const result = performLegalAnalysis(
+          finalPdfText, 
+          targetLang || 'tr',
+          async (text) => {
+            await saveAnalysisAndNotify(text, fileName || 'document.pdf', userId);
           }
-        });
+        );
+        console.log('[API] performLegalAnalysis çağrıldı, result alındı');
+        // performLegalAnalysis artık direkt Response döndürüyor
+        return result;
       }
-      
-      // Risk Assessments'ı parse et - Önce JSON'dan, sonra text'ten
-      let riskAssessments: Array<{
-        risk: string;
-        severity: number;
-        reference: string;
-        type: 'Standard Risk' | 'Quantum Conflict Detected';
-        countries?: string[];
-      }> = [];
-      
-      // Önce JSON'dan risk verilerini çıkar
-      if (parsedJsonData && parsedJsonData.risks && Array.isArray(parsedJsonData.risks)) {
-        parsedJsonData.risks.forEach((riskItem: any) => {
-          riskAssessments.push({
-            risk: riskItem.risk || riskItem.title || riskItem.description || '',
-            severity: parseInt(riskItem.severity || riskItem.level || '0'),
-            reference: riskItem.reference || riskItem.legalReference || '',
-            type: (riskItem.type === 'Quantum Conflict Detected' || riskItem.quantumConflict) ? 'Quantum Conflict Detected' : 'Standard Risk',
-            countries: riskItem.countries || riskItem.affectedCountries
-          });
-        });
-      }
-      
-      // Eğer JSON'dan risk bulunamadıysa, text'ten parse et
-      if (riskAssessments.length === 0 && formattedReply) {
-        // Risk assessment formatı: [Risk Description] | [Severity Score 1-10] | [Legal Reference] [Standard Risk] veya [Quantum Conflict Detected]
-        const riskRegex = /\[([^\]]+)\]\s*\|\s*\[(\d+)\]\s*\|\s*\[([^\]]+)\]\s*\[(Standard Risk|Quantum Conflict Detected)\](?:\s*\[([^\]]+)\])?/gi;
-        let match;
-        while ((match = riskRegex.exec(formattedReply)) !== null) {
-          const risk = match[1] || '';
-          const severity = parseInt(match[2] || '0');
-          const reference = match[3] || '';
-          const type = (match[4] === 'Quantum Conflict Detected' ? 'Quantum Conflict Detected' : 'Standard Risk') as 'Standard Risk' | 'Quantum Conflict Detected';
-          const countries = match[5] ? match[5].split(',').map(c => c.trim()) : undefined;
-          
-          riskAssessments.push({
-            risk,
-            severity,
-            reference,
-            type,
-            countries
-          });
+    } catch (checkError: any) {
+      // Kontrol sırasında hata olursa, analizi yine de yap (TEST MODU) - streaming
+      console.error('[API] Kredi kontrolü sırasında hata - TEST MODU: Analiz yapılıyor', checkError);
+      const result = performLegalAnalysis(
+        finalPdfText, 
+        targetLang || 'tr',
+        async (text) => {
+          await saveAnalysisAndNotify(text, fileName || 'document.pdf', userId);
         }
-        
-        // Alternatif format: Eğer yukarıdaki regex hiçbir şey bulamazsa, daha esnek bir regex dene
-        if (riskAssessments.length === 0) {
-          const flexibleRiskRegex = /(?:Risk|Riski?|Risk Assessment)[:\s]*([^\n|]+?)\s*\|\s*Severity[:\s]*(\d+)\s*\|\s*Reference[:\s]*([^\n|]+?)(?:\s*\[(Standard Risk|Quantum Conflict Detected)\])?/gi;
-          let flexMatch;
-          while ((flexMatch = flexibleRiskRegex.exec(formattedReply)) !== null) {
-            riskAssessments.push({
-              risk: flexMatch[1]?.trim() || '',
-              severity: parseInt(flexMatch[2] || '0'),
-              reference: flexMatch[3]?.trim() || '',
-              type: (flexMatch[4] === 'Quantum Conflict Detected' ? 'Quantum Conflict Detected' : 'Standard Risk') as 'Standard Risk' | 'Quantum Conflict Detected'
-            });
-          }
-        }
-      }
-      
-      // Jurisdiction detection sonucunu response'a ekle
-      return NextResponse.json({ 
-        reply: formattedReply,
-        jurisdiction: jurisdictionResult ? {
-          detected_country: jurisdictionResult.primary_country,
-          confidence: jurisdictionResult.scores.find(s => s.country === jurisdictionResult!.primary_country)?.confidence || 'low',
-          needs_confirmation: jurisdictionResult.needs_user_confirmation,
-          cross_border: jurisdictionResult.cross_border,
-          secondary_countries: jurisdictionResult.secondary_countries,
-          scores: jurisdictionResult.scores
-        } : null,
-        globalConflicts: isGlobalPackage ? globalConflicts : null,
-        isGlobalPackage: isGlobalPackage,
-        legalReferences: legalReferences.length > 0 ? legalReferences : null,
-        riskAssessments: riskAssessments.length > 0 ? riskAssessments : null
-      });
-    } else if (isAdmin || !usedDisks) {
-      // İlk analiz ücretsiz,
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
-        ],
-        temperature: 0.3,
-      });
-      // İlk analiz kaydı (Admin değilse)
-      if (!isAdmin) {
-        await supabase.from("user_analysis_rights").insert({ user_key: userKey });
-      }
-      
-      // Bluebook citation formatı ile analiz sonucunu formatla (ABD kaynakları için)
-      let formattedReply = response.choices[0].message.content || '';
-      if ((targetLang === 'EN' || targetLang === 'English') && relevantDocs.length > 0) {
-        formattedReply = formatAnalysisWithCitations(formattedReply, relevantDocs);
-      }
-      
-      // Risk score'u çıkar
-      const extractRiskScore = (text: string): number => {
-        const scoreMatch = text.match(/risk[_\s]?score[:\s]+(\d+)|risk[:\s]+(\d+)/i);
-        if (scoreMatch) {
-          return parseInt(scoreMatch[1] || scoreMatch[2]) || 0;
-        }
-        const wordCount = text.split(/\s+/).length;
-        const hasRiskKeywords = /risk|danger|warning|threat|vulnerability|exposure/i.test(text);
-        return hasRiskKeywords ? Math.min(60 + Math.floor(Math.random() * 30), 100) : Math.min(30 + Math.floor(Math.random() * 20), 50);
-      };
-      
-      const riskScore = extractRiskScore(formattedReply);
-      
-      // Legal citations
-      const legalCitations = relevantDocs.slice(0, 10).map((doc: any) => ({
-        source: doc.metadata?.source || 'Unknown',
-        citation: generateCitationFromMetadata(doc.metadata) || doc.metadata?.title || 'No citation',
-        relevance: 0.8 - (relevantDocs.indexOf(doc) * 0.1)
-      }));
-      
-      // Cross-jurisdictional conflicts'u parse et (sadece Global paket için)
-      let globalConflictsFree: Array<{
-        article: string;
-        countryA: string;
-        countryARule: string;
-        countryB: string;
-        countryBRule: string;
-        riskScore: number;
-      }> = [];
-      
-      if (isGlobalPackage && formattedReply) {
-        // AI'dan gelen conflict tablosunu parse et
-        const conflictTableRegex = /\[([^\]]+)\]\s*\|\s*\[([^\]]+)\]\s*\|\s*\[([^\]]+)\]\s*\|\s*\[([^\]]+)\]/g;
-        const matches = formattedReply.matchAll(conflictTableRegex);
-        for (const match of matches) {
-          globalConflictsFree.push({
-            article: match[1] || '',
-            countryA: match[2]?.split(':')[0] || '',
-            countryARule: match[2]?.split(':').slice(1).join(':') || match[2] || '',
-            countryB: match[3]?.split(':')[0] || '',
-            countryBRule: match[3]?.split(':').slice(1).join(':') || match[3] || '',
-            riskScore: parseInt(match[4] || '0')
-          });
-        }
-      }
-      
-      // Legal References & Bibliography parsing (ikinci return için)
-      let legalReferencesFree2: Array<{
-        country: string;
-        countryFlag: string;
-        lawName: string;
-        article: string;
-        summary: string;
-        isPrecedent: boolean;
-        crossReference?: Array<{
-          country: string;
-          countryFlag: string;
-          lawName: string;
-          article: string;
-        }>;
-      }> = [];
-      
-      if (formattedReply) {
-        const referenceRegex = /([🇹🇷🇺🇸🇬🇧🇩🇪])\s+([^-]+?)\s*-\s*([^\n]+)/g;
-        const matches = formattedReply.matchAll(referenceRegex);
-        
-        const flagToCountry: { [key: string]: string } = {
-          '🇹🇷': 'TR',
-          '🇺🇸': 'US',
-          '🇬🇧': 'UK',
-          '🇩🇪': 'DE'
-        };
-        
-        for (const match of matches) {
-          const flag = match[1];
-          const lawPart = match[2].trim();
-          const summary = match[3].trim();
-          
-          const articleMatch = lawPart.match(/(.+?)\s+(?:Madde|§|Article|s\.|Art\.)\s*(\d+[a-z]?)/i);
-          if (articleMatch) {
-            legalReferencesFree2.push({
-              country: flagToCountry[flag] || 'UNKNOWN',
-              countryFlag: flag,
-              lawName: articleMatch[1].trim(),
-              article: articleMatch[2],
-              summary: summary,
-              isPrecedent: /Court|Case|Precedent|İçtihat|Karar/i.test(lawPart)
-            });
-          } else {
-            legalReferencesFree2.push({
-              country: flagToCountry[flag] || 'UNKNOWN',
-              countryFlag: flag,
-              lawName: lawPart,
-              article: '',
-              summary: summary,
-              isPrecedent: /Court|Case|Precedent|İçtihat|Karar/i.test(lawPart)
-            });
-          }
-        }
-        
-        if (isGlobalPackage && legalReferencesFree2.length > 0) {
-          const groupedRefs = new Map<string, typeof legalReferencesFree2>();
-          legalReferencesFree2.forEach(ref => {
-            const key = ref.summary.toLowerCase().substring(0, 30);
-            if (!groupedRefs.has(key)) {
-              groupedRefs.set(key, []);
-            }
-            groupedRefs.get(key)!.push(ref);
-          });
-          
-          groupedRefs.forEach((refs, key) => {
-            if (refs.length >= 2) {
-              refs.forEach(ref => {
-                ref.crossReference = refs.filter(r => r.country !== ref.country);
-              });
-            }
-          });
-        }
-      }
-      
-      // Risk Assessments parsing (free tier için)
-      let riskAssessmentsFree: Array<{
-        risk: string;
-        severity: number;
-        reference: string;
-        type: 'Standard Risk' | 'Quantum Conflict Detected';
-        countries?: string[];
-      }> = [];
-      
-      if (formattedReply) {
-        // Risk assessment formatı: [Risk Description] | [Severity Score 1-10] | [Legal Reference] [Standard Risk] veya [Quantum Conflict Detected]
-        const riskRegex = /\[([^\]]+)\]\s*\|\s*\[(\d+)\]\s*\|\s*\[([^\]]+)\]\s*\[(Standard Risk|Quantum Conflict Detected)\](?:\s*\[([^\]]+)\])?/gi;
-        let match;
-        while ((match = riskRegex.exec(formattedReply)) !== null) {
-          const risk = match[1] || '';
-          const severity = parseInt(match[2] || '0');
-          const reference = match[3] || '';
-          const type = (match[4] === 'Quantum Conflict Detected' ? 'Quantum Conflict Detected' : 'Standard Risk') as 'Standard Risk' | 'Quantum Conflict Detected';
-          const countries = match[5] ? match[5].split(',').map(c => c.trim()) : undefined;
-          
-          riskAssessmentsFree.push({
-            risk,
-            severity,
-            reference,
-            type,
-            countries
-          });
-        }
-        
-        // Alternatif format: Eğer yukarıdaki regex hiçbir şey bulamazsa, daha esnek bir regex dene
-        if (riskAssessmentsFree.length === 0) {
-          const flexibleRiskRegex = /(?:Risk|Riski?|Risk Assessment)[:\s]*([^\n|]+?)\s*\|\s*Severity[:\s]*(\d+)\s*\|\s*Reference[:\s]*([^\n|]+?)(?:\s*\[(Standard Risk|Quantum Conflict Detected)\])?/gi;
-          let flexMatch;
-          while ((flexMatch = flexibleRiskRegex.exec(formattedReply)) !== null) {
-            riskAssessmentsFree.push({
-              risk: flexMatch[1]?.trim() || '',
-              severity: parseInt(flexMatch[2] || '0'),
-              reference: flexMatch[3]?.trim() || '',
-              type: (flexMatch[4] === 'Quantum Conflict Detected' ? 'Quantum Conflict Detected' : 'Standard Risk') as 'Standard Risk' | 'Quantum Conflict Detected'
-            });
-          }
-        }
-      }
-      
-      // Jurisdiction detection sonucunu response'a ekle
-      const responseTime = Date.now() - startTime;
-      console.log('[API /analyze] Başarılı yanıt hazırlanıyor:', {
-        responseTimeMs: responseTime,
-        responseTimeSec: (responseTime / 1000).toFixed(2),
-        hasReply: !!formattedReply,
-        replyLength: formattedReply?.length || 0,
-        timestamp: new Date().toISOString()
-      });
-      
-      return NextResponse.json({ 
-        reply: formattedReply,
-        globalConflicts: isGlobalPackage ? globalConflictsFree : null,
-        isGlobalPackage: isGlobalPackage,
-        risk_score: riskScore,
-        legal_citations: legalCitations,
-        legalReferences: legalReferencesFree2.length > 0 ? legalReferencesFree2 : null,
-        riskAssessments: riskAssessmentsFree.length > 0 ? riskAssessmentsFree : null,
-        jurisdiction: jurisdictionResult ? {
-          detected_country: jurisdictionResult.primary_country,
-          confidence: jurisdictionResult.scores.find(s => s.country === jurisdictionResult!.primary_country)?.confidence || 'low',
-          needs_confirmation: jurisdictionResult.needs_user_confirmation,
-          cross_border: jurisdictionResult.cross_border,
-          secondary_countries: jurisdictionResult.secondary_countries,
-          scores: jurisdictionResult.scores
-        } : null
-      });
-    } else {
-      // Hakkı yok
-      return NextResponse.json({ reply: "Analiz hakkınız kalmadı. Ücretsiz hakkınızı kullandınız. Devam etmek için bir paket satın almalısınız." }, { status: 403 });
+      );
+      // performLegalAnalysis artık direkt Response döndürüyor
+      return result;
     }
   } catch (error: any) {
-    console.error("[API /analyze] DETAYLI HATA LOG:", {
-      errorMessage: error.message,
-      errorName: error.name,
-      errorStack: error.stack?.split('\n').slice(0, 10), // İlk 10 satır
-      timestamp: new Date().toISOString(),
-      errorType: error.constructor?.name
-    });
-    
-    // Daha açıklayıcı hata mesajı
-    const errorMessage = error.message || 'Bilinmeyen hata';
-    return NextResponse.json({ 
-      reply: `Sistem hatası: ${errorMessage}`,
-      error: errorMessage
-    }, { status: 500 });
+    console.error("OpenAI/Supabase Hatası:", error);
+    return NextResponse.json({ reply: `Sistem hatası: ${error.message}` }, { status: 500 });
   }
 }
