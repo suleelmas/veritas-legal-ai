@@ -57,3 +57,17 @@ div[style*="overflowY"]::-webkit-scrollbar-thumb {
 div[style*="overflowY"]::-webkit-scrollbar-thumb:hover {
   background: #d4c08a;
 }
+
+/* PDF Page Break Rules */
+#analysis-report section,
+#analysis-report div,
+#analysis-report p,
+#analysis-report h1,
+#analysis-report h2,
+#analysis-report h3,
+#analysis-report h4,
+#analysis-report h5,
+#analysis-report h6 {
+  page-break-inside: avoid;
+  break-inside: avoid;
+}

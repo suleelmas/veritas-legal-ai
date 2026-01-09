@@ -14,6 +14,7 @@ import FeedbackHub from "./components/FeedbackHub";
 import { createBrowserClient } from '@supabase/ssr';
 import { jsPDF } from "jspdf";
 import html2canvas from 'html2canvas';
+import { Scale } from 'lucide-react';
 
 /*
   SQL Şeması - Supabase SQL Editor'da çalıştırın:
@@ -111,7 +112,14 @@ export default function Home() {
   const router = useRouter();
   const [supabase] = useState(() => createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      global: {
+        headers: {
+          'Accept': 'application/json',
+        },
+      },
+    }
   ));
 
   const [user, setUser] = useState<any>(null);
@@ -157,6 +165,7 @@ export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [disclaimerOpen, setDisclaimerOpen] = useState(false);
   const [testMode, setTestMode] = useState<boolean | null>(null); // null = auto, true = TR, false = Global
   const [showLimitModal, setShowLimitModal] = useState(false);
   const [adminTestMode, setAdminTestMode] = useState(false);
@@ -633,11 +642,11 @@ export default function Home() {
             console.error('Credit fetch error:', err);
           }
           
-          // Enterprise kullanıcıları için analiz geçmişini çek
-          if (packageType === 'enterprise') {
+          // Enterprise, Professional, quantum_global ve Admin kullanıcıları için analiz geçmişini çek
+          if (packageType === 'enterprise' || packageType === 'professional' || packageType === 'quantum_global' || isAdmin) {
             const { data: analyses, error: analysesError } = await supabase
               .from('analyses')
-              .select('id, file_name, analysis_summary, created_at, analysis_result')
+              .select('id, file_name, analysis_summary, created_at, analysis_result, risk_score')
               .eq('user_id', userId)
               .order('created_at', { ascending: false })
               .limit(100);
@@ -647,9 +656,9 @@ export default function Home() {
                 id: a.id,
                 title: a.file_name,
                 date: new Date(a.created_at).toLocaleString(language === 'TR' ? 'tr-TR' : 'en-US'),
-                summary: a.analysis_summary || a.analysis_result.substring(0, 200) + '...',
-                fullResult: a.analysis_result,
-                riskScore: extractRiskScore(a.analysis_result)
+                summary: a.analysis_summary || (typeof a.analysis_result === 'string' ? a.analysis_result.substring(0, 200) + '...' : 'Analysis completed'),
+                fullResult: typeof a.analysis_result === 'string' ? a.analysis_result : JSON.stringify(a.analysis_result),
+                riskScore: a.risk_score || extractRiskScore(typeof a.analysis_result === 'string' ? a.analysis_result : JSON.stringify(a.analysis_result))
               }));
               setAnalysisHistory(history);
             }
@@ -789,8 +798,11 @@ export default function Home() {
   };
 
   const canAccessHistory = (): boolean => {
+    // VIP/Admin kullanıcılar için erişim
+    if (isAdmin) return true;
     const pkg = effectivePackage;
-    return pkg === 'enterprise';
+    // Pro paketleri için erişim
+    return pkg === 'professional' || pkg === 'enterprise' || pkg === 'quantum_global';
   };
 
   const canAccessLegislationDetails = (): boolean => {
@@ -800,6 +812,9 @@ export default function Home() {
 
   // Limit uyarı kontrolü
   const getUsagePercentage = (): number => {
+    // Admin için limit yok
+    if (isAdmin) return 0;
+    
     const pkg = effectivePackage;
     if (!pkg) return 0;
     
@@ -830,6 +845,9 @@ export default function Home() {
   };
 
   const isLimitReached = (): boolean => {
+    // Admin için limit yok
+    if (isAdmin) return false;
+    
     // Test Modu / Development Modunda limit yok
     const isDevelopment = process.env.NODE_ENV === 'development';
     if (isDevelopment) {
@@ -1243,25 +1261,38 @@ export default function Home() {
     setChatLoading(true);
     
     try {
+      // Analiz metnini bağlam olarak kullan (result veya pdfText)
+      const contextText = result || pdfText || '';
+      
+      // Konuşma geçmişini formatla (API'nin beklediği formata)
+      const conversationHistory = chatMessages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
+      
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          messages: [...chatMessages, { role: 'user', content: userMessage }],
-          pdfText: pdfText,
-          language: language
+          question: userMessage,
+          pdfText: contextText,
+          conversationHistory: conversationHistory,
+          targetLang: language
         })
       });
       
       const data = await res.json();
-      const assistantMessage = data.reply || data.error || 'Sorry, I could not process your request.';
+      const assistantMessage = data.reply || data.error || (language === 'TR' ? 'Üzgünüm, isteğinizi işleyemedim.' : 'Sorry, I could not process your request.');
       
       setChatMessages(prev => [...prev, { role: 'assistant', content: assistantMessage }]);
     } catch (error) {
       console.error('Chat error:', error);
-      setChatMessages(prev => [...prev, { role: 'assistant', content: 'An error occurred. Please try again.' }]);
+      const errorMessage = language === 'TR' 
+        ? 'Bir hata oluştu. Lütfen tekrar deneyin.' 
+        : 'An error occurred. Please try again.';
+      setChatMessages(prev => [...prev, { role: 'assistant', content: errorMessage }]);
     } finally {
       setChatLoading(false);
     }
@@ -1644,8 +1675,9 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
       console.log('[handleAnalyze] Sonuç set edildi, uzunluk:', resultText.length, 'İlk 200 karakter:', resultText.substring(0, 200));
       
       // Analiz sayısını artır (compare mode'da yok ama burada var)
+      // Admin için analysis_count artırma
       // userId zaten fonksiyonun başında tanımlı
-      if (userId) {
+      if (userId && !isAdmin) {
         try {
           const newCount = analysisCount + 1;
           setAnalysisCount(newCount);
@@ -1689,9 +1721,10 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
       const analysisTitle = file.name.substring(0, 50) + (file.name.length > 50 ? '...' : '');
       const analysisSummary = resultText.substring(0, 200) + (resultText.length > 200 ? '...' : '');
       
-      if (userId) {
+      if (userId && !isAdmin) {
         try {
           // Analiz sayısını artır (hata alsa bile devam et)
+          // Admin için analysis_count artırma
           let newCount = analysisCount + 1;
           
           try {
@@ -1721,10 +1754,13 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
             // Sessizce devam et - profiles tablosu yoksa veya hata varsa
           }
           
-          setAnalysisCount(newCount);
+          // Admin için analysis_count artırma
+          if (!isAdmin) {
+            setAnalysisCount(newCount);
+          }
           
-          // Enterprise kullanıcıları için analizi Supabase'e kaydet
-          if (effectivePackage === 'enterprise') {
+          // Enterprise, Professional, quantum_global ve Admin kullanıcıları için analizi Supabase'e kaydet
+          if (effectivePackage === 'enterprise' || effectivePackage === 'professional' || effectivePackage === 'quantum_global' || isAdmin) {
             const finalRiskScore = riskScore || null;
             
             const { data: newAnalysis, error: analysisError } = await supabase
@@ -1763,10 +1799,12 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
           }
         } catch (err) {
           console.error('Save analysis error:', err);
-          // Fallback: localStorage
-          const newCount = analysisCount + 1;
-          localStorage.setItem(`analysisCount_${userId}`, newCount.toString());
-          setAnalysisCount(newCount);
+          // Fallback: localStorage (Admin için değil)
+          if (!isAdmin) {
+            const newCount = analysisCount + 1;
+            localStorage.setItem(`analysisCount_${userId}`, newCount.toString());
+            setAnalysisCount(newCount);
+          }
         }
       } else {
         // Giriş yapmamış kullanıcılar için localStorage
@@ -1803,62 +1841,136 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
   }; // handleAnalyze fonksiyonu kapanışı
 
   const handleDownloadPDF = async () => {
-    if (!reportRef.current) return;
+    // AnalysisResult div'ini hedefle (id="analysis-report")
+    const analysisResultDiv = document.querySelector('#analysis-report') as HTMLElement;
+    if (!analysisResultDiv) {
+      console.error('PDF: AnalysisResult div bulunamadı');
+      return;
+    }
+    
     try {
-      // Geçici olarak renkleri siyah yap
-      const originalStyles: { element: HTMLElement; color: string; backgroundColor: string }[] = [];
-      const allElements = reportRef.current.querySelectorAll('*');
+      // PDF butonunu gizle
+      const pdfButtons = analysisResultDiv.querySelectorAll('.pdf-download-button');
+      pdfButtons.forEach((btn) => {
+        (btn as HTMLElement).style.display = 'none';
+      });
+
+      // Geçici olarak renkleri siyah yap ve page-break ekle
+      const originalStyles: { element: HTMLElement; color: string; backgroundColor: string; pageBreakInside: string }[] = [];
+      const allElements = analysisResultDiv.querySelectorAll('*');
       allElements.forEach((el) => {
         const htmlEl = el as HTMLElement;
         const computedStyle = window.getComputedStyle(htmlEl);
         originalStyles.push({
           element: htmlEl,
           color: computedStyle.color,
-          backgroundColor: computedStyle.backgroundColor
+          backgroundColor: computedStyle.backgroundColor,
+          pageBreakInside: computedStyle.pageBreakInside || 'auto'
         });
+        // Tüm renkleri siyaha çevir (gold dahil)
         htmlEl.style.color = '#000000';
-        htmlEl.style.backgroundColor = '#ffffff';
+        htmlEl.style.backgroundColor = htmlEl.tagName === 'BODY' || htmlEl.tagName === 'HTML' ? '#ffffff' : (computedStyle.backgroundColor === 'rgba(0, 0, 0, 0)' || computedStyle.backgroundColor === 'transparent' ? '#ffffff' : '#ffffff');
+        // Page break ayarları
+        if (['SECTION', 'DIV', 'P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6'].includes(htmlEl.tagName)) {
+          htmlEl.style.pageBreakInside = 'avoid';
+          htmlEl.style.breakInside = 'avoid';
+        }
+      });
+      
+      // Başlıklar ve paragraflar için özel ayarlar
+      const headings = analysisResultDiv.querySelectorAll('h1, h2, h3, h4, h5, h6, p, div');
+      headings.forEach((el) => {
+        const htmlEl = el as HTMLElement;
+        htmlEl.style.color = '#000000';
+        htmlEl.style.pageBreakInside = 'avoid';
+        htmlEl.style.breakInside = 'avoid';
+        htmlEl.style.pageBreakAfter = 'auto';
+        htmlEl.style.breakAfter = 'auto';
       });
       
       // Başlık ve arka plan rengini de düzelt
-      const titleEl = reportRef.current.querySelector('h3');
+      const titleEl = analysisResultDiv.querySelector('h3');
       if (titleEl) {
         (titleEl as HTMLElement).style.color = '#000000';
       }
-      (reportRef.current as HTMLElement).style.backgroundColor = '#ffffff';
-      (reportRef.current as HTMLElement).style.color = '#000000';
+      analysisResultDiv.style.backgroundColor = '#ffffff';
+      analysisResultDiv.style.color = '#000000';
+      analysisResultDiv.style.pageBreakInside = 'avoid';
 
-      const canvas = await html2canvas(reportRef.current, {
+      // html2canvas ile AnalysisResult div'ini yakala, scale: 2 ile net çıktı
+      const canvas = await html2canvas(analysisResultDiv, {
         backgroundColor: '#ffffff',
-        scale: 2
+        scale: 2,
+        logging: true,
+        useCORS: true,
+        allowTaint: false,
+        removeContainer: false
       });
+      
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF();
+      
+      // Logo ekle - Antetli kağıt düzeni
+      try {
+        const logoResponse = await fetch('/vq.png', {
+          headers: {
+            'Accept': 'image/png, image/*, */*'
+          }
+        });
+        if (logoResponse.ok) {
+          const logoBlob = await logoResponse.blob();
+          const logoDataUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(logoBlob);
+          });
+          // Logo: Sol üst köşe, antetli kağıt düzeni
+          pdf.addImage(logoDataUrl, 'PNG', 10, 8, 35, 12);
+          // Logo altına ince bir çizgi
+          pdf.setDrawColor(0, 0, 0);
+          pdf.setLineWidth(0.5);
+          pdf.line(10, 22, 200, 22);
+        }
+      } catch (logoError) {
+        console.warn('PDF: Logo yüklenemedi:', logoError);
+      }
+      
       const imgWidth = 190;
       const pageHeight = 295;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
       let heightLeft = imgHeight;
-      let position = 0;
+      let position = 28; // Logo ve çizgi için boşluk
+      
       pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
+      heightLeft -= (pageHeight - position);
+      
       while (heightLeft >= 0) {
         position = heightLeft - imgHeight;
         pdf.addPage();
         pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
         heightLeft -= pageHeight;
       }
+      
       pdf.save('veritas-report.pdf');
       
       // Orijinal stilleri geri yükle
-      originalStyles.forEach(({ element, color, backgroundColor }) => {
+      originalStyles.forEach(({ element, color, backgroundColor, pageBreakInside }) => {
         element.style.color = color;
         element.style.backgroundColor = backgroundColor;
+        element.style.pageBreakInside = pageBreakInside;
+        element.style.breakInside = pageBreakInside;
       });
+      
+      // PDF butonunu tekrar göster
+      pdfButtons.forEach((btn) => {
+        (btn as HTMLElement).style.display = '';
+      });
+      
       if (titleEl) {
         (titleEl as HTMLElement).style.color = gold;
       }
-      (reportRef.current as HTMLElement).style.backgroundColor = '#1a1f2e';
-      (reportRef.current as HTMLElement).style.color = lightText;
+      analysisResultDiv.style.backgroundColor = '#1a1f2e';
+      analysisResultDiv.style.color = lightText;
     } catch (err) {
       console.error('PDF download error:', err);
     }
@@ -2947,7 +3059,7 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
                         style={{
                           padding: '12px 24px',
                           background: (uploadMode as any) === 'single' ? gold : 'transparent',
-                          color: (uploadMode as any) === 'single' ? '#000000' : gold,
+                          color: (uploadMode as any) === 'single' ? '#ffffff' : gold,
                           border: `2px solid ${gold}`,
                           borderRadius: '10px 10px 0 0',
                           cursor: 'pointer',
@@ -3376,7 +3488,7 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
                             style={{
                               padding: '8px 16px',
                               background: isSelected ? gold : 'transparent',
-                              color: isSelected ? '#000000' : lightText,
+                              color: isSelected ? '#ffffff' : lightText,
                               border: `2px solid ${isSelected ? gold : gold + '66'}`,
                               borderRadius: '8px',
                               cursor: (loading || isAnalyzing) ? 'not-allowed' : 'pointer',
@@ -3905,7 +4017,7 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
                 </div>
               )}
 
-              {activeTab === 'history' && effectivePackage === 'enterprise' && (
+              {activeTab === 'history' && canAccessHistory() && (
                 <div style={{ marginTop: '40px', maxWidth: '900px', width: '100%' }}>
                   <h2 style={{ color: gold, fontSize: '2rem', marginBottom: '30px', textAlign: 'center' }}>
                     {language === 'TR' ? 'Analiz Geçmişi' : 'Analysis History'}
@@ -4574,6 +4686,22 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
             KVKK Aydınlatma Metni
           </a>
           <a 
+            href="/privacy" 
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ 
+              color: gold, 
+              textDecoration: 'none', 
+              fontSize: '14px',
+              fontWeight: '500',
+              transition: 'opacity 0.2s'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.opacity = '0.7'}
+            onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+          >
+            GDPR
+          </a>
+          <a 
             href="/distance-agreement" 
             target="_blank"
             rel="noopener noreferrer"
@@ -4605,6 +4733,68 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
           >
             Gizlilik Politikası
           </a>
+        </div>
+        
+        {/* Yasal Uyarı Akordiyon */}
+        <div style={{
+          maxWidth: '800px',
+          margin: '30px auto 20px',
+          border: `1px solid ${gold}33`,
+          borderRadius: '8px',
+          overflow: 'hidden',
+          background: darkBlue
+        }}>
+          <button
+            onClick={() => setDisclaimerOpen(!disclaimerOpen)}
+            style={{
+              width: '100%',
+              background: 'transparent',
+              border: 'none',
+              padding: '15px 20px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              color: gold,
+              fontSize: '14px',
+              fontWeight: '600',
+              transition: 'background 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = `${gold}11`;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Scale size={18} color={gold} />
+              <span>{language === 'TR' ? 'Yasal Uyarı' : 'Legal Disclaimer'}</span>
+            </div>
+            <span style={{ fontSize: '12px', transition: 'transform 0.2s', transform: disclaimerOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+              ▼
+            </span>
+          </button>
+          {disclaimerOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.3 }}
+              style={{
+                padding: '20px',
+                borderTop: `1px solid ${gold}33`,
+                color: lightText,
+                fontSize: '13px',
+                lineHeight: '1.6',
+                textAlign: 'left'
+              }}
+            >
+              {language === 'TR' 
+                ? 'Veritas Q-AI, yapay zeka tabanlı bir analiz aracıdır. Sunulan raporlar ve analizler yalnızca bilgilendirme ve risk değerlendirme amaçlı olup, hukuki tavsiye niteliği taşımaz. Sistemimiz, yetkili bir avukatın profesyonel görüşünün yerini almaz. Kuantum-AI mantığı ile en yüksek doğruluk hedeflense de, hukuki yorumlar farklılık gösterebilir. Veritas Q-AI ve işletmecileri, bu analizlere dayanılarak alınan kararlardan sorumlu tutulamaz.'
+                : 'Veritas Q-AI is an artificial intelligence-based analysis tool. The reports and insights provided are for informational and risk-assessment purposes only and do not constitute legal advice. Our system does not replace the professional judgment of a qualified lawyer. While we strive for 100% accuracy using Quantum-AI logic, legal interpretations may vary. Veritas Q-AI and its operators are not liable for any decisions made based on this analysis.'}
+            </motion.div>
+          )}
         </div>
         <p style={{ color: lightText, fontSize: '12px', margin: 0, opacity: 0.8 }}>
           © {new Date().getFullYear()} Veritas Q-AI. Tüm hakları saklıdır.
@@ -5269,68 +5459,6 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
         </div>
       )}
 
-      {/* Footer with Legal Disclaimer */}
-      <footer style={{
-        marginTop: '80px',
-        padding: '40px 20px',
-        background: darkBlue,
-        borderTop: `1px solid ${gold}22`,
-        textAlign: 'center'
-      }}>
-        <div style={{
-          maxWidth: '1200px',
-          margin: '0 auto'
-        }}>
-          <div style={{
-            marginBottom: '20px',
-            padding: '20px',
-            background: `${darkBlue}dd`,
-            borderRadius: '12px',
-            border: `1px solid ${gold}22`,
-            borderLeft: `4px solid ${gold}66`
-          }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'flex-start',
-              gap: '10px',
-              justifyContent: 'center',
-              flexWrap: 'wrap'
-            }}>
-              <span style={{
-                fontSize: '1.2rem',
-                lineHeight: '1.2'
-              }}>
-                ⚠️
-              </span>
-              <div style={{
-                flex: 1,
-                maxWidth: '900px',
-                color: lightText,
-                fontSize: '0.85rem',
-                lineHeight: '1.6',
-                fontStyle: 'italic',
-                opacity: 0.85,
-                textAlign: 'left'
-              }}>
-                <strong style={{ color: gold, fontStyle: 'normal' }}>
-                  {language === 'TR' ? 'Yasal Uyarı:' : 'Legal Disclaimer:'}
-                </strong>{' '}
-                {language === 'TR' 
-                  ? 'Veritas Q-AI, yapay zeka tabanlı bir analiz aracıdır. Sunulan raporlar ve analizler yalnızca bilgilendirme ve risk değerlendirme amaçlı olup, hukuki tavsiye niteliği taşımaz. Sistemimiz, yetkili bir avukatın profesyonel görüşünün yerini almaz. Kuantum-AI mantığı ile en yüksek doğruluk hedeflense de, hukuki yorumlar farklılık gösterebilir. Veritas Q-AI ve işletmecileri, bu analizlere dayanılarak alınan kararlardan sorumlu tutulamaz.'
-                  : 'Veritas Q-AI is an artificial intelligence-based analysis tool. The reports and insights provided are for informational and risk-assessment purposes only and do not constitute legal advice. Our system does not replace the professional judgment of a qualified lawyer. While we strive for 100% accuracy using Quantum-AI logic, legal interpretations may vary. Veritas Q-AI and its operators are not liable for any decisions made based on this analysis.'}
-              </div>
-            </div>
-          </div>
-          <div style={{
-            color: lightText,
-            fontSize: '0.8rem',
-            opacity: 0.6,
-            marginTop: '20px'
-          }}>
-            © {new Date().getFullYear()} Veritas Q-AI. {language === 'TR' ? 'Tüm hakları saklıdır.' : 'All rights reserved.'}
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }

@@ -2,6 +2,8 @@
 import React, { useState, useRef } from 'react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { Download } from 'lucide-react';
+import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 
 type UserPackage = "free" | "basic" | "professional" | "enterprise" | "quantum_global" | null;
 
@@ -142,7 +144,46 @@ const getSeverityBadgeColor = (severity: string): string => {
   return 'rgba(107, 114, 128, 0.2)'; // Varsayılan gri
 };
 
-export default function AnalysisResult({ data, result, gold, darkBlue, midBlue, lightText, language = 'TR', effectivePackage, handleDownloadPDF, isAdmin }: AnalysisResultProps) {
+export default function AnalysisResult({ 
+  data, 
+  result, 
+  gold, 
+  darkBlue, 
+  midBlue, 
+  lightText, 
+  language = 'TR', 
+  effectivePackage, 
+  handleDownloadPDF, 
+  isAdmin,
+  chatMessages,
+  chatInput,
+  setChatInput,
+  chatLoading,
+  handleChatSend,
+  activeResultTab,
+  setActiveResultTab,
+  parseAnalysisResult,
+  extractRiskScore,
+  getRiskColor,
+  getRiskLevel,
+  riskScore,
+  legalCitations,
+  canViewDetailedAnalysis,
+  canDownload,
+  canAccessLegislationDetails,
+  handleDownloadWord,
+  setShowLimitModal,
+  detectLegislationReferences,
+  fetchLegislationDetail,
+  showLegislationModal,
+  setShowLegislationModal,
+  selectedLegislation,
+  ui,
+  globalConflicts,
+  isGlobalPackage,
+  legalReferences,
+  riskAssessments
+}: AnalysisResultProps) {
   // Önce result prop'unu kontrol et (ana analiz metni)
   const displayResult = result || data;
   
@@ -589,21 +630,79 @@ export default function AnalysisResult({ data, result, gold, darkBlue, midBlue, 
     try {
       console.log('PDF: Stil değişiklikleri başlatılıyor...');
       
-      // Geçici olarak renkleri siyah yap
-      const originalStyles: { element: HTMLElement; color: string; backgroundColor: string }[] = [];
+      // Geçici olarak renkleri siyah yap (sadece metinler için)
+      const originalStyles: { element: HTMLElement; color: string; backgroundColor: string; fill?: string; stroke?: string }[] = [];
       const allElements = reportContainerRef.current.querySelectorAll('*');
       console.log('PDF: Toplam element sayısı:', allElements.length);
       
       allElements.forEach((el) => {
         const htmlEl = el as HTMLElement;
         const computedStyle = window.getComputedStyle(htmlEl);
-        originalStyles.push({
+        const originalStyle: any = {
           element: htmlEl,
           color: computedStyle.color,
           backgroundColor: computedStyle.backgroundColor
-        });
+        };
+        
+        // Sadece grafik yazıları (axis, legend) için siyah yap, sütun renklerine dokunma
+        const isChartText = htmlEl.classList.contains('pdf-axis-text') || 
+                           htmlEl.classList.contains('recharts-text') ||
+                           (htmlEl.tagName === 'text' && htmlEl.closest('svg.recharts-surface'));
+        
+        // SVG elementleri için fill ve stroke'u kaydet ama sadece yazılar için siyah yap
+        if (htmlEl.tagName === 'path' || htmlEl.tagName === 'line' || htmlEl.tagName === 'rect' || htmlEl.tagName === 'circle' || htmlEl.tagName === 'text') {
+          originalStyle.fill = (htmlEl as SVGElement).getAttribute('fill');
+          originalStyle.stroke = (htmlEl as SVGElement).getAttribute('stroke');
+          
+          // Sadece yazılar için siyah yap, sütunlar (Bar) için dokunma
+          if (isChartText || (htmlEl.tagName === 'text' && !htmlEl.closest('.recharts-bar'))) {
+            (htmlEl as SVGElement).setAttribute('fill', '#000000');
+            (htmlEl as SVGElement).setAttribute('stroke', '#000000');
+          }
+        }
+        
+        originalStyles.push(originalStyle);
         htmlEl.style.color = '#000000';
         htmlEl.style.backgroundColor = '#ffffff';
+      });
+      
+      // Recharts grafiklerindeki sadece yazıları (axis, legend) siyah yap, sütun renklerine dokunma
+      const svgTextElements = reportContainerRef.current.querySelectorAll('svg text.pdf-axis-text, svg .recharts-text, svg .recharts-cartesian-axis-tick-value, svg .recharts-legend-item-text');
+      svgTextElements.forEach((el) => {
+        const svgEl = el as SVGElement;
+        // Sadece yazıları siyah yap
+        if (svgEl.getAttribute('fill') && svgEl.getAttribute('fill') !== 'none') {
+          svgEl.setAttribute('fill', '#000000');
+        }
+        if (svgEl.getAttribute('stroke') && svgEl.getAttribute('stroke') !== 'none') {
+          svgEl.setAttribute('stroke', '#000000');
+        }
+      });
+      
+      // Bar (sütun) renklerini koru - pdf-bar-cell class'ına sahip elementlerin renklerini koru
+      const barCells = reportContainerRef.current.querySelectorAll('.pdf-bar-cell, .recharts-bar-rectangle');
+      barCells.forEach((el) => {
+        const svgEl = el as SVGElement;
+        // Orijinal rengi data-original-color'dan al ve geri yükle
+        const originalColor = svgEl.getAttribute('data-original-color');
+        if (originalColor) {
+          svgEl.setAttribute('fill', originalColor);
+        }
+      });
+      
+      // Tüm SVG path/rect elementlerini kontrol et, eğer pdf-bar-cell değilse ve text değilse siyah yapma
+      const allSvgElements = reportContainerRef.current.querySelectorAll('svg path, svg rect, svg circle');
+      allSvgElements.forEach((el) => {
+        const svgEl = el as SVGElement;
+        // Eğer bar cell değilse ve text değilse, axis grid çizgileri için siyah yap
+        if (!svgEl.classList.contains('pdf-bar-cell') && 
+            !svgEl.closest('.recharts-bar') &&
+            svgEl.closest('.recharts-cartesian-grid')) {
+          // Grid çizgileri için siyah yap
+          if (svgEl.getAttribute('stroke')) {
+            svgEl.setAttribute('stroke', '#000000');
+          }
+        }
       });
       
       (reportContainerRef.current as HTMLElement).style.backgroundColor = '#ffffff';
@@ -617,24 +716,50 @@ export default function AnalysisResult({ data, result, gold, darkBlue, midBlue, 
         useCORS: true
       });
 
+      // html2canvas için sabit genişlik ayarla (A4 genişliği: 1200px)
+      const fixedWidth = 1200;
+      const originalWidth = reportContainerRef.current.offsetWidth;
+      const originalHeight = reportContainerRef.current.offsetHeight;
+      
+      // Geçici olarak genişliği sabitle
+      (reportContainerRef.current as HTMLElement).style.width = `${fixedWidth}px`;
+      (reportContainerRef.current as HTMLElement).style.maxWidth = `${fixedWidth}px`;
+      
       const canvas = await html2canvas(reportContainerRef.current, {
         backgroundColor: '#ffffff',
         scale: 2,
         logging: true,
         useCORS: true,
         allowTaint: false,
-        removeContainer: false
+        removeContainer: false,
+        width: fixedWidth,
+        windowWidth: fixedWidth,
+        windowHeight: reportContainerRef.current.scrollHeight
       });
+      
+      // Orijinal genişliği geri yükle
+      (reportContainerRef.current as HTMLElement).style.width = '';
+      (reportContainerRef.current as HTMLElement).style.maxWidth = '';
       
       console.log('PDF: Canvas oluşturuldu, boyutlar:', canvas.width, 'x', canvas.height);
       
       const imgData = canvas.toDataURL('image/png');
       console.log('PDF: Image data oluşturuldu, uzunluk:', imgData.length);
       
-      const pdf = new jsPDF();
-      console.log('PDF: jsPDF instance oluşturuldu');
+      const pdf = new jsPDF({
+        unit: 'pt',
+        format: 'a4',
+        orientation: 'portrait'
+      });
+      console.log('PDF: jsPDF instance oluşturuldu (A4 format, pt unit)');
       
-      // Logo ekle
+      // PDF sayfa boyutları (A4: 595.28 x 841.89 pt)
+      const pageWidth = 595.28;
+      const pageHeight = 841.89;
+      const margin = 40; // 40px margin
+      const contentWidth = pageWidth - (margin * 2);
+      
+      // Logo ekle - üstten boşluk bırak
       try {
         console.log('PDF: Logo yükleniyor...');
         const logoResponse = await fetch('/vq.png');
@@ -645,8 +770,11 @@ export default function AnalysisResult({ data, result, gold, darkBlue, midBlue, 
             reader.onloadend = () => resolve(reader.result as string);
             reader.readAsDataURL(logoBlob);
           });
-          pdf.addImage(logoDataUrl, 'PNG', 10, 10, 30, 10);
-          console.log('PDF: Logo eklendi');
+          // Logo boyutları: 120px genişlik, aspect-ratio korunur
+          const logoWidthPt = 120 * 0.75; // px to pt conversion (1px ≈ 0.75pt)
+          const logoHeightPt = logoWidthPt; // Aspect ratio korunur
+          pdf.addImage(logoDataUrl, 'PNG', margin, margin + 20, logoWidthPt, logoHeightPt);
+          console.log('PDF: Logo eklendi (üstten boşluk ile)');
         } else {
           console.warn('PDF: Logo yüklenemedi, status:', logoResponse.status);
         }
@@ -654,24 +782,42 @@ export default function AnalysisResult({ data, result, gold, darkBlue, midBlue, 
         console.warn('PDF: Logo hatası:', logoError);
       }
       
-      const imgWidth = 190;
-      const pageHeight = 295;
+      const imgWidth = contentWidth;
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
       let heightLeft = imgHeight;
-      let position = 25; // Logo için boşluk
+      let position = margin + 80; // Logo için boşluk (üstten 40px margin + 40px logo alanı)
       
       console.log('PDF: İlk sayfa ekleniyor, pozisyon:', position, 'yükseklik:', imgHeight);
-      pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
-      heightLeft -= (pageHeight - position);
+      pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
+      heightLeft -= (pageHeight - position - margin);
       
       let pageCount = 1;
       while (heightLeft >= 0) {
-        position = heightLeft - imgHeight;
+        position = margin + 20; // Her yeni sayfada üstten margin
         pdf.addPage();
         pageCount++;
         console.log('PDF: Sayfa', pageCount, 'ekleniyor, pozisyon:', position);
-        pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
+        
+        // Her sayfaya logo ekle
+        try {
+          const logoResponse = await fetch('/vq.png');
+          if (logoResponse.ok) {
+            const logoBlob = await logoResponse.blob();
+            const logoDataUrl = await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.readAsDataURL(logoBlob);
+            });
+            const logoWidthPt = 120 * 0.75;
+            const logoHeightPt = logoWidthPt;
+            pdf.addImage(logoDataUrl, 'PNG', margin, margin + 20, logoWidthPt, logoHeightPt);
+          }
+        } catch (logoError) {
+          // Logo eklenemezse devam et
+        }
+        
+        pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
+        heightLeft -= (pageHeight - margin - position);
       }
       
       console.log('PDF: Toplam sayfa sayısı:', pageCount);
@@ -680,9 +826,16 @@ export default function AnalysisResult({ data, result, gold, darkBlue, midBlue, 
       console.log('PDF: Dosya başarıyla kaydedildi!');
       
       // Orijinal stilleri geri yükle
-      originalStyles.forEach(({ element, color, backgroundColor }) => {
+      originalStyles.forEach(({ element, color, backgroundColor, fill, stroke }) => {
         element.style.color = color;
         element.style.backgroundColor = backgroundColor;
+        // SVG elementleri için fill ve stroke'u geri yükle
+        if (fill !== undefined && (element as SVGElement).setAttribute) {
+          (element as SVGElement).setAttribute('fill', fill || '');
+        }
+        if (stroke !== undefined && (element as SVGElement).setAttribute) {
+          (element as SVGElement).setAttribute('stroke', stroke || '');
+        }
       });
       (reportContainerRef.current as HTMLElement).style.backgroundColor = midBlueColor;
       (reportContainerRef.current as HTMLElement).style.color = lightTextColor;
@@ -697,7 +850,26 @@ export default function AnalysisResult({ data, result, gold, darkBlue, midBlue, 
   };
   
   return (
-    <div ref={reportContainerRef} id="analysis-report" className="block min-h-[200px]" style={{ marginTop: '60px', position: 'relative' }}>
+    <div ref={reportContainerRef} id="analysis-report" className="block min-h-[200px]" style={{ marginTop: '60px', position: 'relative', pageBreakInside: 'avoid', breakInside: 'avoid', margin: '40px' }}>
+      <style>{`
+        #analysis-report section,
+        #analysis-report .panel,
+        #analysis-report > div > div,
+        #analysis-report [style*="padding"],
+        #analysis-report [style*="background"][style*="borderRadius"] {
+          page-break-inside: avoid !important;
+          break-inside: avoid !important;
+        }
+        #analysis-report > div {
+          position: relative !important;
+          margin-bottom: 32px !important;
+        }
+        #analysis-report p,
+        #analysis-report div[style*="whiteSpace"] {
+          page-break-inside: avoid !important;
+          break-inside: avoid !important;
+        }
+      `}</style>
       {/* Header: Banner ve PDF Butonu - Flex Layout */}
       <div style={{
         display: 'flex',
@@ -718,6 +890,7 @@ export default function AnalysisResult({ data, result, gold, darkBlue, midBlue, 
           {hasCriticalRisk && (
             <div
               className="animate-pulse"
+              data-html2canvas-ignore="true"
               style={{
                 background: '#ef4444',
                 color: '#ffffff',
@@ -741,38 +914,43 @@ export default function AnalysisResult({ data, result, gold, darkBlue, midBlue, 
             <button
               onClick={handlePDFDownload}
               disabled={isGeneratingPDF}
+              className="pdf-download-button"
+              data-html2canvas-ignore="true"
               style={{
                 padding: '12px 24px',
                 background: isVIP ? goldColor : '#666',
-                color: '#000000',
-                border: 'none',
+                color: isVIP ? '#FDF2E9' : '#ffffff',
+                border: `1px solid ${isVIP ? goldColor : '#666'}`,
                 borderRadius: '8px',
-                fontWeight: 'bold',
+                fontWeight: '500',
                 cursor: isGeneratingPDF ? 'wait' : (isVIP ? 'pointer' : 'not-allowed'),
-                fontSize: '1rem',
+                fontSize: '0.95rem',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                boxShadow: `0 4px 12px rgba(199, 176, 121, 0.3)`,
+                boxShadow: isVIP ? `0 2px 8px rgba(199, 176, 121, 0.2)` : 'none',
                 transition: 'all 0.3s ease',
                 zIndex: 10,
                 opacity: isGeneratingPDF ? 0.7 : 1,
                 whiteSpace: 'nowrap',
                 flexShrink: 0,
+                letterSpacing: '0.3px',
               }}
               onMouseEnter={(e) => {
                 if (isVIP && !isGeneratingPDF) {
                   e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = `0 6px 16px rgba(199, 176, 121, 0.4)`;
+                  e.currentTarget.style.boxShadow = `0 4px 12px rgba(199, 176, 121, 0.3)`;
+                  e.currentTarget.style.background = `${goldColor}dd`;
                 }
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = `0 4px 12px rgba(199, 176, 121, 0.3)`;
+                e.currentTarget.style.boxShadow = isVIP ? `0 2px 8px rgba(199, 176, 121, 0.2)` : 'none';
+                e.currentTarget.style.background = isVIP ? goldColor : '#666';
               }}
               title={!isVIP ? (language === 'TR' ? 'Bu özellik sadece VIP kullanıcılar içindir' : 'This feature is only available for VIP users') : ''}
             >
-              <span>{isGeneratingPDF ? '⏳' : '📥'}</span>
+              <Download size={16} strokeWidth={2} />
               <span>
                 {isGeneratingPDF 
                   ? (language === 'TR' ? 'PDF Hazırlanıyor...' : language === 'EN' ? 'Generating PDF...' : 'PDF wird erstellt...')
@@ -792,7 +970,7 @@ export default function AnalysisResult({ data, result, gold, darkBlue, midBlue, 
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'rgba(0, 0, 0, 0.7)',
+          background: `linear-gradient(135deg, ${goldColor}22, #000000 80%)`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -801,17 +979,18 @@ export default function AnalysisResult({ data, result, gold, darkBlue, midBlue, 
           gap: '20px',
         }}>
           <div style={{
-            background: midBlueColor,
-            padding: '30px 50px',
-            borderRadius: '12px',
-            border: `2px solid ${goldColor}`,
+            background: `linear-gradient(135deg, ${goldColor}33, #1a1a1a)`,
+            padding: '40px 60px',
+            borderRadius: '16px',
+            border: `2px solid ${goldColor}66`,
             textAlign: 'center',
+            boxShadow: `0 20px 60px rgba(0, 0, 0, 0.5), 0 0 40px ${goldColor}44`,
           }}>
             <div style={{ fontSize: '3rem', marginBottom: '20px' }}>⏳</div>
-            <div style={{ color: goldColor, fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '10px' }}>
+            <div style={{ color: '#FFFFFF', fontSize: '1.3rem', fontWeight: 'bold', marginBottom: '10px', textShadow: '0 2px 8px rgba(0, 0, 0, 0.5)' }}>
               {language === 'TR' ? 'PDF Hazırlanıyor...' : language === 'EN' ? 'Generating PDF...' : 'PDF wird erstellt...'}
             </div>
-            <div style={{ color: lightTextColor, fontSize: '0.9rem' }}>
+            <div style={{ color: '#FFFFFF', fontSize: '0.95rem', lineHeight: '1.6', opacity: 0.9, textShadow: '0 1px 4px rgba(0, 0, 0, 0.5)' }}>
               {language === 'TR' ? 'Lütfen bekleyin, bu işlem birkaç saniye sürebilir.' : language === 'EN' ? 'Please wait, this may take a few seconds.' : 'Bitte warten Sie, dies kann einige Sekunden dauern.'}
             </div>
           </div>
@@ -825,6 +1004,9 @@ export default function AnalysisResult({ data, result, gold, darkBlue, midBlue, 
           gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
           gap: '20px',
           marginBottom: '40px',
+          pageBreakInside: 'avoid',
+          breakInside: 'avoid',
+          position: 'relative',
         }}>
           {/* Risk Skoru */}
           <div style={{
@@ -833,6 +1015,8 @@ export default function AnalysisResult({ data, result, gold, darkBlue, midBlue, 
             borderRadius: '12px',
             border: `2px solid ${goldColor}44`,
             textAlign: 'center',
+            pageBreakInside: 'avoid',
+            breakInside: 'avoid',
           }}>
             <div style={{ color: goldColor, fontSize: '0.9rem', marginBottom: '8px', fontWeight: 'bold' }}>
               {language === 'TR' ? 'Risk Skoru' : language === 'EN' ? 'Risk Score' : language === 'DE' ? 'Risikobewertung' : 'Risk Score'}
@@ -855,6 +1039,8 @@ export default function AnalysisResult({ data, result, gold, darkBlue, midBlue, 
             borderRadius: '12px',
             border: `2px solid ${goldColor}44`,
             textAlign: 'center',
+            pageBreakInside: 'avoid',
+            breakInside: 'avoid',
           }}>
             <div style={{ color: goldColor, fontSize: '0.9rem', marginBottom: '8px', fontWeight: 'bold' }}>
               {language === 'TR' ? 'Uyumluluk Yüzdesi' : language === 'EN' ? 'Compliance Percentage' : language === 'DE' ? 'Compliance-Prozentsatz' : 'Compliance Percentage'}
@@ -879,6 +1065,8 @@ export default function AnalysisResult({ data, result, gold, darkBlue, midBlue, 
             borderRadius: '12px',
             border: `2px solid ${goldColor}44`,
             textAlign: 'center',
+            pageBreakInside: 'avoid',
+            breakInside: 'avoid',
           }}>
             <div style={{ color: goldColor, fontSize: '0.9rem', marginBottom: '8px', fontWeight: 'bold' }}>
               {language === 'TR' ? 'Güven Endeksi' : language === 'EN' ? 'Trust Index' : language === 'DE' ? 'Vertrauensindex' : 'Trust Index'}
@@ -895,6 +1083,82 @@ export default function AnalysisResult({ data, result, gold, darkBlue, midBlue, 
           </div>
         </div>
       )}
+
+      {/* Risk Dağılım Grafiği */}
+      {isJson && parsedData && (
+        <div style={{
+          marginTop: '30px',
+          padding: '24px',
+          background: darkBlueColor,
+          borderRadius: '12px',
+          border: `2px solid ${goldColor}44`,
+          pageBreakInside: 'avoid',
+          breakInside: 'avoid',
+        }}>
+          <div style={{ color: goldColor, fontSize: '1.1rem', marginBottom: '20px', fontWeight: 'bold', textAlign: 'center' }}>
+            {language === 'TR' ? 'Risk Dağılım Grafiği' : language === 'EN' ? 'Risk Distribution Chart' : language === 'DE' ? 'Risikoverteilungsdiagramm' : 'Risk Distribution Chart'}
+          </div>
+          <ResponsiveContainer width="100%" height={300}>
+            {(() => {
+              const riskScore = calculateRiskScore();
+              const complianceScore = calculateComplianceScore();
+              const trustIndex = calculateTrustIndex();
+              const chartData = [
+                {
+                  name: language === 'TR' ? 'Risk Skoru' : language === 'EN' ? 'Risk Score' : 'Risk Score',
+                  value: riskScore,
+                  color: riskScore >= 70 ? '#dc2626' : riskScore >= 40 ? '#ea580c' : '#3b82f6'
+                },
+                {
+                  name: language === 'TR' ? 'Uyumluluk' : language === 'EN' ? 'Compliance' : 'Compliance',
+                  value: complianceScore,
+                  color: complianceScore >= 80 ? '#16a34a' : complianceScore >= 50 ? '#ea580c' : '#dc2626'
+                },
+                {
+                  name: language === 'TR' ? 'Güven' : language === 'EN' ? 'Trust' : 'Trust',
+                  value: trustIndex,
+                  color: trustIndex >= 70 ? '#16a34a' : trustIndex >= 40 ? '#ea580c' : '#dc2626'
+                }
+              ];
+              return (
+                <BarChart
+                  data={chartData}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke={goldColor} opacity={0.2} />
+                  <XAxis 
+                    dataKey="name" 
+                    stroke={lightTextColor}
+                    style={{ fontSize: '12px' }}
+                    tick={{ fill: lightTextColor }}
+                    className="pdf-axis-text"
+                  />
+                  <YAxis 
+                    domain={[0, 100]}
+                    stroke={lightTextColor}
+                    style={{ fontSize: '12px' }}
+                    tick={{ fill: lightTextColor }}
+                    className="pdf-axis-text"
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: darkBlueColor, 
+                      border: `1px solid ${goldColor}`, 
+                      borderRadius: '8px',
+                      color: lightTextColor
+                    }}
+                  />
+                  <Bar dataKey="value" className="pdf-bar-chart">
+                    {chartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color || '#8884d8'} className="pdf-bar-cell" data-original-color={entry.color || '#8884d8'} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              );
+            })()}
+          </ResponsiveContainer>
+        </div>
+      )}
       
       {/* Ana Analiz Sonucu */}
       {displayResult && (
@@ -904,19 +1168,62 @@ export default function AnalysisResult({ data, result, gold, darkBlue, midBlue, 
           borderRadius: '20px',
           border: `2px solid ${goldColor}44`,
           marginBottom: references.length > 0 ? '40px' : '0',
+          pageBreakInside: 'avoid',
+          breakInside: 'avoid',
+          position: 'relative',
         }}>
           {/* JSON formatında ise hiyerarşik düzen */}
           {isJson && parsedData ? (
             <>
-              {/* Belge Türü ve Temel Bilgiler */}
+              {/* Belge Türü ve Temel Bilgiler - Header with Logo */}
               {(parsedData.document_type || parsedData.parties || parsedData.applicable_laws) && (
-                <div style={panelStyle}>
+                <div style={{...panelStyle, pageBreakInside: 'avoid', breakInside: 'avoid', position: 'relative', marginBottom: '32px', paddingTop: '40px', paddingBottom: '20px'}}>
+                  {/* Header: Logo ve Belge Türü */}
                   {parsedData.document_type && (
-                    <div style={{ marginBottom: '16px' }}>
-                      <strong style={{ color: goldColor, fontSize: '1.1rem' }}>{t.documentType}:</strong>
-                      <span style={{ color: lightTextColor, marginLeft: '12px', fontSize: '1rem' }}>
-                        {parsedData.document_type}
-                      </span>
+                    <div style={{ 
+                      marginBottom: '24px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '20px',
+                      paddingBottom: '16px',
+                      borderBottom: `1px solid ${goldColor}33`
+                    }}>
+                      {/* Logo - Sol taraf */}
+                      <div style={{ 
+                        width: '120px',
+                        height: 'auto',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'flex-start',
+                        flexShrink: 0
+                      }}>
+                        <img 
+                          src="/vq.png" 
+                          alt="Veritas Logo" 
+                          style={{ 
+                            width: '120px',
+                            height: 'auto',
+                            objectFit: 'contain',
+                            display: 'block'
+                          }}
+                        />
+                      </div>
+                      {/* Belge Türü - Sağ taraf */}
+                      <div style={{ 
+                        flex: 1, 
+                        textAlign: 'right',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'flex-end'
+                      }}>
+                        <div>
+                          <strong style={{ color: goldColor, fontSize: '1.1rem' }}>{t.documentType}:</strong>
+                          <span style={{ color: lightTextColor, marginLeft: '12px', fontSize: '1rem' }}>
+                            {parsedData.document_type}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   )}
                   {parsedData.parties && Array.isArray(parsedData.parties) && parsedData.parties.length > 0 && (
@@ -950,7 +1257,7 @@ export default function AnalysisResult({ data, result, gold, darkBlue, midBlue, 
               
               {/* Kapsamlı Özet */}
               {parsedData.summary && (
-                <>
+                <div style={{ pageBreakInside: 'avoid', breakInside: 'avoid', marginBottom: '2rem' }}>
                   <SectionHeader title={t.summary} icon="📋" />
                   <div style={{
                     ...panelStyle,
@@ -958,15 +1265,17 @@ export default function AnalysisResult({ data, result, gold, darkBlue, midBlue, 
                     fontSize: '1rem',
                     whiteSpace: 'pre-wrap',
                     wordWrap: 'break-word',
+                    pageBreakInside: 'avoid',
+                    breakInside: 'avoid',
                   }}>
                     {enrichTextWithTooltips(parsedData.summary)}
                   </div>
-                </>
+                </div>
               )}
               
               {/* Hukuki Risk Analizi */}
               {parsedData.risk_cards && Array.isArray(parsedData.risk_cards) && parsedData.risk_cards.length > 0 && (
-                <>
+                <div style={{ pageBreakInside: 'avoid', breakInside: 'avoid', marginBottom: '2rem' }}>
                   <SectionHeader title={t.riskAnalysis} icon="⚠️" />
                   {parsedData.risk_cards.map((risk: any, index: number) => {
                     const severityColor = getSeverityColor(risk.severity || '');
@@ -980,6 +1289,8 @@ export default function AnalysisResult({ data, result, gold, darkBlue, midBlue, 
                           ...panelStyle,
                           borderLeft: `4px solid ${severityColor}`,
                           paddingLeft: '28px',
+                          pageBreakInside: 'avoid',
+                          breakInside: 'avoid',
                         }}
                       >
                         {/* Risk Başlığı ve Badge'ler */}
@@ -1122,17 +1433,17 @@ export default function AnalysisResult({ data, result, gold, darkBlue, midBlue, 
                       </div>
                     );
                   })}
-                </>
+                </div>
               )}
               
               {/* Eylem Planı */}
               {parsedData.action_plan && Array.isArray(parsedData.action_plan) && parsedData.action_plan.length > 0 && (
-                <>
+                <div style={{ pageBreakInside: 'avoid', breakInside: 'avoid', marginBottom: '2rem' }}>
                   <SectionHeader title={t.actionPlan} icon="📝" />
                   {parsedData.action_plan.map((action: any, index: number) => {
                     const actionId = action.id || action.action || `action-${index}`;
                     return (
-                    <div key={`action-plan-${index}-${String(actionId).substring(0, 20)}`} style={panelStyle}>
+                    <div key={`action-plan-${index}-${String(actionId).substring(0, 20)}`} style={{...panelStyle, pageBreakInside: 'avoid', breakInside: 'avoid'}}>
                       <h3 style={{
                         color: goldColor,
                         fontSize: '1.2rem',
@@ -1204,14 +1515,14 @@ export default function AnalysisResult({ data, result, gold, darkBlue, midBlue, 
                     </div>
                   );
                   })}
-                </>
+                </div>
               )}
               
               {/* Uyumluluk Durumu */}
               {parsedData.compliance_status && (
-                <>
+                <div style={{ pageBreakInside: 'avoid', breakInside: 'avoid', marginBottom: '2rem' }}>
                   <SectionHeader title={t.complianceStatus} icon="✅" />
-                  <div style={panelStyle}>
+                  <div style={{...panelStyle, pageBreakInside: 'avoid', breakInside: 'avoid'}}>
                     {parsedData.compliance_status.overall && (
                       <div style={{ marginBottom: '16px' }}>
                         <strong style={{ color: goldColor, fontSize: '1.1rem' }}>{t.overall}:</strong>
@@ -1261,14 +1572,14 @@ export default function AnalysisResult({ data, result, gold, darkBlue, midBlue, 
                       </div>
                     )}
                   </div>
-                </>
+                </div>
               )}
               
               {/* Hukuki Görüş */}
               {parsedData.legal_opinion && (
-                <>
+                <div style={{ pageBreakInside: 'avoid', breakInside: 'avoid', marginBottom: '2rem' }}>
                   <SectionHeader title={t.legalOpinion} icon="⚖️" />
-                  <div style={panelStyle}>
+                  <div style={{...panelStyle, pageBreakInside: 'avoid', breakInside: 'avoid'}}>
                     {parsedData.legal_opinion.validity && (
                       <div style={{ marginBottom: '20px' }}>
                         <strong style={{ color: goldColor, fontSize: '1.1rem', display: 'block', marginBottom: '12px' }}>
@@ -1333,7 +1644,7 @@ export default function AnalysisResult({ data, result, gold, darkBlue, midBlue, 
                       </div>
                     )}
                   </div>
-                </>
+                </div>
               )}
             </>
           ) : (
@@ -1357,6 +1668,201 @@ export default function AnalysisResult({ data, result, gold, darkBlue, midBlue, 
           )}
         </div>
       )}
+
+      {/* AI'ya Sor (Chat) */}
+      {displayResult && chatMessages !== undefined && chatInput !== undefined && setChatInput && handleChatSend && chatLoading !== undefined && (
+        <div 
+          data-html2canvas-ignore="true"
+          style={{
+            marginTop: '40px',
+            padding: '30px',
+            background: midBlueColor,
+            borderRadius: '20px',
+            border: `2px solid ${goldColor}44`,
+          }}
+        >
+          <div style={{
+            color: goldColor,
+            fontSize: '1.3rem',
+            fontWeight: 'bold',
+            marginBottom: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}>
+            <span>💬</span>
+            <span>{language === 'TR' ? 'Bu Analiz Hakkında Sorunuz mu Var?' : language === 'EN' ? 'Do You Have Questions About This Analysis?' : language === 'DE' ? 'Haben Sie Fragen zu dieser Analyse?' : 'Do You Have Questions About This Analysis?'}</span>
+          </div>
+
+          {/* Chat Mesajları */}
+          <div style={{
+            maxHeight: '400px',
+            overflowY: 'auto',
+            marginBottom: '20px',
+            padding: '15px',
+            background: darkBlueColor,
+            borderRadius: '12px',
+            border: `1px solid ${goldColor}33`,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '15px'
+          }}>
+            {chatMessages.length === 0 ? (
+              <div style={{
+                color: lightTextColor,
+                opacity: 0.7,
+                textAlign: 'center',
+                padding: '20px',
+                fontSize: '0.9rem'
+              }}>
+                {language === 'TR' 
+                  ? 'Analiz hakkında sorularınızı buraya yazabilirsiniz. AI, analiz sonuçlarına göre yanıt verecektir.' 
+                  : language === 'EN'
+                  ? 'You can ask questions about the analysis here. AI will respond based on the analysis results.'
+                  : 'Sie können hier Fragen zur Analyse stellen. Die KI wird basierend auf den Analyseergebnissen antworten.'}
+              </div>
+            ) : (
+              chatMessages.map((msg, index) => (
+                <div
+                  key={index}
+                  style={{
+                    display: 'flex',
+                    justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                    marginBottom: '10px'
+                  }}
+                >
+                  <div style={{
+                    maxWidth: '75%',
+                    padding: '12px 16px',
+                    borderRadius: '12px',
+                    background: msg.role === 'user' 
+                      ? `${goldColor}33` 
+                      : darkBlueColor,
+                    border: `1px solid ${msg.role === 'user' ? goldColor : `${goldColor}22`}`,
+                    color: lightTextColor,
+                    fontSize: '0.9rem',
+                    lineHeight: '1.6',
+                    whiteSpace: 'pre-wrap',
+                    wordWrap: 'break-word'
+                  }}>
+                    <div style={{
+                      color: goldColor,
+                      fontSize: '0.75rem',
+                      marginBottom: '5px',
+                      fontWeight: 'bold'
+                    }}>
+                      {msg.role === 'user' 
+                        ? (language === 'TR' ? 'Siz' : language === 'EN' ? 'You' : 'Sie')
+                        : 'AI'}
+                    </div>
+                    {msg.content}
+                  </div>
+                </div>
+              ))
+            )}
+            {chatLoading && (
+              <div style={{
+                display: 'flex',
+                justifyContent: 'flex-start',
+                marginBottom: '10px'
+              }}>
+                <div style={{
+                  padding: '12px 16px',
+                  borderRadius: '12px',
+                  background: darkBlueColor,
+                  border: `1px solid ${goldColor}22`,
+                  color: lightTextColor,
+                  fontSize: '0.9rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px'
+                }}>
+                  <span>🤔</span>
+                  <span>{language === 'TR' ? 'Düşünüyor...' : language === 'EN' ? 'Thinking...' : 'Denke nach...'}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Chat Input */}
+          <div style={{
+            display: 'flex',
+            gap: '10px',
+            alignItems: 'flex-end'
+          }}>
+            <input
+              type="text"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleChatSend();
+                }
+              }}
+              placeholder={language === 'TR' 
+                ? 'Sorunuzu buraya yazın...' 
+                : language === 'EN'
+                ? 'Type your question here...'
+                : 'Geben Sie hier Ihre Frage ein...'}
+              disabled={chatLoading}
+              style={{
+                flex: 1,
+                padding: '12px 16px',
+                background: darkBlueColor,
+                border: `1px solid ${goldColor}44`,
+                borderRadius: '10px',
+                color: lightTextColor,
+                fontSize: '0.95rem',
+                outline: 'none',
+                transition: 'border-color 0.2s'
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = goldColor;
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = `${goldColor}44`;
+              }}
+            />
+            <button
+              onClick={handleChatSend}
+              disabled={!chatInput.trim() || chatLoading}
+              style={{
+                padding: '12px 24px',
+                background: (!chatInput.trim() || chatLoading) 
+                  ? '#666' 
+                  : `linear-gradient(135deg, ${goldColor}, #d4c08a)`,
+                border: `2px solid ${goldColor}`,
+                borderRadius: '10px',
+                color: (!chatInput.trim() || chatLoading) ? '#999' : darkBlueColor,
+                fontSize: '0.95rem',
+                fontWeight: 'bold',
+                cursor: (!chatInput.trim() || chatLoading) ? 'not-allowed' : 'pointer',
+                transition: 'all 0.2s',
+                boxShadow: (!chatInput.trim() || chatLoading) 
+                  ? 'none' 
+                  : `0 4px 12px ${goldColor}44`
+              }}
+              onMouseEnter={(e) => {
+                if (chatInput.trim() && !chatLoading) {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = `0 6px 16px ${goldColor}66`;
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (chatInput.trim() && !chatLoading) {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = `0 4px 12px ${goldColor}44`;
+                }
+              }}
+            >
+              {chatLoading 
+                ? (language === 'TR' ? 'Gönderiliyor...' : language === 'EN' ? 'Sending...' : 'Wird gesendet...')
+                : (language === 'TR' ? 'Gönder' : language === 'EN' ? 'Send' : 'Senden')}
+            </button>
+          </div>
+        </div>
+      )}
       
       {/* Hukuki Referanslar (eğer varsa) */}
       {references && references.length > 0 && (
@@ -1366,6 +1872,8 @@ export default function AnalysisResult({ data, result, gold, darkBlue, midBlue, 
           borderRadius: '20px',
           border: `2px solid ${goldColor}44`,
           marginTop: '40px',
+          pageBreakInside: 'avoid',
+          breakInside: 'avoid',
         }}>
           <SectionHeader title={t.legalReferences} icon="📚" />
           <div style={{

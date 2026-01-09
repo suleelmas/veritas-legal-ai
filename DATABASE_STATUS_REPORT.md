@@ -321,3 +321,4 @@ Eğer her iki model de kullanılıyorsa, iki ayrı fonksiyon oluşturulmalı vey
 
 
 
+

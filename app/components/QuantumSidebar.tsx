@@ -86,7 +86,7 @@ export default function QuantumSidebar({
   if (!sidebarOpen) return null;
 
   return (
-    <aside style={{ width: '260px', background: '#131b26', height: '100vh', position: 'fixed', left: 0, padding: '20px', borderRight: `1px solid ${gold}44`, zIndex: 1050, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <aside style={{ width: '260px', background: '#131b26', height: '100vh', position: 'fixed', left: 0, padding: '20px', borderRight: `1px solid ${gold}44`, zIndex: 999, display: 'flex', flexDirection: 'column', overflowY: 'auto', overflowX: 'hidden' }}>
       <h2 style={{ color: gold, textAlign: 'center', marginBottom: '20px' }}>VERITAS Q-AI</h2>
       
       {/* Credits Display */}
@@ -1064,6 +1064,7 @@ export default function QuantumSidebar({
     </aside>
   );
 }
+
 
 
 
