@@ -6,7 +6,11 @@ import { motion } from 'framer-motion';
 import PricingCard from "./components/PricingCard";
 import Header from "./components/Header";
 import QuantumSidebar from "./components/QuantumSidebar";
-import AnalysisResult from "./components/AnalysisResult";
+import dynamic from 'next/dynamic';
+
+const AnalysisResult = dynamic(() => import("./components/AnalysisResult"), {
+  ssr: false
+});
 import ComparisonResult from "./components/ComparisonResult";
 import BetaBanner from "./components/BetaBanner";
 import FeedbackModal from "./components/FeedbackModal";

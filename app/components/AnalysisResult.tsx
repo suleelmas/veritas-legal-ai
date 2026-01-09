@@ -666,16 +666,77 @@ export default function AnalysisResult({
         htmlEl.style.backgroundColor = '#ffffff';
       });
       
-      // Recharts grafiklerindeki sadece yazıları (axis, legend) siyah yap, sütun renklerine dokunma
-      const svgTextElements = reportContainerRef.current.querySelectorAll('svg text.pdf-axis-text, svg .recharts-text, svg .recharts-cartesian-axis-tick-value, svg .recharts-legend-item-text');
+      // Recharts grafiklerindeki TÜM yazıları (axis, legend, labels) PDF için geçici olarak siyah yap
+      // Orijinal renkleri kaydet ki PDF sonrası geri yükleyebilelim
+      const svgTextOriginalStyles: { element: SVGElement; fill: string | null; stroke: string | null; styleFill: string; styleStroke: string; styleColor: string }[] = [];
+      
+      const svgTextElements = reportContainerRef.current.querySelectorAll('svg text, svg .recharts-text, svg .recharts-cartesian-axis-tick-value, svg .recharts-legend-item-text, svg .recharts-cartesian-axis-tick, svg .recharts-label, svg .recharts-legend-item, svg tspan');
       svgTextElements.forEach((el) => {
         const svgEl = el as SVGElement;
-        // Sadece yazıları siyah yap
-        if (svgEl.getAttribute('fill') && svgEl.getAttribute('fill') !== 'none') {
+        // Bar içindeki text değilse zorla siyah yap (PDF için)
+        if (!svgEl.closest('.recharts-bar') && !svgEl.closest('.pdf-bar-cell')) {
+          // Orijinal renkleri kaydet
+          svgTextOriginalStyles.push({
+            element: svgEl,
+            fill: svgEl.getAttribute('fill'),
+            stroke: svgEl.getAttribute('stroke'),
+            styleFill: svgEl.style.fill || '',
+            styleStroke: svgEl.style.stroke || '',
+            styleColor: svgEl.style.color || ''
+          });
+          
+          // PDF için siyah yap
           svgEl.setAttribute('fill', '#000000');
-        }
-        if (svgEl.getAttribute('stroke') && svgEl.getAttribute('stroke') !== 'none') {
           svgEl.setAttribute('stroke', '#000000');
+          svgEl.style.fill = '#000000';
+          svgEl.style.stroke = '#000000';
+          svgEl.style.color = '#000000';
+          
+          // Tüm child text elementlerini de siyah yap ve kaydet
+          const childTexts = svgEl.querySelectorAll('text, tspan');
+          childTexts.forEach((child) => {
+            const childEl = child as SVGElement;
+            svgTextOriginalStyles.push({
+              element: childEl,
+              fill: childEl.getAttribute('fill'),
+              stroke: childEl.getAttribute('stroke'),
+              styleFill: childEl.style.fill || '',
+              styleStroke: childEl.style.stroke || '',
+              styleColor: childEl.style.color || ''
+            });
+            childEl.setAttribute('fill', '#000000');
+            childEl.setAttribute('stroke', '#000000');
+            childEl.style.fill = '#000000';
+            childEl.style.color = '#000000';
+          });
+        }
+      });
+      
+      // Tüm SVG text elementlerini tekrar kontrol et ve zorla siyah yap (PDF için)
+      const allSvgTexts = reportContainerRef.current.querySelectorAll('svg text');
+      allSvgTexts.forEach((el) => {
+        const svgEl = el as SVGElement;
+        // Bar içindeki text değilse zorla siyah yap (PDF için)
+        if (!svgEl.closest('.recharts-bar') && !svgEl.closest('.pdf-bar-cell') && !svgEl.closest('.recharts-bar-rectangle')) {
+          // Eğer daha önce kaydedilmediyse kaydet
+          const alreadySaved = svgTextOriginalStyles.some(s => s.element === svgEl);
+          if (!alreadySaved) {
+            svgTextOriginalStyles.push({
+              element: svgEl,
+              fill: svgEl.getAttribute('fill'),
+              stroke: svgEl.getAttribute('stroke'),
+              styleFill: svgEl.style.fill || '',
+              styleStroke: svgEl.style.stroke || '',
+              styleColor: svgEl.style.color || ''
+            });
+          }
+          
+          // PDF için siyah yap
+          svgEl.setAttribute('fill', '#000000');
+          svgEl.setAttribute('stroke', '#000000');
+          svgEl.style.fill = '#000000';
+          svgEl.style.stroke = '#000000';
+          svgEl.style.color = '#000000';
         }
       });
       
@@ -716,6 +777,22 @@ export default function AnalysisResult({
         useCORS: true
       });
 
+      // Gizlenen elementleri (data-html2canvas-ignore) layout'tan çıkar
+      const ignoredElements = reportContainerRef.current.querySelectorAll('[data-html2canvas-ignore="true"]');
+      const originalDisplayStyles: { element: HTMLElement; display: string }[] = [];
+      
+      ignoredElements.forEach((el) => {
+        const htmlEl = el as HTMLElement;
+        originalDisplayStyles.push({
+          element: htmlEl,
+          display: htmlEl.style.display
+        });
+        // Elementi görsel olarak gizle ama layout'u etkilemesin
+        htmlEl.style.display = 'none';
+      });
+      
+      console.log('PDF: Gizlenen element sayısı:', ignoredElements.length);
+      
       // html2canvas için sabit genişlik ayarla (A4 genişliği: 1200px)
       const fixedWidth = 1200;
       const originalWidth = reportContainerRef.current.offsetWidth;
@@ -725,43 +802,27 @@ export default function AnalysisResult({
       (reportContainerRef.current as HTMLElement).style.width = `${fixedWidth}px`;
       (reportContainerRef.current as HTMLElement).style.maxWidth = `${fixedWidth}px`;
       
-      const canvas = await html2canvas(reportContainerRef.current, {
-        backgroundColor: '#ffffff',
-        scale: 2,
-        logging: true,
-        useCORS: true,
-        allowTaint: false,
-        removeContainer: false,
-        width: fixedWidth,
-        windowWidth: fixedWidth,
-        windowHeight: reportContainerRef.current.scrollHeight
-      });
+      // Layout'un stabilize olması için kısa bir bekleme
+      await new Promise(resolve => setTimeout(resolve, 100));
       
-      // Orijinal genişliği geri yükle
-      (reportContainerRef.current as HTMLElement).style.width = '';
-      (reportContainerRef.current as HTMLElement).style.maxWidth = '';
-      
-      console.log('PDF: Canvas oluşturuldu, boyutlar:', canvas.width, 'x', canvas.height);
-      
-      const imgData = canvas.toDataURL('image/png');
-      console.log('PDF: Image data oluşturuldu, uzunluk:', imgData.length);
+      // jsPDF + html2canvas ile PDF oluştur
+      console.log('PDF: jsPDF + html2canvas ile PDF oluşturuluyor...');
       
       const pdf = new jsPDF({
         unit: 'pt',
         format: 'a4',
         orientation: 'portrait'
       });
-      console.log('PDF: jsPDF instance oluşturuldu (A4 format, pt unit)');
       
       // PDF sayfa boyutları (A4: 595.28 x 841.89 pt)
       const pageWidth = 595.28;
       const pageHeight = 841.89;
-      const margin = 40; // 40px margin
+      const margin = 40;
       const contentWidth = pageWidth - (margin * 2);
       
-      // Logo ekle - üstten boşluk bırak
+      // Logo yükleme - Sadece PDF'in en başına, %50 küçültülmüş olarak ekle
+      let logoHeight = 0; // Logo yüksekliği (pt)
       try {
-        console.log('PDF: Logo yükleniyor...');
         const logoResponse = await fetch('/vq.png');
         if (logoResponse.ok) {
           const logoBlob = await logoResponse.blob();
@@ -770,81 +831,263 @@ export default function AnalysisResult({
             reader.onloadend = () => resolve(reader.result as string);
             reader.readAsDataURL(logoBlob);
           });
-          // Logo boyutları: 120px genişlik, aspect-ratio korunur
-          const logoWidthPt = 120 * 0.75; // px to pt conversion (1px ≈ 0.75pt)
-          const logoHeightPt = logoWidthPt; // Aspect ratio korunur
-          pdf.addImage(logoDataUrl, 'PNG', margin, margin + 20, logoWidthPt, logoHeightPt);
-          console.log('PDF: Logo eklendi (üstten boşluk ile)');
-        } else {
-          console.warn('PDF: Logo yüklenemedi, status:', logoResponse.status);
+          
+          // Logo görselini yükle ve gerçek boyutlarını al
+          const img = new Image();
+          await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+            img.src = logoDataUrl;
+          });
+          
+          // %50 küçült (aspect ratio koru)
+          const originalWidth = 120; // Orijinal genişlik (px)
+          const originalHeight = img.height * (120 / img.width); // Orijinal yükseklik (px)
+          
+          // pt cinsine çevir (1px ≈ 0.75pt) ve %50 küçült
+          const logoWidthPt = (originalWidth * 0.75) * 0.5; // %50 küçültülmüş
+          logoHeight = (originalHeight * 0.75) * 0.5; // %50 küçültülmüş
+          
+          // Logoyu sayfanın en üstüne, ortaya yerleştir
+          const logoX = (pageWidth - logoWidthPt) / 2; // Ortala
+          const logoY = 20; // Üstten 20pt boşluk
+          
+          pdf.addImage(logoDataUrl, 'PNG', logoX, logoY, logoWidthPt, logoHeight);
+          console.log(`PDF: Logo en üste eklendi (${logoWidthPt.toFixed(1)}x${logoHeight.toFixed(1)}pt)`);
         }
       } catch (logoError) {
         console.warn('PDF: Logo hatası:', logoError);
       }
       
-      const imgWidth = contentWidth;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      let position = margin + 80; // Logo için boşluk (üstten 40px margin + 40px logo alanı)
+      // Ultra agresif blok bazlı render - Her metin bloğunu ayrı render et (harf kesilmesini TAMAMEN önlemek için)
+      const sectionIds = [
+        'pdf-section-dashboard',
+        'pdf-section-chart',
+        'pdf-section-document-info',
+        'pdf-section-summary',
+        'pdf-section-risk-analysis',
+        'pdf-section-action-plan',
+        'pdf-section-compliance',
+        'pdf-section-legal-opinion'
+      ];
       
-      console.log('PDF: İlk sayfa ekleniyor, pozisyon:', position, 'yükseklik:', imgHeight);
-      pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
-      heightLeft -= (pageHeight - position - margin);
+      // Logo yüksekliği + boşluk kadar aşağıdan başla
+      let currentY = margin + logoHeight + 30; // Logo için boşluk (30pt)
+      const blockSpacing = 15; // Bloklar arası boşluk
+      const minBlockHeight = 50; // Minimum blok yüksekliği (pt)
       
-      let pageCount = 1;
-      while (heightLeft >= 0) {
-        position = margin + 20; // Her yeni sayfada üstten margin
-        pdf.addPage();
-        pageCount++;
-        console.log('PDF: Sayfa', pageCount, 'ekleniyor, pozisyon:', position);
+      // Helper: Bir elementi PDF'e ekle
+      const addElementToPDF = async (element: HTMLElement, elementName: string = '') => {
+        if (!element || element.offsetHeight === 0) return;
         
-        // Her sayfaya logo ekle
-        try {
-          const logoResponse = await fetch('/vq.png');
-          if (logoResponse.ok) {
-            const logoBlob = await logoResponse.blob();
-            const logoDataUrl = await new Promise<string>((resolve) => {
-              const reader = new FileReader();
-              reader.onloadend = () => resolve(reader.result as string);
-              reader.readAsDataURL(logoBlob);
+        // Element'e padding ekle (hava boşluğu)
+        const originalPaddingBottom = element.style.paddingBottom;
+        const originalMarginBottom = element.style.marginBottom;
+        element.style.paddingBottom = '30px';
+        element.style.marginBottom = '10px';
+        element.style.pageBreakInside = 'avoid';
+        element.style.breakInside = 'avoid';
+        
+        // Canvas oluştur
+        const blockCanvas = await html2canvas(element, {
+          backgroundColor: '#ffffff',
+          scale: 2,
+          logging: false,
+          useCORS: true,
+          allowTaint: false,
+          letterRendering: true,
+          width: fixedWidth,
+          windowWidth: fixedWidth,
+          ignoreElements: (el) => {
+            return el.hasAttribute('data-html2canvas-ignore');
+          },
+          onclone: (clonedDoc, clonedElement) => {
+            // Tüm metin elementlerine sayfa kesme koruması ekle
+            const allTextElements = clonedDoc.querySelectorAll('*');
+            allTextElements.forEach((el) => {
+              const htmlEl = el as HTMLElement;
+              htmlEl.style.pageBreakInside = 'avoid';
+              htmlEl.style.breakInside = 'avoid';
+              htmlEl.style.orphans = '10'; // Çok yüksek değer - harf kesilmesini tamamen önler
+              htmlEl.style.widows = '10';
+              htmlEl.style.wordBreak = 'keep-all';
+              htmlEl.style.hyphens = 'none';
+              htmlEl.style.lineHeight = '1.8'; // Daha fazla satır yüksekliği
+              htmlEl.style.whiteSpace = 'pre-wrap'; // Boşlukları koru
             });
-            const logoWidthPt = 120 * 0.75;
-            const logoHeightPt = logoWidthPt;
-            pdf.addImage(logoDataUrl, 'PNG', margin, margin + 20, logoWidthPt, logoHeightPt);
+            
+            // Özellikle paragraflar ve başlıklar için - ÇOK AGRESİF KORUMA
+            const paragraphs = clonedDoc.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, div, span');
+            paragraphs.forEach((el) => {
+              const htmlEl = el as HTMLElement;
+              htmlEl.style.pageBreakInside = 'avoid';
+              htmlEl.style.breakInside = 'avoid';
+              htmlEl.style.pageBreakBefore = 'auto';
+              htmlEl.style.pageBreakAfter = 'auto';
+              htmlEl.style.display = 'block';
+              htmlEl.style.minHeight = '2em'; // Daha büyük minimum yükseklik
+              htmlEl.style.paddingBottom = '20px'; // Alt padding
+              htmlEl.style.marginBottom = '15px'; // Alt margin
+            });
+            
+            // Her satırı korumak için - Tüm text node'ları span içine al
+            const walker = clonedDoc.createTreeWalker(
+              clonedElement || clonedDoc.body || clonedDoc,
+              NodeFilter.SHOW_TEXT,
+              null
+            );
+            
+            const textNodes: Text[] = [];
+            let node;
+            while (node = walker.nextNode()) {
+              if (node.textContent && node.textContent.trim().length > 0) {
+                textNodes.push(node as Text);
+              }
+            }
+            
+            textNodes.forEach((textNode) => {
+              const span = clonedDoc.createElement('span');
+              span.style.pageBreakInside = 'avoid';
+              span.style.breakInside = 'avoid';
+              span.style.display = 'inline-block';
+              span.style.minHeight = '1.5em';
+              span.style.lineHeight = '1.8';
+              span.style.whiteSpace = 'nowrap'; // Satırları bölme
+              textNode.parentNode?.replaceChild(span, textNode);
+              span.appendChild(textNode);
+            });
           }
-        } catch (logoError) {
-          // Logo eklenemezse devam et
+        });
+        
+        // Padding'i geri yükle
+        element.style.paddingBottom = originalPaddingBottom;
+        element.style.marginBottom = originalMarginBottom;
+        
+        const blockImgData = blockCanvas.toDataURL('image/png');
+        const blockWidth = contentWidth;
+        const blockHeight = (blockCanvas.height * blockWidth) / blockCanvas.width;
+        
+        // Eğer blok çok küçükse atla (boş bloklar)
+        if (blockHeight < minBlockHeight) return;
+        
+        // Sayfa geçişi kontrolü - Eğer blok mevcut sayfaya sığmıyorsa yeni sayfa
+        const availableHeight = pageHeight - currentY - margin;
+        if (blockHeight > availableHeight && currentY > margin) {
+          pdf.addPage();
+          currentY = margin; // Yeni sayfada logo yok, direkt margin'den başla
         }
         
-        pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight);
-        heightLeft -= (pageHeight - margin - position);
+        // Blok çok büyükse (sayfa boyutundan büyük) böl
+        if (blockHeight > pageHeight - (margin * 2)) {
+          // Blok çok büyük, bölmek yerine uyarı ver
+          console.warn(`PDF: ${elementName} bloğu çok büyük (${blockHeight}pt), sayfa boyutunu aşıyor`);
+          // Yine de ekle, jsPDF otomatik olarak kesecek
+        }
+        
+        // Bloğu PDF'e ekle
+        pdf.addImage(blockImgData, 'PNG', margin, currentY, blockWidth, blockHeight);
+        currentY += blockHeight + blockSpacing;
+        
+        // Eğer sayfa taşarsa yeni sayfaya geç
+        if (currentY > pageHeight - margin - 50) { // 50pt güvenlik marjı
+          pdf.addPage();
+          currentY = margin;
+        }
+      };
+      
+      // Her bölümü işle
+      for (const sectionId of sectionIds) {
+        const sectionElement = reportContainerRef.current.querySelector(`#${sectionId}`) as HTMLElement;
+        if (!sectionElement) continue;
+        
+        // Grafik içeren bölümler için (chart, dashboard) - Tüm bölümü tek seferde render et
+        const hasChart = sectionElement.querySelector('svg, .recharts-wrapper, canvas');
+        if (hasChart) {
+          await addElementToPDF(sectionElement, sectionId);
+          continue;
+        }
+        
+        // Metin içeren bölümler için - Her paragraf/başlığı ayrı render et
+        const textBlocks = sectionElement.querySelectorAll('h1, h2, h3, h4, h5, h6, p, li, div[style*="margin"], div[style*="padding"]');
+        
+        if (textBlocks.length > 0) {
+          // Her metin bloğunu ayrı ayrı render et
+          for (let i = 0; i < textBlocks.length; i++) {
+            const block = textBlocks[i] as HTMLElement;
+            // Boş blokları atla
+            if (block.textContent && block.textContent.trim().length > 0) {
+              await addElementToPDF(block, `${sectionId}-block-${i}`);
+            }
+          }
+        } else {
+          // Eğer metin bloğu yoksa, tüm bölümü render et
+          await addElementToPDF(sectionElement, sectionId);
+        }
       }
       
-      console.log('PDF: Toplam sayfa sayısı:', pageCount);
-      console.log('PDF: Dosya kaydediliyor...');
+      console.log('PDF: jsPDF ile PDF başarıyla oluşturuldu');
       pdf.save('veritas-report.pdf');
-      console.log('PDF: Dosya başarıyla kaydedildi!');
-      
-      // Orijinal stilleri geri yükle
-      originalStyles.forEach(({ element, color, backgroundColor, fill, stroke }) => {
-        element.style.color = color;
-        element.style.backgroundColor = backgroundColor;
-        // SVG elementleri için fill ve stroke'u geri yükle
-        if (fill !== undefined && (element as SVGElement).setAttribute) {
-          (element as SVGElement).setAttribute('fill', fill || '');
-        }
-        if (stroke !== undefined && (element as SVGElement).setAttribute) {
-          (element as SVGElement).setAttribute('stroke', stroke || '');
-        }
-      });
-      (reportContainerRef.current as HTMLElement).style.backgroundColor = midBlueColor;
-      (reportContainerRef.current as HTMLElement).style.color = lightTextColor;
     } catch (err) {
       console.error('PDF download error:', err);
       alert(language === 'TR' 
         ? 'PDF oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.' 
         : 'An error occurred while generating PDF. Please try again.');
     } finally {
+      // Orijinal stilleri geri yükle (her durumda çalışmalı)
+      try {
+        originalStyles.forEach(({ element, color, backgroundColor, fill, stroke }) => {
+          if (element && element.style) {
+            element.style.color = color;
+            element.style.backgroundColor = backgroundColor;
+            if (fill !== undefined && (element as SVGElement).setAttribute) {
+              (element as SVGElement).setAttribute('fill', fill || '');
+            }
+            if (stroke !== undefined && (element as SVGElement).setAttribute) {
+              (element as SVGElement).setAttribute('stroke', stroke || '');
+            }
+          }
+        });
+        
+        // Grafik yazılarının orijinal renklerini geri yükle (svgTextOriginalStyles kullanarak)
+        svgTextOriginalStyles.forEach(({ element, fill, stroke, styleFill, styleStroke, styleColor }) => {
+          if (element && element.style) {
+            if (fill !== null) {
+              element.setAttribute('fill', fill);
+            } else {
+              element.removeAttribute('fill');
+            }
+            if (stroke !== null) {
+              element.setAttribute('stroke', stroke);
+            } else {
+              element.removeAttribute('stroke');
+            }
+            element.style.fill = styleFill;
+            element.style.stroke = styleStroke;
+            element.style.color = styleColor;
+          }
+        });
+        
+        if (reportContainerRef.current) {
+          (reportContainerRef.current as HTMLElement).style.backgroundColor = midBlueColor;
+          (reportContainerRef.current as HTMLElement).style.color = lightTextColor;
+        }
+        
+        // Gizlenen elementlerin display stillerini geri yükle
+        originalDisplayStyles.forEach(({ element, display }) => {
+          if (element && element.style) {
+            element.style.display = display;
+          }
+        });
+        
+        // Orijinal genişliği geri yükle
+        if (reportContainerRef.current) {
+          (reportContainerRef.current as HTMLElement).style.width = '';
+          (reportContainerRef.current as HTMLElement).style.maxWidth = '';
+        }
+      } catch (restoreError) {
+        console.error('PDF restore error:', restoreError);
+      }
+      
       setIsGeneratingPDF(false);
     }
   };
@@ -865,9 +1108,30 @@ export default function AnalysisResult({
           margin-bottom: 32px !important;
         }
         #analysis-report p,
-        #analysis-report div[style*="whiteSpace"] {
+        #analysis-report div[style*="whiteSpace"],
+        #analysis-report span,
+        #analysis-report div {
           page-break-inside: avoid !important;
           break-inside: avoid !important;
+          orphans: 3 !important;
+          widows: 3 !important;
+          word-break: normal !important;
+          hyphens: none !important;
+        }
+        /* Harflerin ve kelimelerin bölünmesini engelle */
+        #analysis-report * {
+          word-break: keep-all !important;
+          overflow-wrap: break-word !important;
+          hyphens: none !important;
+        }
+        /* Satırların bölünmesini engelle */
+        #analysis-report p,
+        #analysis-report div,
+        #analysis-report span {
+          page-break-inside: avoid !important;
+          break-inside: avoid !important;
+          orphans: 2 !important;
+          widows: 2 !important;
         }
       `}</style>
       {/* Header: Banner ve PDF Butonu - Flex Layout */}
@@ -987,7 +1251,7 @@ export default function AnalysisResult({
             boxShadow: `0 20px 60px rgba(0, 0, 0, 0.5), 0 0 40px ${goldColor}44`,
           }}>
             <div style={{ fontSize: '3rem', marginBottom: '20px' }}>⏳</div>
-            <div style={{ color: '#FFFFFF', fontSize: '1.3rem', fontWeight: 'bold', marginBottom: '10px', textShadow: '0 2px 8px rgba(0, 0, 0, 0.5)' }}>
+            <div style={{ color: '#FFFFFF', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '10px', textShadow: '0 2px 8px rgba(0, 0, 0, 0.5)' }}>
               {language === 'TR' ? 'PDF Hazırlanıyor...' : language === 'EN' ? 'Generating PDF...' : 'PDF wird erstellt...'}
             </div>
             <div style={{ color: '#FFFFFF', fontSize: '0.95rem', lineHeight: '1.6', opacity: 0.9, textShadow: '0 1px 4px rgba(0, 0, 0, 0.5)' }}>
@@ -1086,7 +1350,7 @@ export default function AnalysisResult({
 
       {/* Risk Dağılım Grafiği */}
       {isJson && parsedData && (
-        <div style={{
+        <div id="pdf-section-chart" style={{
           marginTop: '30px',
           padding: '24px',
           background: darkBlueColor,
@@ -1130,14 +1394,14 @@ export default function AnalysisResult({
                     dataKey="name" 
                     stroke={lightTextColor}
                     style={{ fontSize: '12px' }}
-                    tick={{ fill: lightTextColor }}
+                    tick={{ fill: '#000000', fontSize: 12 }}
                     className="pdf-axis-text"
                   />
                   <YAxis 
                     domain={[0, 100]}
                     stroke={lightTextColor}
                     style={{ fontSize: '12px' }}
-                    tick={{ fill: lightTextColor }}
+                    tick={{ fill: '#000000', fontSize: 12 }}
                     className="pdf-axis-text"
                   />
                   <Tooltip 
@@ -1257,7 +1521,7 @@ export default function AnalysisResult({
               
               {/* Kapsamlı Özet */}
               {parsedData.summary && (
-                <div style={{ pageBreakInside: 'avoid', breakInside: 'avoid', marginBottom: '2rem' }}>
+                <div id="pdf-section-summary" style={{ pageBreakInside: 'avoid', breakInside: 'avoid', marginBottom: '2rem' }}>
                   <SectionHeader title={t.summary} icon="📋" />
                   <div style={{
                     ...panelStyle,
@@ -1267,6 +1531,10 @@ export default function AnalysisResult({
                     wordWrap: 'break-word',
                     pageBreakInside: 'avoid',
                     breakInside: 'avoid',
+                    wordBreak: 'keep-all',
+                    hyphens: 'none',
+                    orphans: 3,
+                    widows: 3,
                   }}>
                     {enrichTextWithTooltips(parsedData.summary)}
                   </div>
@@ -1275,7 +1543,7 @@ export default function AnalysisResult({
               
               {/* Hukuki Risk Analizi */}
               {parsedData.risk_cards && Array.isArray(parsedData.risk_cards) && parsedData.risk_cards.length > 0 && (
-                <div style={{ pageBreakInside: 'avoid', breakInside: 'avoid', marginBottom: '2rem' }}>
+                <div id="pdf-section-risk-analysis" style={{ pageBreakInside: 'avoid', breakInside: 'avoid', marginBottom: '2rem' }}>
                   <SectionHeader title={t.riskAnalysis} icon="⚠️" />
                   {parsedData.risk_cards.map((risk: any, index: number) => {
                     const severityColor = getSeverityColor(risk.severity || '');
@@ -1367,6 +1635,12 @@ export default function AnalysisResult({
                             marginBottom: '20px',
                             lineHeight: '1.8',
                             whiteSpace: 'pre-wrap',
+                            pageBreakInside: 'avoid',
+                            breakInside: 'avoid',
+                            wordBreak: 'keep-all',
+                            hyphens: 'none',
+                            orphans: 3,
+                            widows: 3,
                           }}>
                             {enrichTextWithTooltips(risk.description)}
                           </div>
@@ -1408,6 +1682,12 @@ export default function AnalysisResult({
                               fontSize: '1rem',
                               lineHeight: '1.8',
                               whiteSpace: 'pre-wrap',
+                              pageBreakInside: 'avoid',
+                              breakInside: 'avoid',
+                              wordBreak: 'keep-all',
+                              hyphens: 'none',
+                              orphans: 3,
+                              widows: 3,
                             }}>
                               {risk.potential_consequences}
                             </div>
@@ -1425,6 +1705,12 @@ export default function AnalysisResult({
                               fontSize: '1rem',
                               lineHeight: '1.8',
                               whiteSpace: 'pre-wrap',
+                              pageBreakInside: 'avoid',
+                              breakInside: 'avoid',
+                              wordBreak: 'keep-all',
+                              hyphens: 'none',
+                              orphans: 3,
+                              widows: 3,
                             }}>
                               {risk.mitigation_suggestions}
                             </div>
@@ -1520,7 +1806,7 @@ export default function AnalysisResult({
               
               {/* Uyumluluk Durumu */}
               {parsedData.compliance_status && (
-                <div style={{ pageBreakInside: 'avoid', breakInside: 'avoid', marginBottom: '2rem' }}>
+                <div id="pdf-section-compliance" style={{ pageBreakInside: 'avoid', breakInside: 'avoid', marginBottom: '2rem' }}>
                   <SectionHeader title={t.complianceStatus} icon="✅" />
                   <div style={{...panelStyle, pageBreakInside: 'avoid', breakInside: 'avoid'}}>
                     {parsedData.compliance_status.overall && (
@@ -1539,6 +1825,12 @@ export default function AnalysisResult({
                         lineHeight: '1.8',
                         whiteSpace: 'pre-wrap',
                         marginBottom: '20px',
+                        pageBreakInside: 'avoid',
+                        breakInside: 'avoid',
+                        wordBreak: 'keep-all',
+                        hyphens: 'none',
+                        orphans: 3,
+                        widows: 3,
                       }}>
                         {parsedData.compliance_status.details}
                       </div>
@@ -1577,7 +1869,7 @@ export default function AnalysisResult({
               
               {/* Hukuki Görüş */}
               {parsedData.legal_opinion && (
-                <div style={{ pageBreakInside: 'avoid', breakInside: 'avoid', marginBottom: '2rem' }}>
+                <div id="pdf-section-legal-opinion" style={{ pageBreakInside: 'avoid', breakInside: 'avoid', marginBottom: '2rem' }}>
                   <SectionHeader title={t.legalOpinion} icon="⚖️" />
                   <div style={{...panelStyle, pageBreakInside: 'avoid', breakInside: 'avoid'}}>
                     {parsedData.legal_opinion.validity && (
@@ -1590,6 +1882,12 @@ export default function AnalysisResult({
                           fontSize: '1rem',
                           lineHeight: '1.8',
                           whiteSpace: 'pre-wrap',
+                          pageBreakInside: 'avoid',
+                          breakInside: 'avoid',
+                          wordBreak: 'keep-all',
+                          hyphens: 'none',
+                          orphans: 3,
+                          widows: 3,
                         }}>
                           {parsedData.legal_opinion.validity}
                         </div>
@@ -1606,6 +1904,12 @@ export default function AnalysisResult({
                           fontSize: '1rem',
                           lineHeight: '1.8',
                           whiteSpace: 'pre-wrap',
+                          pageBreakInside: 'avoid',
+                          breakInside: 'avoid',
+                          wordBreak: 'keep-all',
+                          hyphens: 'none',
+                          orphans: 3,
+                          widows: 3,
                         }}>
                           {parsedData.legal_opinion.enforceability}
                         </div>
@@ -1622,6 +1926,12 @@ export default function AnalysisResult({
                           fontSize: '1rem',
                           lineHeight: '1.8',
                           whiteSpace: 'pre-wrap',
+                          pageBreakInside: 'avoid',
+                          breakInside: 'avoid',
+                          wordBreak: 'keep-all',
+                          hyphens: 'none',
+                          orphans: 3,
+                          widows: 3,
                         }}>
                           {parsedData.legal_opinion.recommendations}
                         </div>
@@ -1638,6 +1948,12 @@ export default function AnalysisResult({
                           fontSize: '1rem',
                           lineHeight: '1.8',
                           whiteSpace: 'pre-wrap',
+                          pageBreakInside: 'avoid',
+                          breakInside: 'avoid',
+                          wordBreak: 'keep-all',
+                          hyphens: 'none',
+                          orphans: 3,
+                          widows: 3,
                         }}>
                           {parsedData.legal_opinion.alternative_approaches}
                         </div>
