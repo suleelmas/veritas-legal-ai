@@ -583,8 +583,8 @@ export default function AnalysisResult({
   const isVIP = isAdmin || effectivePackage === 'enterprise' || effectivePackage === 'quantum_global' || effectivePackage === 'professional';
   
   // PDF indirme fonksiyonu (eğer prop'tan gelmiyorsa)
-  const handlePDFDownload = async () => {
-    console.log('PDF: Fonksiyon başladı');
+  const handlePDFDownload = () => {
+    console.log('PDF: window.print() yöntemi ile yazdırma başlatılıyor...');
     
     // VIP kontrolü
     if (!isVIP) {
@@ -599,502 +599,196 @@ export default function AnalysisResult({
     
     console.log('PDF: VIP kontrolü başarılı');
     
-    if (handleDownloadPDF) {
-      console.log('PDF: handleDownloadPDF prop kullanılıyor');
-      setIsGeneratingPDF(true);
-      try {
-        await handleDownloadPDF();
-        console.log('PDF: Prop fonksiyonu tamamlandı');
-      } catch (err) {
-        console.error('PDF: Prop fonksiyonu hatası:', err);
-      } finally {
-        setIsGeneratingPDF(false);
-      }
-      return;
-    }
-    
-    if (!reportContainerRef.current) {
-      console.error('PDF: Element bulunamadı - reportContainerRef.current null');
-      alert(language === 'TR' 
-        ? 'Rapor bulunamadı. Lütfen sayfayı yenileyin.' 
-        : 'Report not found. Please refresh the page.');
-      return;
-    }
-    
-    console.log('PDF: Element bulundu:', reportContainerRef.current);
-    console.log('PDF: Element ID:', reportContainerRef.current.id);
-    console.log('PDF: Element görünür mü:', reportContainerRef.current.offsetWidth > 0 && reportContainerRef.current.offsetHeight > 0);
-    
-    setIsGeneratingPDF(true);
-    
-    try {
-      console.log('PDF: Stil değişiklikleri başlatılıyor...');
-      
-      // Geçici olarak renkleri siyah yap (sadece metinler için)
-      const originalStyles: { element: HTMLElement; color: string; backgroundColor: string; fill?: string; stroke?: string }[] = [];
-      const allElements = reportContainerRef.current.querySelectorAll('*');
-      console.log('PDF: Toplam element sayısı:', allElements.length);
-      
-      allElements.forEach((el) => {
-        const htmlEl = el as HTMLElement;
-        const computedStyle = window.getComputedStyle(htmlEl);
-        const originalStyle: any = {
-          element: htmlEl,
-          color: computedStyle.color,
-          backgroundColor: computedStyle.backgroundColor
-        };
-        
-        // Sadece grafik yazıları (axis, legend) için siyah yap, sütun renklerine dokunma
-        const isChartText = htmlEl.classList.contains('pdf-axis-text') || 
-                           htmlEl.classList.contains('recharts-text') ||
-                           (htmlEl.tagName === 'text' && htmlEl.closest('svg.recharts-surface'));
-        
-        // SVG elementleri için fill ve stroke'u kaydet ama sadece yazılar için siyah yap
-        if (htmlEl.tagName === 'path' || htmlEl.tagName === 'line' || htmlEl.tagName === 'rect' || htmlEl.tagName === 'circle' || htmlEl.tagName === 'text') {
-          originalStyle.fill = (htmlEl as SVGElement).getAttribute('fill');
-          originalStyle.stroke = (htmlEl as SVGElement).getAttribute('stroke');
-          
-          // Sadece yazılar için siyah yap, sütunlar (Bar) için dokunma
-          if (isChartText || (htmlEl.tagName === 'text' && !htmlEl.closest('.recharts-bar'))) {
-            (htmlEl as SVGElement).setAttribute('fill', '#000000');
-            (htmlEl as SVGElement).setAttribute('stroke', '#000000');
-          }
-        }
-        
-        originalStyles.push(originalStyle);
-        htmlEl.style.color = '#000000';
-        htmlEl.style.backgroundColor = '#ffffff';
-      });
-      
-      // Recharts grafiklerindeki TÜM yazıları (axis, legend, labels) PDF için geçici olarak siyah yap
-      // Orijinal renkleri kaydet ki PDF sonrası geri yükleyebilelim
-      const svgTextOriginalStyles: { element: SVGElement; fill: string | null; stroke: string | null; styleFill: string; styleStroke: string; styleColor: string }[] = [];
-      
-      const svgTextElements = reportContainerRef.current.querySelectorAll('svg text, svg .recharts-text, svg .recharts-cartesian-axis-tick-value, svg .recharts-legend-item-text, svg .recharts-cartesian-axis-tick, svg .recharts-label, svg .recharts-legend-item, svg tspan');
-      svgTextElements.forEach((el) => {
-        const svgEl = el as SVGElement;
-        // Bar içindeki text değilse zorla siyah yap (PDF için)
-        if (!svgEl.closest('.recharts-bar') && !svgEl.closest('.pdf-bar-cell')) {
-          // Orijinal renkleri kaydet
-          svgTextOriginalStyles.push({
-            element: svgEl,
-            fill: svgEl.getAttribute('fill'),
-            stroke: svgEl.getAttribute('stroke'),
-            styleFill: svgEl.style.fill || '',
-            styleStroke: svgEl.style.stroke || '',
-            styleColor: svgEl.style.color || ''
-          });
-          
-          // PDF için siyah yap
-          svgEl.setAttribute('fill', '#000000');
-          svgEl.setAttribute('stroke', '#000000');
-          svgEl.style.fill = '#000000';
-          svgEl.style.stroke = '#000000';
-          svgEl.style.color = '#000000';
-          
-          // Tüm child text elementlerini de siyah yap ve kaydet
-          const childTexts = svgEl.querySelectorAll('text, tspan');
-          childTexts.forEach((child) => {
-            const childEl = child as SVGElement;
-            svgTextOriginalStyles.push({
-              element: childEl,
-              fill: childEl.getAttribute('fill'),
-              stroke: childEl.getAttribute('stroke'),
-              styleFill: childEl.style.fill || '',
-              styleStroke: childEl.style.stroke || '',
-              styleColor: childEl.style.color || ''
-            });
-            childEl.setAttribute('fill', '#000000');
-            childEl.setAttribute('stroke', '#000000');
-            childEl.style.fill = '#000000';
-            childEl.style.color = '#000000';
-          });
-        }
-      });
-      
-      // Tüm SVG text elementlerini tekrar kontrol et ve zorla siyah yap (PDF için)
-      const allSvgTexts = reportContainerRef.current.querySelectorAll('svg text');
-      allSvgTexts.forEach((el) => {
-        const svgEl = el as SVGElement;
-        // Bar içindeki text değilse zorla siyah yap (PDF için)
-        if (!svgEl.closest('.recharts-bar') && !svgEl.closest('.pdf-bar-cell') && !svgEl.closest('.recharts-bar-rectangle')) {
-          // Eğer daha önce kaydedilmediyse kaydet
-          const alreadySaved = svgTextOriginalStyles.some(s => s.element === svgEl);
-          if (!alreadySaved) {
-            svgTextOriginalStyles.push({
-              element: svgEl,
-              fill: svgEl.getAttribute('fill'),
-              stroke: svgEl.getAttribute('stroke'),
-              styleFill: svgEl.style.fill || '',
-              styleStroke: svgEl.style.stroke || '',
-              styleColor: svgEl.style.color || ''
-            });
-          }
-          
-          // PDF için siyah yap
-          svgEl.setAttribute('fill', '#000000');
-          svgEl.setAttribute('stroke', '#000000');
-          svgEl.style.fill = '#000000';
-          svgEl.style.stroke = '#000000';
-          svgEl.style.color = '#000000';
-        }
-      });
-      
-      // Bar (sütun) renklerini koru - pdf-bar-cell class'ına sahip elementlerin renklerini koru
-      const barCells = reportContainerRef.current.querySelectorAll('.pdf-bar-cell, .recharts-bar-rectangle');
-      barCells.forEach((el) => {
-        const svgEl = el as SVGElement;
-        // Orijinal rengi data-original-color'dan al ve geri yükle
-        const originalColor = svgEl.getAttribute('data-original-color');
-        if (originalColor) {
-          svgEl.setAttribute('fill', originalColor);
-        }
-      });
-      
-      // Tüm SVG path/rect elementlerini kontrol et, eğer pdf-bar-cell değilse ve text değilse siyah yapma
-      const allSvgElements = reportContainerRef.current.querySelectorAll('svg path, svg rect, svg circle');
-      allSvgElements.forEach((el) => {
-        const svgEl = el as SVGElement;
-        // Eğer bar cell değilse ve text değilse, axis grid çizgileri için siyah yap
-        if (!svgEl.classList.contains('pdf-bar-cell') && 
-            !svgEl.closest('.recharts-bar') &&
-            svgEl.closest('.recharts-cartesian-grid')) {
-          // Grid çizgileri için siyah yap
-          if (svgEl.getAttribute('stroke')) {
-            svgEl.setAttribute('stroke', '#000000');
-          }
-        }
-      });
-      
-      (reportContainerRef.current as HTMLElement).style.backgroundColor = '#ffffff';
-      (reportContainerRef.current as HTMLElement).style.color = '#000000';
-      
-      console.log('PDF: Canvas oluşturuluyor...');
-      console.log('PDF: html2canvas ayarları:', {
-        backgroundColor: '#ffffff',
-        scale: 2,
-        logging: true,
-        useCORS: true
-      });
-
-      // Gizlenen elementleri (data-html2canvas-ignore) layout'tan çıkar
-      const ignoredElements = reportContainerRef.current.querySelectorAll('[data-html2canvas-ignore="true"]');
-      const originalDisplayStyles: { element: HTMLElement; display: string }[] = [];
-      
-      ignoredElements.forEach((el) => {
-        const htmlEl = el as HTMLElement;
-        originalDisplayStyles.push({
-          element: htmlEl,
-          display: htmlEl.style.display
-        });
-        // Elementi görsel olarak gizle ama layout'u etkilemesin
-        htmlEl.style.display = 'none';
-      });
-      
-      console.log('PDF: Gizlenen element sayısı:', ignoredElements.length);
-      
-      // html2canvas için sabit genişlik ayarla (A4 genişliği: 1200px)
-      const fixedWidth = 1200;
-      const originalWidth = reportContainerRef.current.offsetWidth;
-      const originalHeight = reportContainerRef.current.offsetHeight;
-      
-      // Geçici olarak genişliği sabitle
-      (reportContainerRef.current as HTMLElement).style.width = `${fixedWidth}px`;
-      (reportContainerRef.current as HTMLElement).style.maxWidth = `${fixedWidth}px`;
-      
-      // Layout'un stabilize olması için kısa bir bekleme
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // jsPDF + html2canvas ile PDF oluştur
-      console.log('PDF: jsPDF + html2canvas ile PDF oluşturuluyor...');
-      
-      const pdf = new jsPDF({
-        unit: 'pt',
-        format: 'a4',
-        orientation: 'portrait'
-      });
-      
-      // PDF sayfa boyutları (A4: 595.28 x 841.89 pt)
-      const pageWidth = 595.28;
-      const pageHeight = 841.89;
-      const margin = 40;
-      const contentWidth = pageWidth - (margin * 2);
-      
-      // Logo yükleme - Sadece PDF'in en başına, %50 küçültülmüş olarak ekle
-      let logoHeight = 0; // Logo yüksekliği (pt)
-      try {
-        const logoResponse = await fetch('/vq.png');
-        if (logoResponse.ok) {
-          const logoBlob = await logoResponse.blob();
-          const logoDataUrl = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.readAsDataURL(logoBlob);
-          });
-          
-          // Logo görselini yükle ve gerçek boyutlarını al
-          const img = new Image();
-          await new Promise((resolve, reject) => {
-            img.onload = resolve;
-            img.onerror = reject;
-            img.src = logoDataUrl;
-          });
-          
-          // %50 küçült (aspect ratio koru)
-          const originalWidth = 120; // Orijinal genişlik (px)
-          const originalHeight = img.height * (120 / img.width); // Orijinal yükseklik (px)
-          
-          // pt cinsine çevir (1px ≈ 0.75pt) ve %50 küçült
-          const logoWidthPt = (originalWidth * 0.75) * 0.5; // %50 küçültülmüş
-          logoHeight = (originalHeight * 0.75) * 0.5; // %50 küçültülmüş
-          
-          // Logoyu sayfanın en üstüne, ortaya yerleştir
-          const logoX = (pageWidth - logoWidthPt) / 2; // Ortala
-          const logoY = 20; // Üstten 20pt boşluk
-          
-          pdf.addImage(logoDataUrl, 'PNG', logoX, logoY, logoWidthPt, logoHeight);
-          console.log(`PDF: Logo en üste eklendi (${logoWidthPt.toFixed(1)}x${logoHeight.toFixed(1)}pt)`);
-        }
-      } catch (logoError) {
-        console.warn('PDF: Logo hatası:', logoError);
-      }
-      
-      // Ultra agresif blok bazlı render - Her metin bloğunu ayrı render et (harf kesilmesini TAMAMEN önlemek için)
-      const sectionIds = [
-        'pdf-section-dashboard',
-        'pdf-section-chart',
-        'pdf-section-document-info',
-        'pdf-section-summary',
-        'pdf-section-risk-analysis',
-        'pdf-section-action-plan',
-        'pdf-section-compliance',
-        'pdf-section-legal-opinion'
-      ];
-      
-      // Logo yüksekliği + boşluk kadar aşağıdan başla
-      let currentY = margin + logoHeight + 30; // Logo için boşluk (30pt)
-      const blockSpacing = 15; // Bloklar arası boşluk
-      const minBlockHeight = 50; // Minimum blok yüksekliği (pt)
-      
-      // Helper: Bir elementi PDF'e ekle
-      const addElementToPDF = async (element: HTMLElement, elementName: string = '') => {
-        if (!element || element.offsetHeight === 0) return;
-        
-        // Element'e padding ekle (hava boşluğu)
-        const originalPaddingBottom = element.style.paddingBottom;
-        const originalMarginBottom = element.style.marginBottom;
-        element.style.paddingBottom = '30px';
-        element.style.marginBottom = '10px';
-        element.style.pageBreakInside = 'avoid';
-        element.style.breakInside = 'avoid';
-        
-        // Canvas oluştur
-        const blockCanvas = await html2canvas(element, {
-          backgroundColor: '#ffffff',
-          scale: 2,
-          logging: false,
-          useCORS: true,
-          allowTaint: false,
-          letterRendering: true,
-          width: fixedWidth,
-          windowWidth: fixedWidth,
-          ignoreElements: (el) => {
-            return el.hasAttribute('data-html2canvas-ignore');
-          },
-          onclone: (clonedDoc, clonedElement) => {
-            // Tüm metin elementlerine sayfa kesme koruması ekle
-            const allTextElements = clonedDoc.querySelectorAll('*');
-            allTextElements.forEach((el) => {
-              const htmlEl = el as HTMLElement;
-              htmlEl.style.pageBreakInside = 'avoid';
-              htmlEl.style.breakInside = 'avoid';
-              htmlEl.style.orphans = '10'; // Çok yüksek değer - harf kesilmesini tamamen önler
-              htmlEl.style.widows = '10';
-              htmlEl.style.wordBreak = 'keep-all';
-              htmlEl.style.hyphens = 'none';
-              htmlEl.style.lineHeight = '1.8'; // Daha fazla satır yüksekliği
-              htmlEl.style.whiteSpace = 'pre-wrap'; // Boşlukları koru
-            });
-            
-            // Özellikle paragraflar ve başlıklar için - ÇOK AGRESİF KORUMA
-            const paragraphs = clonedDoc.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, div, span');
-            paragraphs.forEach((el) => {
-              const htmlEl = el as HTMLElement;
-              htmlEl.style.pageBreakInside = 'avoid';
-              htmlEl.style.breakInside = 'avoid';
-              htmlEl.style.pageBreakBefore = 'auto';
-              htmlEl.style.pageBreakAfter = 'auto';
-              htmlEl.style.display = 'block';
-              htmlEl.style.minHeight = '2em'; // Daha büyük minimum yükseklik
-              htmlEl.style.paddingBottom = '20px'; // Alt padding
-              htmlEl.style.marginBottom = '15px'; // Alt margin
-            });
-            
-            // Her satırı korumak için - Tüm text node'ları span içine al
-            const walker = clonedDoc.createTreeWalker(
-              clonedElement || clonedDoc.body || clonedDoc,
-              NodeFilter.SHOW_TEXT,
-              null
-            );
-            
-            const textNodes: Text[] = [];
-            let node;
-            while (node = walker.nextNode()) {
-              if (node.textContent && node.textContent.trim().length > 0) {
-                textNodes.push(node as Text);
-              }
-            }
-            
-            textNodes.forEach((textNode) => {
-              const span = clonedDoc.createElement('span');
-              span.style.pageBreakInside = 'avoid';
-              span.style.breakInside = 'avoid';
-              span.style.display = 'inline-block';
-              span.style.minHeight = '1.5em';
-              span.style.lineHeight = '1.8';
-              span.style.whiteSpace = 'nowrap'; // Satırları bölme
-              textNode.parentNode?.replaceChild(span, textNode);
-              span.appendChild(textNode);
-            });
-          }
-        });
-        
-        // Padding'i geri yükle
-        element.style.paddingBottom = originalPaddingBottom;
-        element.style.marginBottom = originalMarginBottom;
-        
-        const blockImgData = blockCanvas.toDataURL('image/png');
-        const blockWidth = contentWidth;
-        const blockHeight = (blockCanvas.height * blockWidth) / blockCanvas.width;
-        
-        // Eğer blok çok küçükse atla (boş bloklar)
-        if (blockHeight < minBlockHeight) return;
-        
-        // Sayfa geçişi kontrolü - Eğer blok mevcut sayfaya sığmıyorsa yeni sayfa
-        const availableHeight = pageHeight - currentY - margin;
-        if (blockHeight > availableHeight && currentY > margin) {
-          pdf.addPage();
-          currentY = margin; // Yeni sayfada logo yok, direkt margin'den başla
-        }
-        
-        // Blok çok büyükse (sayfa boyutundan büyük) böl
-        if (blockHeight > pageHeight - (margin * 2)) {
-          // Blok çok büyük, bölmek yerine uyarı ver
-          console.warn(`PDF: ${elementName} bloğu çok büyük (${blockHeight}pt), sayfa boyutunu aşıyor`);
-          // Yine de ekle, jsPDF otomatik olarak kesecek
-        }
-        
-        // Bloğu PDF'e ekle
-        pdf.addImage(blockImgData, 'PNG', margin, currentY, blockWidth, blockHeight);
-        currentY += blockHeight + blockSpacing;
-        
-        // Eğer sayfa taşarsa yeni sayfaya geç
-        if (currentY > pageHeight - margin - 50) { // 50pt güvenlik marjı
-          pdf.addPage();
-          currentY = margin;
-        }
-      };
-      
-      // Her bölümü işle
-      for (const sectionId of sectionIds) {
-        const sectionElement = reportContainerRef.current.querySelector(`#${sectionId}`) as HTMLElement;
-        if (!sectionElement) continue;
-        
-        // Grafik içeren bölümler için (chart, dashboard) - Tüm bölümü tek seferde render et
-        const hasChart = sectionElement.querySelector('svg, .recharts-wrapper, canvas');
-        if (hasChart) {
-          await addElementToPDF(sectionElement, sectionId);
-          continue;
-        }
-        
-        // Metin içeren bölümler için - Her paragraf/başlığı ayrı render et
-        const textBlocks = sectionElement.querySelectorAll('h1, h2, h3, h4, h5, h6, p, li, div[style*="margin"], div[style*="padding"]');
-        
-        if (textBlocks.length > 0) {
-          // Her metin bloğunu ayrı ayrı render et
-          for (let i = 0; i < textBlocks.length; i++) {
-            const block = textBlocks[i] as HTMLElement;
-            // Boş blokları atla
-            if (block.textContent && block.textContent.trim().length > 0) {
-              await addElementToPDF(block, `${sectionId}-block-${i}`);
-            }
-          }
-        } else {
-          // Eğer metin bloğu yoksa, tüm bölümü render et
-          await addElementToPDF(sectionElement, sectionId);
-        }
-      }
-      
-      console.log('PDF: jsPDF ile PDF başarıyla oluşturuldu');
-      pdf.save('veritas-report.pdf');
-    } catch (err) {
-      console.error('PDF download error:', err);
-      alert(language === 'TR' 
-        ? 'PDF oluşturulurken bir hata oluştu. Lütfen tekrar deneyin.' 
-        : 'An error occurred while generating PDF. Please try again.');
-    } finally {
-      // Orijinal stilleri geri yükle (her durumda çalışmalı)
-      try {
-        originalStyles.forEach(({ element, color, backgroundColor, fill, stroke }) => {
-          if (element && element.style) {
-            element.style.color = color;
-            element.style.backgroundColor = backgroundColor;
-            if (fill !== undefined && (element as SVGElement).setAttribute) {
-              (element as SVGElement).setAttribute('fill', fill || '');
-            }
-            if (stroke !== undefined && (element as SVGElement).setAttribute) {
-              (element as SVGElement).setAttribute('stroke', stroke || '');
-            }
-          }
-        });
-        
-        // Grafik yazılarının orijinal renklerini geri yükle (svgTextOriginalStyles kullanarak)
-        svgTextOriginalStyles.forEach(({ element, fill, stroke, styleFill, styleStroke, styleColor }) => {
-          if (element && element.style) {
-            if (fill !== null) {
-              element.setAttribute('fill', fill);
-            } else {
-              element.removeAttribute('fill');
-            }
-            if (stroke !== null) {
-              element.setAttribute('stroke', stroke);
-            } else {
-              element.removeAttribute('stroke');
-            }
-            element.style.fill = styleFill;
-            element.style.stroke = styleStroke;
-            element.style.color = styleColor;
-          }
-        });
-        
-        if (reportContainerRef.current) {
-          (reportContainerRef.current as HTMLElement).style.backgroundColor = midBlueColor;
-          (reportContainerRef.current as HTMLElement).style.color = lightTextColor;
-        }
-        
-        // Gizlenen elementlerin display stillerini geri yükle
-        originalDisplayStyles.forEach(({ element, display }) => {
-          if (element && element.style) {
-            element.style.display = display;
-          }
-        });
-        
-        // Orijinal genişliği geri yükle
-        if (reportContainerRef.current) {
-          (reportContainerRef.current as HTMLElement).style.width = '';
-          (reportContainerRef.current as HTMLElement).style.maxWidth = '';
-        }
-      } catch (restoreError) {
-        console.error('PDF restore error:', restoreError);
-      }
-      
-      setIsGeneratingPDF(false);
-    }
+    // Grafiklerin render olması için bekleme süresi
+    setTimeout(() => {
+      window.print();
+    }, 500);
   };
   
   return (
     <div ref={reportContainerRef} id="analysis-report" className="block min-h-[200px]" style={{ marginTop: '60px', position: 'relative', pageBreakInside: 'avoid', breakInside: 'avoid', margin: '40px' }}>
       <style>{`
+        /* PDF İndir butonunun rengini koru */
+        .pdf-download-button {
+          color: #f5f3e8 !important;
+        }
+        .pdf-download-button:disabled {
+          color: #f5f3e8 !important;
+        }
+        .pdf-download-button span {
+          color: inherit !important;
+        }
+        
+        /* @media print - Spotlight (Sahne Işığı) Tekniği */
+        @page {
+          size: auto;
+          margin: 10mm;
+        }
+        
+        @media print {
+          /* 1. Önce sayfadaki HER ŞEYİ görünmez yap (ama yok etme, visibility kullan) */
+          body * {
+            visibility: hidden;
+          }
+
+          /* 2. Sadece "analysis-report" ID'li raporu GÖRÜNÜR yap */
+          #analysis-report, #analysis-report * {
+            visibility: visible !important;
+          }
+
+          /* 3. Raporu sayfanın en tepesine yerleştir */
+          #analysis-report {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 20px !important;
+            background-color: white !important;
+            color: black !important;
+            height: auto !important;
+            overflow: visible !important;
+            max-width: none !important;
+          }
+
+          /* 4. Renkleri Zorla: Beyaz Kağıt, Siyah Yazı */
+          #analysis-report * {
+            color: #000000 !important;
+            background-color: transparent !important;
+            text-shadow: none !important;
+            box-shadow: none !important;
+          }
+          
+          #analysis-report h1, 
+          #analysis-report h2, 
+          #analysis-report h3,
+          #analysis-report h4,
+          #analysis-report h5,
+          #analysis-report h6,
+          #analysis-report p,
+          #analysis-report div,
+          #analysis-report span {
+            color: #000000 !important;
+          }
+
+          /* 5. Gereksiz butonları ve chat'i gizle (Display none burada güvenli çünkü raporun içinde değiller) */
+          button,
+          .no-print,
+          .pdf-download-button,
+          .download-button,
+          [id*="chat"],
+          [class*="chat"],
+          [class*="Chat"],
+          .download-section,
+          aside,
+          nav,
+          footer,
+          [data-html2canvas-ignore="true"],
+          header:not(#analysis-report header) {
+            display: none !important;
+            visibility: hidden !important;
+          }
+          
+          /* 6. Grafikleri Görünür Kıl (SVG Fix) */
+          #analysis-report .recharts-wrapper,
+          #analysis-report .recharts-surface,
+          #analysis-report .chart-container,
+          #analysis-report svg {
+            width: 100% !important;
+            height: auto !important;
+            min-height: 300px !important;
+            display: block !important;
+            overflow: visible !important;
+            visibility: visible !important;
+            max-width: none !important;
+          }
+          
+          /* Grafik yazılarını siyah yap */
+          #analysis-report tspan,
+          #analysis-report text,
+          #analysis-report svg text,
+          #analysis-report svg tspan,
+          #analysis-report .recharts-cartesian-axis-tick-value,
+          #analysis-report .recharts-text,
+          #analysis-report .recharts-legend-item-text {
+            fill: #000000 !important;
+            stroke: none !important;
+            color: #000000 !important;
+          }
+          
+          /* Grafik çizgilerini siyah yap */
+          #analysis-report path,
+          #analysis-report line {
+            stroke: #000000 !important;
+          }
+          
+          /* 6a. Document Type Başlık Hizalaması - Flex yapısını kır */
+          #analysis-report [style*="justify-content"],
+          #analysis-report [style*="display: flex"],
+          #analysis-report [style*="display:flex"],
+          #analysis-report [class*="flex"] {
+            display: block !important;
+          }
+          
+          /* Document Type başlığını sola yasla */
+          #analysis-report [id*="document-info"],
+          #analysis-report [id*="pdf-section-document-info"],
+          #analysis-report [style*="Document Type"],
+          #analysis-report [style*="Belge Türü"],
+          #analysis-report [style*="textAlign: 'right'"] {
+            text-align: left !important;
+            margin-left: 0 !important;
+            width: 100% !important;
+          }
+          
+          /* Document Type içindeki flex container'ları block yap */
+          #analysis-report [style*="justifyContent: 'space-between'"],
+          #analysis-report [style*="justifyContent: 'flex-end'"],
+          #analysis-report [style*="justifyContent: 'flex-start'"] {
+            display: block !important;
+            text-align: left !important;
+          }
+          
+          /* 7. Başlıkların sayfa sonuna denk gelip bölünmemesi */
+          #analysis-report h1,
+          #analysis-report h2,
+          #analysis-report h3,
+          #analysis-report h4,
+          #analysis-report h5,
+          #analysis-report h6 {
+            page-break-after: avoid !important;
+            break-after: avoid !important;
+          }
+          
+          /* 8. Sayfa bölünmelerini önle */
+          #analysis-report section,
+          #analysis-report .panel,
+          #analysis-report > div > div {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+          
+          /* 9. Logo düzenlemesi - PDF'in en başında zarif görünüm */
+          #analysis-report img[src*="vq.png"],
+          #analysis-report img[src*="logo"] {
+            display: block !important;
+            width: 120px !important;
+            height: auto !important;
+            margin-bottom: 20px !important;
+            object-fit: contain !important;
+            visibility: visible !important;
+          }
+          
+          /* 10. Flex ve container kısıtlamalarını kaldır */
+          #analysis-report [class*="flex"],
+          #analysis-report [style*="display: flex"],
+          #analysis-report [class*="max-w"],
+          #analysis-report [style*="max-width"] {
+            max-width: none !important;
+            width: 100% !important;
+          }
+        }
+        
         #analysis-report section,
         #analysis-report .panel,
         #analysis-report > div > div,
@@ -1183,7 +877,7 @@ export default function AnalysisResult({
               style={{
                 padding: '12px 24px',
                 background: isVIP ? goldColor : '#666',
-                color: isVIP ? '#FDF2E9' : '#ffffff',
+                color: isVIP ? '#f5f3e8' : '#ffffff', // Beyaza yakın gold
                 border: `1px solid ${isVIP ? goldColor : '#666'}`,
                 borderRadius: '8px',
                 fontWeight: '500',
@@ -1211,6 +905,7 @@ export default function AnalysisResult({
                 e.currentTarget.style.transform = 'translateY(0)';
                 e.currentTarget.style.boxShadow = isVIP ? `0 2px 8px rgba(199, 176, 121, 0.2)` : 'none';
                 e.currentTarget.style.background = isVIP ? goldColor : '#666';
+                e.currentTarget.style.color = `${isVIP ? '#f5f3e8' : '#ffffff'} !important`; // Rengi koru
               }}
               title={!isVIP ? (language === 'TR' ? 'Bu özellik sadece VIP kullanıcılar içindir' : 'This feature is only available for VIP users') : ''}
             >
@@ -1234,7 +929,9 @@ export default function AnalysisResult({
           left: 0,
           right: 0,
           bottom: 0,
-          background: `linear-gradient(135deg, ${goldColor}22, #000000 80%)`,
+          background: 'rgba(245, 243, 232, 0.95)', // Beyaza yakın gold
+          backdropFilter: 'blur(5px)',
+          WebkitBackdropFilter: 'blur(5px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -1243,18 +940,35 @@ export default function AnalysisResult({
           gap: '20px',
         }}>
           <div style={{
-            background: `linear-gradient(135deg, ${goldColor}33, #1a1a1a)`,
-            padding: '40px 60px',
-            borderRadius: '16px',
-            border: `2px solid ${goldColor}66`,
+            background: 'rgba(255, 255, 255, 0.98)',
+            padding: '50px 70px',
+            borderRadius: '20px',
+            border: '1px solid #d4af37',
             textAlign: 'center',
-            boxShadow: `0 20px 60px rgba(0, 0, 0, 0.5), 0 0 40px ${goldColor}44`,
+            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.1), 0 0 20px rgba(212, 175, 55, 0.2)',
           }}>
-            <div style={{ fontSize: '3rem', marginBottom: '20px' }}>⏳</div>
-            <div style={{ color: '#FFFFFF', fontSize: '1.5rem', fontWeight: 'bold', marginBottom: '10px', textShadow: '0 2px 8px rgba(0, 0, 0, 0.5)' }}>
+            <div style={{ 
+              fontSize: '3rem', 
+              marginBottom: '24px',
+              color: '#1a365d',
+              animation: 'spin 2s linear infinite'
+            }}>⏳</div>
+            <div style={{ 
+              color: '#1a365d', 
+              fontSize: '1.5rem', 
+              fontWeight: 600, 
+              marginBottom: '12px',
+              letterSpacing: '0.5px'
+            }}>
               {language === 'TR' ? 'PDF Hazırlanıyor...' : language === 'EN' ? 'Generating PDF...' : 'PDF wird erstellt...'}
             </div>
-            <div style={{ color: '#FFFFFF', fontSize: '0.95rem', lineHeight: '1.6', opacity: 0.9, textShadow: '0 1px 4px rgba(0, 0, 0, 0.5)' }}>
+            <div style={{ 
+              color: '#1a365d', 
+              fontSize: '0.95rem', 
+              lineHeight: '1.6', 
+              opacity: 0.8,
+              letterSpacing: '0.3px'
+            }}>
               {language === 'TR' ? 'Lütfen bekleyin, bu işlem birkaç saniye sürebilir.' : language === 'EN' ? 'Please wait, this may take a few seconds.' : 'Bitte warten Sie, dies kann einige Sekunden dauern.'}
             </div>
           </div>
@@ -1388,20 +1102,21 @@ export default function AnalysisResult({
                 <BarChart
                   data={chartData}
                   margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                  isAnimationActive={false}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke={goldColor} opacity={0.2} />
                   <XAxis 
                     dataKey="name" 
                     stroke={lightTextColor}
                     style={{ fontSize: '12px' }}
-                    tick={{ fill: '#000000', fontSize: 12 }}
+                    tick={{ fill: '#f5f3e8', fontSize: 12 }} // Beyaza yakın gold
                     className="pdf-axis-text"
                   />
                   <YAxis 
                     domain={[0, 100]}
                     stroke={lightTextColor}
                     style={{ fontSize: '12px' }}
-                    tick={{ fill: '#000000', fontSize: 12 }}
+                    tick={{ fill: '#f5f3e8', fontSize: 12 }} // Beyaza yakın gold
                     className="pdf-axis-text"
                   />
                   <Tooltip 
@@ -1451,22 +1166,25 @@ export default function AnalysisResult({
                       alignItems: 'center',
                       gap: '20px',
                       paddingBottom: '16px',
-                      borderBottom: `1px solid ${goldColor}33`
+                      border: 'none !important',
+                      boxShadow: 'none !important'
+                      // Border ve box-shadow kaldırıldı - çirkin siyah çizgi yok
                     }}>
-                      {/* Logo - Sol taraf */}
+                      {/* Logo - Sol taraf - Küçük ve zarif */}
                       <div style={{ 
-                        width: '120px',
+                        width: '30px',
                         height: 'auto',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'flex-start',
-                        flexShrink: 0
+                        flexShrink: 0,
+                        marginTop: '40px' // Üst boşluk
                       }}>
                         <img 
                           src="/vq.png" 
                           alt="Veritas Logo" 
                           style={{ 
-                            width: '120px',
+                            width: '30px',
                             height: 'auto',
                             objectFit: 'contain',
                             display: 'block'

@@ -2208,7 +2208,72 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
   };
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: darkBlue, color: lightText, fontFamily: 'sans-serif' }}>
+    <>
+      <style jsx global>{`
+        @media print {
+          /* --- SAYFA VE GÖRÜNÜRLÜK --- */
+          @page { size: auto; margin: 10mm; }
+          body { background-color: white !important; -webkit-print-color-adjust: exact; }
+          
+          /* Her şeyi gizle, sadece raporu aç (Spotlight Tekniği) */
+          body * { visibility: hidden; height: 0; overflow: hidden; }
+          
+          #printable-area, #printable-area *,
+          #analysis-report, #analysis-report * {
+            visibility: visible !important;
+            height: auto;
+            overflow: visible !important;
+          }
+          
+          #printable-area,
+          #analysis-report {
+            position: absolute !important; left: 0 !important; top: 0 !important;
+            width: 100% !important; margin: 0 !important; padding: 0 !important;
+            z-index: 9999;
+          }
+
+          /* --- 📊 GRAFİK (RECHARTS) DÜZELTME --- */
+          /* Grafiğin kutusuna fiziksel yükseklik zorla (Kare sorununu çözer) */
+          #printable-area .recharts-wrapper,
+          #printable-area .recharts-surface,
+          #printable-area .recharts-responsive-container,
+          #analysis-report .recharts-wrapper,
+          #analysis-report .recharts-surface,
+          #analysis-report .recharts-responsive-container {
+            display: block !important;
+            visibility: visible !important;
+            width: 100% !important;
+            height: 400px !important; /* KESİN YÜKSEKLİK */
+            min-height: 400px !important;
+          }
+          
+          /* SVG Çizgilerini Siyaha Boya */
+          #printable-area path, #printable-area line, #printable-area rect, #printable-area circle,
+          #analysis-report path, #analysis-report line, #analysis-report rect, #analysis-report circle {
+            stroke: #000000 !important;
+            stroke-width: 2px !important;
+            fill-opacity: 0.8 !important;
+          }
+          #printable-area text,
+          #analysis-report text {
+            fill: #000000 !important;
+            font-weight: bold !important;
+          }
+
+          /* --- 🧹 TEMİZLİK --- */
+          /* Butonları boyutsuz hale getirerek yok et */
+          button, .no-print, a, [role="button"], .download-btn {
+            display: none !important; width: 0 !important; height: 0 !important;
+          }
+
+          /* --- 📝 METİN HİZALAMA --- */
+          #printable-area h1, #printable-area h2, #printable-area h3, #printable-area div,
+          #analysis-report h1, #analysis-report h2, #analysis-report h3, #analysis-report div {
+            text-align: left !important; margin-left: 0 !important; width: 100% !important;
+          }
+        }
+      `}</style>
+      <div style={{ minHeight: '100vh', backgroundColor: darkBlue, color: lightText, fontFamily: 'sans-serif' }}>
       <BetaBanner 
         language={language}
         onReportClick={() => setShowFeedbackModal(true)}
@@ -3122,13 +3187,13 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
                         <label
                           htmlFor="pdfInputFinal"
                           style={{ 
-                            backgroundColor: '#ffffff',
-                            background: '#ffffff',
-                            color: '#000000', 
+                            backgroundColor: '#1e293b',
+                            background: '#1e293b',
+                            color: '#ffffff', 
                             borderRadius: '50px', 
                             padding: '15px 40px', 
-                            fontWeight: 'bold',
-                            border: '2px solid #ffffff',
+                            fontWeight: 800,
+                            border: '2px solid #1e293b',
                             cursor: 'pointer',
                             marginBottom: '20px',
                             display: 'flex',
@@ -3136,30 +3201,38 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
                             justifyContent: 'center',
                             width: 'fit-content',
                             margin: '0 auto 20px auto',
-                            boxShadow: '0 4px 20px rgba(255, 255, 255, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.2)',
+                            boxShadow: '0 4px 20px rgba(30, 41, 59, 0.4), 0 0 0 1px rgba(30, 41, 59, 0.3)',
                             transition: 'all 0.3s ease',
                             fontSize: '16px'
                           }}
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.setProperty('background-color', '#f5f5f5', 'important');
-                            e.currentTarget.style.setProperty('background', '#f5f5f5', 'important');
-                            e.currentTarget.style.setProperty('color', '#000000', 'important');
+                            e.currentTarget.style.setProperty('background-color', '#334155', 'important');
+                            e.currentTarget.style.setProperty('background', '#334155', 'important');
+                            e.currentTarget.style.setProperty('color', '#ffffff', 'important');
                             e.currentTarget.style.transform = 'translateY(-2px)';
-                            e.currentTarget.style.boxShadow = '0 6px 25px rgba(255, 255, 255, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.4)';
+                            e.currentTarget.style.boxShadow = '0 6px 25px rgba(30, 41, 59, 0.6), 0 0 0 1px rgba(30, 41, 59, 0.5)';
+                            const span = e.currentTarget.querySelector('span');
+                            if (span) span.style.color = '#ffffff';
                           }}
                           onMouseLeave={(e) => {
-                            e.currentTarget.style.setProperty('background-color', '#ffffff', 'important');
-                            e.currentTarget.style.setProperty('background', '#ffffff', 'important');
-                            e.currentTarget.style.setProperty('color', '#000000', 'important');
+                            e.currentTarget.style.setProperty('background-color', '#1e293b', 'important');
+                            e.currentTarget.style.setProperty('background', '#1e293b', 'important');
+                            e.currentTarget.style.setProperty('color', '#ffffff', 'important');
                             e.currentTarget.style.transform = 'translateY(0)';
-                            e.currentTarget.style.boxShadow = '0 4px 20px rgba(255, 255, 255, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.2)';
+                            e.currentTarget.style.boxShadow = '0 4px 20px rgba(30, 41, 59, 0.4), 0 0 0 1px rgba(30, 41, 59, 0.3)';
+                            const span = e.currentTarget.querySelector('span');
+                            if (span) span.style.color = '#ffffff';
                           }}
                         >
-                          <span style={{ color: '#000000', fontWeight: 'bold' }}>
+                          <span style={{ color: '#ffffff', fontWeight: 800 }}>
                             {language === 'TR' ? 'Dosya Seç' : language === 'EN' ? 'Choose File' : language === 'DE' ? 'Datei auswählen' : language === 'FR' ? 'Sélectionner un fichier' : ui[language].select || 'Select File'}
                           </span>
                         </label>
                         {file && <p style={{ marginTop: '20px', color: '#4ade80', fontWeight: 'bold', fontSize: '1rem' }}>● {file.name}</p>}
+                        {/* Açıklama yazıları - Beyaz veya açık gri renk */}
+                        <p style={{ color: '#e2e8f0', fontSize: '0.95rem', marginTop: '15px', textAlign: 'center', opacity: 0.9 }}>
+                          {ui[language].step1Desc || (language === 'TR' ? 'PDF belgenizi yükleyin' : 'Upload your PDF document')}
+                        </p>
                       </>
                     )}
 
@@ -3176,7 +3249,8 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
                           padding: '30px',
                           background: darkBlue,
                           borderRadius: '15px',
-                          border: `2px dashed ${gold}66`
+                          border: `2px dashed ${gold}66`,
+                          color: '#ffffff' // Açıklama yazıları için beyaz
                         }}>
                           <h3 style={{ color: gold, fontSize: '1.2rem', marginBottom: '20px', textAlign: 'center' }}>
                             {language === 'TR' ? 'İlk Dosya' : 'Document 1'}
@@ -3565,6 +3639,9 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
                           e.currentTarget.style.backgroundColor = '#2563eb'; // Hover: bg-blue-700
                           e.currentTarget.style.boxShadow = '0 6px 16px rgba(59, 130, 246, 0.6)';
                           e.currentTarget.style.transform = 'translateY(-2px)';
+                          // Hover'da yazı rengini koru
+                          const span = e.currentTarget.querySelector('span');
+                          if (span) span.style.color = '#ffffff';
                         }
                       }}
                       onMouseLeave={(e) => {
@@ -3575,10 +3652,22 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
                           e.currentTarget.style.backgroundColor = '#3b82f6';
                           e.currentTarget.style.boxShadow = '0 4px 12px rgba(59, 130, 246, 0.4)';
                           e.currentTarget.style.transform = 'translateY(0)';
+                          // Normal durumda yazı rengini koru
+                          const span = e.currentTarget.querySelector('span');
+                          if (span) span.style.color = '#ffffff';
+                        } else {
+                          // Disabled durumda soluk beyaz
+                          const span = e.currentTarget.querySelector('span');
+                          if (span) span.style.color = '#e2e8f0';
                         }
                       }}
                     >
-                      <span style={{ color: '#ffffff' }}>
+                      <span style={{ 
+                        color: (
+                          ((uploadMode as any) === 'single' && file) || 
+                          ((uploadMode as any) === 'compare' && file && file2)
+                        ) && !loading && !isAnalyzing && !isLimitReached() ? '#ffffff' : '#e2e8f0' // Disabled durumda soluk beyaz
+                      }}>
                         {isAnalyzing 
                           ? (language === 'TR' ? '🔍 Analiz Ediliyor...' : '🔍 Analyzing...') 
                           : isLimitReached() 
@@ -5463,6 +5552,7 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
         </div>
       )}
 
-    </div>
+      </div>
+    </>
   );
 }
