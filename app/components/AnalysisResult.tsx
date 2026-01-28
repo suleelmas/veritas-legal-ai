@@ -606,6 +606,7 @@ export default function AnalysisResult({
   };
   
   return (
+    <>
     <div ref={reportContainerRef} id="analysis-report" className="block min-h-[200px]" style={{ marginTop: '60px', position: 'relative', pageBreakInside: 'avoid', breakInside: 'avoid', margin: '40px' }}>
       <style>{`
         /* PDF İndir butonunun rengini koru */
@@ -872,7 +873,7 @@ export default function AnalysisResult({
             <button
               onClick={handlePDFDownload}
               disabled={isGeneratingPDF}
-              className="pdf-download-button"
+              className="pdf-download-button no-print"
               data-html2canvas-ignore="true"
               style={{
                 padding: '12px 24px',
@@ -1993,5 +1994,61 @@ export default function AnalysisResult({
         </div>
       )}
     </div>
+    
+    {/* PDF İndir Butonu - #analysis-report dışında (PDF'te görünmemesi için) */}
+    {(handleDownloadPDF || handlePDFDownload) && (
+      <button
+        onClick={handlePDFDownload}
+        disabled={isGeneratingPDF}
+        className="pdf-download-button no-print"
+        data-html2canvas-ignore="true"
+        style={{
+          padding: '12px 24px',
+          background: isVIP ? goldColor : '#666',
+          color: isVIP ? '#f5f3e8' : '#ffffff', // Beyaza yakın gold
+          border: `1px solid ${isVIP ? goldColor : '#666'}`,
+          borderRadius: '8px',
+          fontWeight: '500',
+          cursor: isGeneratingPDF ? 'wait' : (isVIP ? 'pointer' : 'not-allowed'),
+          fontSize: '0.95rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          boxShadow: isVIP ? `0 2px 8px rgba(199, 176, 121, 0.2)` : 'none',
+          transition: 'all 0.3s ease',
+          zIndex: 10,
+          opacity: isGeneratingPDF ? 0.7 : 1,
+          whiteSpace: 'nowrap',
+          flexShrink: 0,
+          letterSpacing: '0.3px',
+          position: 'absolute',
+          top: '20px',
+          right: '20px',
+        }}
+        onMouseEnter={(e) => {
+          if (isVIP && !isGeneratingPDF) {
+            e.currentTarget.style.transform = 'translateY(-2px)';
+            e.currentTarget.style.boxShadow = `0 4px 12px rgba(199, 176, 121, 0.3)`;
+            e.currentTarget.style.background = `${goldColor}dd`;
+          }
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'translateY(0)';
+          e.currentTarget.style.boxShadow = isVIP ? `0 2px 8px rgba(199, 176, 121, 0.2)` : 'none';
+          e.currentTarget.style.background = isVIP ? goldColor : '#666';
+          e.currentTarget.style.color = `${isVIP ? '#f5f3e8' : '#ffffff'} !important`; // Rengi koru
+        }}
+        title={!isVIP ? (language === 'TR' ? 'Bu özellik sadece VIP kullanıcılar içindir' : 'This feature is only available for VIP users') : ''}
+      >
+        <Download size={16} strokeWidth={2} />
+        <span>
+          {isGeneratingPDF 
+            ? (language === 'TR' ? 'PDF Hazırlanıyor...' : language === 'EN' ? 'Generating PDF...' : 'PDF wird erstellt...')
+            : (language === 'TR' ? 'PDF İndir' : language === 'EN' ? 'Download PDF' : language === 'DE' ? 'PDF Herunterladen' : 'Download PDF')
+          }
+        </span>
+      </button>
+    )}
+    </>
   );
 }

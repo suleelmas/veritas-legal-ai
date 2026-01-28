@@ -2211,29 +2211,45 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
     <>
       <style jsx global>{`
         @media print {
-          /* --- SAYFA VE GÖRÜNÜRLÜK --- */
-          @page { size: auto; margin: 10mm; }
-          body { background-color: white !important; -webkit-print-color-adjust: exact; }
-          
-          /* Her şeyi gizle, sadece raporu aç (Spotlight Tekniği) */
-          body * { visibility: hidden; height: 0; overflow: hidden; }
-          
+          /* 1. SAYFA YAPISI */
+          @page { size: A4; margin: 10mm; }
+          body { 
+            margin: 0; 
+            padding: 0; 
+            background-color: white !important; 
+            -webkit-print-color-adjust: exact;
+          }
+
+          /* 2. HER ŞEYİ GİZLE (RESET) */
+          body * {
+            visibility: hidden;
+          }
+
+          /* 3. BEYAZ PERDE TAKTİĞİ (Raporu en üste al ve arkasını kapat) */
           #printable-area, #printable-area *,
           #analysis-report, #analysis-report * {
             visibility: visible !important;
-            height: auto;
-            overflow: visible !important;
-          }
-          
-          #printable-area,
-          #analysis-report {
-            position: absolute !important; left: 0 !important; top: 0 !important;
-            width: 100% !important; margin: 0 !important; padding: 0 !important;
-            z-index: 9999;
           }
 
-          /* --- 📊 GRAFİK (RECHARTS) DÜZELTME --- */
-          /* Grafiğin kutusuna fiziksel yükseklik zorla (Kare sorununu çözer) */
+          #printable-area,
+          #analysis-report {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            min-height: 100vh !important;
+            margin: 0 !important;
+            padding: 20px !important;
+            
+            /* KRİTİK: Arka planı KİREÇ BEYAZI yap ki arkadaki dev ikon görünmesin */
+            background-color: #ffffff !important; 
+            
+            /* KRİTİK: Raporu diğer her şeyin üstüne çıkar */
+            z-index: 99999 !important; 
+          }
+
+          /* 4. GRAFİKLERİ GERİ GETİR (Eski Çalışan Yöntem) */
+          /* Grafiğin olduğu kutuya kesin boyut ver */
           #printable-area .recharts-wrapper,
           #printable-area .recharts-surface,
           #printable-area .recharts-responsive-container,
@@ -2243,33 +2259,35 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
             display: block !important;
             visibility: visible !important;
             width: 100% !important;
-            height: 400px !important; /* KESİN YÜKSEKLİK */
-            min-height: 400px !important;
+            height: 400px !important; /* Bu satır grafiği görünür kılan kilit koddu */
+            overflow: visible !important;
           }
           
-          /* SVG Çizgilerini Siyaha Boya */
-          #printable-area path, #printable-area line, #printable-area rect, #printable-area circle,
-          #analysis-report path, #analysis-report line, #analysis-report rect, #analysis-report circle {
-            stroke: #000000 !important;
-            stroke-width: 2px !important;
-            fill-opacity: 0.8 !important;
-          }
+          /* Çizgileri siyah yap */
+          #printable-area path,
+          #printable-area line,
           #printable-area text,
+          #analysis-report path,
+          #analysis-report line,
           #analysis-report text {
-            fill: #000000 !important;
-            font-weight: bold !important;
+            fill: #000 !important;
+            stroke: #000 !important;
+            opacity: 1 !important;
           }
 
-          /* --- 🧹 TEMİZLİK --- */
-          /* Butonları boyutsuz hale getirerek yok et */
-          button, .no-print, a, [role="button"], .download-btn {
-            display: none !important; width: 0 !important; height: 0 !important;
+          /* 5. DEV İKONU VE BUTONU "GRAFİĞE DOKUNMADAN" SİL */
+          /* Sadece butonları ve linkleri gizle, SVG genelini gizleme! */
+          button,
+          .no-print,
+          a[href],
+          [role="button"],
+          .download-section {
+            display: none !important;
           }
-
-          /* --- 📝 METİN HİZALAMA --- */
-          #printable-area h1, #printable-area h2, #printable-area h3, #printable-area div,
-          #analysis-report h1, #analysis-report h2, #analysis-report h3, #analysis-report div {
-            text-align: left !important; margin-left: 0 !important; width: 100% !important;
+          
+          /* Eğer butonun içindeki SVG (ikon) ayrı bir elemansa onu buton üzerinden hedefle */
+          button svg, .no-print svg {
+            display: none !important;
           }
         }
       `}</style>
