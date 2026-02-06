@@ -12,22 +12,38 @@ genai.configure(api_key=gemini_key)
 model = genai.GenerativeModel('gemini-2.0-flash')
 
 def create_post():
-    # İçerik Üretme
-    prompt = "Create a professional Instagram post about Veritas Q-AI, the world's first quantum-powered legal analysis platform. Include a hook, 3 benefits, and hashtags. Language: English."
-    response = model.generate_content(prompt)
-    content = response.text
+    try:
+        # İçerik Üretme
+        prompt = "Create a professional Instagram post about Veritas Q-AI. Mention it's an AI-powered legal analysis platform. Include 3 benefits and legal hashtags. Language: English."
+        response = model.generate_content(prompt)
+        content = response.text
 
-    # Instagram'a Yükleme (Örnek görsel ile)
-    image_url = "https://images.unsplash.com/photo-1589829545856-d10d557cf95f" # Geçici hukuk görseli
-    
-    post_url = f"https://graph.facebook.com/v21.0/{insta_id}/media"
-    payload = {'image_url': image_url, 'caption': content, 'access_token': insta_token}
-    r = requests.post(post_url, data=payload)
-    
-    if r.status_code == 200:
+        # Instagram'a Yükleme (Örnek hukuk görseli)
+        image_url = "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?q=80&w=1000&auto=format&fit=crop"
+        
+        # 1. Adım: Medya Kabı Oluşturma
+        post_url = f"https://graph.facebook.com/v21.0/{insta_id}/media"
+        payload = {
+            'image_url': image_url, 
+            'caption': content, 
+            'access_token': insta_token
+        }
+        r = requests.post(post_url, data=payload)
+        r.raise_for_status() # Hata varsa durdur
+        
+        # 2. Adım: Medyayı Yayınlama
         creation_id = r.json()['id']
         publish_url = f"https://graph.facebook.com/v21.0/{insta_id}/media_publish"
-        requests.post(publish_url, data={'creation_id': creation_id, 'access_token': insta_token})
-        print("Paylaşım başarılı!")
+        publish_payload = {
+            'creation_id': creation_id, 
+            'access_token': insta_token
+        }
+        requests.post(publish_url, data=publish_payload)
+        print("Veritas Q-AI paylaşımı başarıyla yapıldı!")
 
-create_post()
+    except Exception as e:
+        print(f"Hata oluştu: {e}")
+
+if __name__ == "__main__":
+    create_post()
+    
