@@ -2,28 +2,30 @@ import os
 from google import genai
 import requests
 
-# Secrets'tan bilgileri çekiyoruz
+# Secrets'tan (GitHub Sırları) bilgileri çekiyoruz
 gemini_key = os.getenv("GEMINI_API_KEY")
 insta_token = os.getenv("INSTA_TOKEN")
 insta_id = os.getenv("INSTA_ACCOUNT_ID")
 
-# Yeni Gemini Kurulumu
+# Yeni nesil Gemini kurulumu
 client = genai.Client(api_key=gemini_key)
 
 def create_post():
     try:
-        # İçerik Üretme (Model adını 'gemini-2.0-flash' veya 'gemini-1.5-flash' yapabilirsin)
+        # 1. Gemini ile İçerik Üretme
+        # 'models/' ön eki 404 hatasını çözmek için eklendi
         prompt = "Create a professional Instagram post about Veritas Q-AI, an AI-powered legal analysis platform. Mention its speed and accuracy for lawyers. Language: English."
         response = client.models.generate_content(
-            model="gemini-1.5-flash",
+            model="models/gemini-1.5-flash", 
             contents=prompt
         )
         content = response.text
 
-        # Güvenilir görsel
+        # 2. Instagram Paylaşım Ayarları
+        # Unsplash üzerinden güvenilir bir görsel linki
         image_url = "https://images.unsplash.com/photo-1505664194779-8beaceb93744?w=1080"
         
-        # Instagram'a veri gönderiliyor
+        # Medya Kabı Oluşturma (Step 1)
         post_url = f"https://graph.facebook.com/v21.0/{insta_id}/media"
         payload = {
             'image_url': image_url, 
@@ -31,26 +33,15 @@ def create_post():
             'access_token': insta_token
         }
         
-        print("Instagram'a gönderiliyor...")
+        print("Instagram sunucularına veri gönderiliyor...")
         r = requests.post(post_url, data=payload)
         
+        # Eğer Instagram tarafında hata olursa detayını yazdır
         if r.status_code != 200:
-            print(f"Hata Detayı: {r.text}")
+            print(f"Instagram Hata Detayı: {r.text}")
             return
 
-        # Medyayı Yayınlama
+        # Medyayı Yayınlama (Step 2)
         creation_id = r.json()['id']
-        publish_url = f"https://graph.facebook.com/v21.0/{insta_id}/media_publish"
-        publish_payload = {
-            'creation_id': creation_id, 
-            'access_token': insta_token
-        }
+        publish_url = f"
         
-        pub_r = requests.post(publish_url, data=publish_payload)
-        print("Veritas Q-AI paylaşımı başarıyla yapıldı!")
-
-    except Exception as e:
-        print(f"Kod hatası: {e}")
-
-if __name__ == "__main__":
-    create_post()
