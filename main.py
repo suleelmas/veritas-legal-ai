@@ -13,9 +13,10 @@ client = genai.Client(api_key=gemini_key)
 def create_post():
     try:
         # 1. Gemini ile İçerik Üretme
+        # Bazı sürümlerde model ismi sadece 'gemini-1.5-flash' olarak kabul edilir
         prompt = "Create a professional Instagram post about Veritas Q-AI, an AI-powered legal analysis platform. Mention its speed and accuracy for lawyers. Language: English."
         response = client.models.generate_content(
-            model="models/gemini-1.5-flash", 
+            model="gemini-1.5-flash", 
             contents=prompt
         )
         content = response.text
