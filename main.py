@@ -13,7 +13,6 @@ client = genai.Client(api_key=gemini_key)
 def create_post():
     try:
         # 1. Gemini ile İngilizce ve Profesyonel İçerik Üretme
-        # Dili İngilizce olarak belirledik ve sadece "caption" üretmesini istedik
         prompt = (
             "Write a short, professional, and catchy Instagram caption in English for Veritas Q-AI. "
             "Veritas Q-AI is an AI-powered legal analysis platform that helps lawyers analyze documents with speed and accuracy. "
@@ -28,7 +27,6 @@ def create_post():
         content = response.text
 
         # 2. Instagram Paylaşım Ayarları
-        # Teknolojik ve modern bir hukuk görseli
         image_url = "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=1080"
         
         # Medya Kabı Oluşturma
@@ -57,4 +55,14 @@ def create_post():
         publish_request = requests.post(publish_url, data=publish_payload)
         
         if publish_request.status_code == 200:
-            
+            print("Veritas Q-AI English post published successfully!")
+        else:
+            print(f"Publish Error: {publish_request.text}")
+
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+
+# Hatanın oluştuğu yer burasıydı, alt satırın mutlaka içeride (girintili) olması gerekir
+if __name__ == "__main__":
+    create_post()
+    
