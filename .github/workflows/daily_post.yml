@@ -1,8 +1,8 @@
 name: Daily Post
 on:
   schedule:
-    - cron: '0 07 * * *' # Her sabah Türkiye saatiyle 10:00'da çalışır
-  workflow_dispatch: # Manuel "Run workflow" butonunu aktif eder
+    - cron: '0 07 * * *'
+  workflow_dispatch:
 
 jobs:
   build:
@@ -14,11 +14,11 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11' # Desteklenmeyen 3.9 yerine güncel sürüm
+          python-version: '3.11'
 
       - name: Install dependencies
         run: |
-          pip install google-genai requests # Yeni nesil Gemini kütüphanesi
+          pip install google-genai requests
 
       - name: Run bot
         env:
