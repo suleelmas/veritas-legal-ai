@@ -1,7 +1,7 @@
 name: Daily Post
 on:
   schedule:
-    - cron: '0 07 * * *'
+    - cron: '0 07 * * *' # Her sabah 10:00 TSİ
   workflow_dispatch:
 
 jobs:
