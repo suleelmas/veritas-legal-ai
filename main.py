@@ -2,22 +2,23 @@ import os
 from google import genai
 import requests
 
-# GitHub Secrets'tan bilgileri çekiyoruz
+# GitHub Secrets'tan bilgiler çekiliyor
 gemini_key = os.getenv("GEMINI_API_KEY")
 insta_token = os.getenv("INSTA_TOKEN")
 insta_id = os.getenv("INSTA_ACCOUNT_ID")
 
-# Yeni nesil Gemini kurulumu
 client = genai.Client(api_key=gemini_key)
 
 def create_post():
     try:
-        # 1. Gemini ile İngilizce ve Profesyonel İçerik Üretme
+        # Gemini Komutu: Daha katı kurallar ekledik ki hashtagleri unutmasın
         prompt = (
-            "Write a short, professional, and catchy Instagram caption in English for Veritas Q-AI. "
-            "Veritas Q-AI is an AI-powered legal analysis platform that helps lawyers analyze documents with speed and accuracy. "
-            "The tone should be innovative and trustworthy. Write ONLY the caption itself, no introductory text or choices. "
-            "Include 3-5 legal tech hashtags like #LegalAI #VeritasQAI #LegalTech."
+            "Write a high-quality, professional Instagram caption for Veritas Q-AI. "
+            "Focus: AI-powered legal document analysis and speed for lawyers. "
+            "Language: English only. "
+            "Output format: Start with a catchy headline, followed by 2 sentences of explanation. "
+            "At the end, ALWAYS include exactly these 5 hashtags: #VeritasQAI #LegalTech #AIforLawyers #LegalInnovation #FutureOfLaw. "
+            "Do not include any other text, labels, or choices."
         )
         
         response = client.models.generate_content(
@@ -26,43 +27,26 @@ def create_post():
         )
         content = response.text
 
-        # 2. Instagram Paylaşım Ayarları
+        # Görsel Linki (Hukuk Temalı)
         image_url = "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=1080"
         
-        # Medya Kabı Oluşturma
+        # Instagram API İşlemleri
         post_url = f"https://graph.facebook.com/v21.0/{insta_id}/media"
-        payload = {
-            'image_url': image_url, 
-            'caption': content, 
-            'access_token': insta_token
-        }
+        payload = {'image_url': image_url, 'caption': content, 'access_token': insta_token}
         
-        print("Sending data to Instagram in English...")
         r = requests.post(post_url, data=payload)
-        
         if r.status_code != 200:
-            print(f"Instagram Error Detail: {r.text}")
+            print(f"Hata: {r.text}")
             return
 
-        # Medyayı Yayınlama
         creation_id = r.json()['id']
         publish_url = f"https://graph.facebook.com/v21.0/{insta_id}/media_publish"
-        publish_payload = {
-            'creation_id': creation_id, 
-            'access_token': insta_token
-        }
-        
-        publish_request = requests.post(publish_url, data=publish_payload)
-        
-        if publish_request.status_code == 200:
-            print("Veritas Q-AI English post published successfully!")
-        else:
-            print(f"Publish Error: {publish_request.text}")
+        requests.post(publish_url, data={'creation_id': creation_id, 'access_token': insta_token})
+        print("Veritas Q-AI postu 5 hashtag ve İngilizce diliyle başarıyla paylaşıldı!")
 
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
+        print(f"Hata oluştu: {e}")
 
-# Hatanın oluştuğu yer burasıydı, alt satırın mutlaka içeride (girintili) olması gerekir
 if __name__ == "__main__":
     create_post()
     
