@@ -20,22 +20,22 @@ def create_post():
         response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
         content = response.text
 
-        # 2. Instagram'ın Kabul Edeceği %100 Garanti Link Yapısı
+        # 2. Instagram'ın İstediği En Saf Link Yapısı
+        # Parametreleri temizledik, sadece en gerekli olanları bıraktık.
         law_photos = [
             "1589829545856-d10d557cf95f", "1505664194779-8beaceb93744", 
             "1450101499163-c8848c66ca85", "1473186578172-c141e6798ee4",
             "1521791136364-79c0640a52c1", "1507679799987-c73779587ccf",
-            "1453722751126-97e51e4863e6", "1593113598332-cd288d649433",
-            "1528732163351-512c8b05988d", "1427751369412-14197394206c",
-            "1553484771-047a44efe27b", "1486312338239-5e58a2f5915a"
+            "1453722751126-97e51e4863e6", "1593113598332-cd288d649433"
         ]
         
         selected_id = random.choice(law_photos)
         
-        # Linkin sonuna .jpg ekleyerek Instagram'ın "bu bir fotoğraf değil" demesini engelliyoruz
-        image_url = f"https://images.unsplash.com/photo-{selected_id}?q=80&w=1080&auto=format&fit=crop&format=jpg&ext=.jpg"
+        # Instagram bazen '?' işaretinden sonrasını sevmez. 
+        # Bu yüzden en sade JPG çıktısını zorluyoruz.
+        image_url = f"https://images.unsplash.com/photo-{selected_id}?ixlib=rb-4.0.3&auto=format&fit=crop&w=1080&q=80"
 
-        # 3. Instagram API Adımları
+        # 3. Instagram API İşlemleri
         post_url = f"https://graph.facebook.com/v21.0/{insta_id}/media"
         payload = {
             'image_url': image_url, 
@@ -43,11 +43,19 @@ def create_post():
             'access_token': insta_token
         }
         
-        print(f"Görsel gönderiliyor: {image_url}")
+        print(f"Deneme yapılıyor: {image_url}")
         r = requests.post(post_url, data=payload)
         
+        # EĞER HALA HATA ALIRSAK (B PLANI): 
+        # Linki bir kez daha sadeleştirip deneyeceğiz.
         if r.status_code != 200:
-            print(f"Instagram Hatası: {r.text}")
+            print("İlk deneme başarısız, B planı uygulanıyor...")
+            image_url_simple = f"https://images.unsplash.com/photo-{selected_id}.jpg"
+            payload['image_url'] = image_url_simple
+            r = requests.post(post_url, data=payload)
+
+        if r.status_code != 200:
+            print(f"Instagram Kesin Hata: {r.text}")
             return
 
         creation_id = r.json()['id']
@@ -55,7 +63,7 @@ def create_post():
         publish_res = requests.post(publish_url, data={'creation_id': creation_id, 'access_token': insta_token})
         
         if publish_res.status_code == 200:
-            print("Veritas Q-AI postu başarıyla paylaşıldı!")
+            print("BAŞARILI! Veritas Q-AI postu yayında.")
         else:
             print(f"Yayınlama hatası: {publish_res.text}")
 
