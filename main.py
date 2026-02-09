@@ -20,27 +20,30 @@ def create_post():
         response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
         content = response.text
 
-        # 2. %100 ÇALIŞAN RASTGELE GÖRSEL HAVUZU
-        # Instagram'ın hata vermeyeceği doğrudan fotoğraf ID'leri
+        # 2. Instagram'ın Kabul Edeceği %100 Garanti Link Yapısı
         law_photos = [
             "1589829545856-d10d557cf95f", "1505664194779-8beaceb93744", 
             "1450101499163-c8848c66ca85", "1473186578172-c141e6798ee4",
             "1521791136364-79c0640a52c1", "1507679799987-c73779587ccf",
             "1453722751126-97e51e4863e6", "1593113598332-cd288d649433",
             "1528732163351-512c8b05988d", "1427751369412-14197394206c",
-            "1553484771-047a44efe27b", "1486312338239-5e58a2f5915a",
-            "1504384308000-525207b6f247", "1497366216401-20e7af5669e2"
+            "1553484771-047a44efe27b", "1486312338239-5e58a2f5915a"
         ]
         
         selected_id = random.choice(law_photos)
-        # Doğrudan fotoğraf dosyasına giden temiz URL
-        image_url = f"https://images.unsplash.com/photo-{selected_id}?w=1080&q=80&fm=jpg"
+        
+        # Linkin sonuna .jpg ekleyerek Instagram'ın "bu bir fotoğraf değil" demesini engelliyoruz
+        image_url = f"https://images.unsplash.com/photo-{selected_id}?q=80&w=1080&auto=format&fit=crop&format=jpg&ext=.jpg"
 
         # 3. Instagram API Adımları
         post_url = f"https://graph.facebook.com/v21.0/{insta_id}/media"
-        payload = {'image_url': image_url, 'caption': content, 'access_token': insta_token}
+        payload = {
+            'image_url': image_url, 
+            'caption': content, 
+            'access_token': insta_token
+        }
         
-        print(f"Seçilen görsel gönderiliyor: {image_url}")
+        print(f"Görsel gönderiliyor: {image_url}")
         r = requests.post(post_url, data=payload)
         
         if r.status_code != 200:
@@ -52,7 +55,7 @@ def create_post():
         publish_res = requests.post(publish_url, data={'creation_id': creation_id, 'access_token': insta_token})
         
         if publish_res.status_code == 200:
-            print("Veritas Q-AI postu yeni bir görselle paylaşıldı!")
+            print("Veritas Q-AI postu başarıyla paylaşıldı!")
         else:
             print(f"Yayınlama hatası: {publish_res.text}")
 
