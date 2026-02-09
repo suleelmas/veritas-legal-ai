@@ -20,17 +20,27 @@ def create_post():
         response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
         content = response.text
 
-        # 2. GERÇEK RASTGELE GÖRSEL SEÇİMİ
-        # Burada sabit bir ID kullanmıyoruz, doğrudan 'featured' (öne çıkan) havuzundan çekiyoruz.
-        random_sig = random.randint(1, 1000000)
-        # Instagram'ın reddetmemesi için sonuna .jpg ekleyerek kandırıyoruz
-        image_url = f"https://images.unsplash.com/featured/1080x1080/?law,legal,ai,technology&sig={random_sig}.jpg"
+        # 2. %100 ÇALIŞAN RASTGELE GÖRSEL HAVUZU
+        # Instagram'ın hata vermeyeceği doğrudan fotoğraf ID'leri
+        law_photos = [
+            "1589829545856-d10d557cf95f", "1505664194779-8beaceb93744", 
+            "1450101499163-c8848c66ca85", "1473186578172-c141e6798ee4",
+            "1521791136364-79c0640a52c1", "1507679799987-c73779587ccf",
+            "1453722751126-97e51e4863e6", "1593113598332-cd288d649433",
+            "1528732163351-512c8b05988d", "1427751369412-14197394206c",
+            "1553484771-047a44efe27b", "1486312338239-5e58a2f5915a",
+            "1504384308000-525207b6f247", "1497366216401-20e7af5669e2"
+        ]
+        
+        selected_id = random.choice(law_photos)
+        # Doğrudan fotoğraf dosyasına giden temiz URL
+        image_url = f"https://images.unsplash.com/photo-{selected_id}?w=1080&q=80&fm=jpg"
 
         # 3. Instagram API Adımları
         post_url = f"https://graph.facebook.com/v21.0/{insta_id}/media"
         payload = {'image_url': image_url, 'caption': content, 'access_token': insta_token}
         
-        print(f"Yeni ve benzersiz görsel gönderiliyor: {image_url}")
+        print(f"Seçilen görsel gönderiliyor: {image_url}")
         r = requests.post(post_url, data=payload)
         
         if r.status_code != 200:
@@ -42,7 +52,7 @@ def create_post():
         publish_res = requests.post(publish_url, data={'creation_id': creation_id, 'access_token': insta_token})
         
         if publish_res.status_code == 200:
-            print("İşlem tamam! Şimdi Instagram profilini kontrol edebilirsin.")
+            print("Veritas Q-AI postu yeni bir görselle paylaşıldı!")
         else:
             print(f"Yayınlama hatası: {publish_res.text}")
 
