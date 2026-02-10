@@ -12,35 +12,28 @@ client = genai.Client(api_key=gemini_key)
 
 def create_post():
     try:
-        # 1. Gemini ile Metin Üretimi (Metin zekası sorunsuz çalışıyor)
+        # 1. ADIM: Gemini ile İçerik Üretimi
         print("Gemini içerik üretiyor...")
         prompt = (
             "Write a short, professional Instagram caption in English for Veritas Q-AI. "
-            "Focus on AI-powered legal document analysis. "
-            "Include 5 hashtags like #VeritasQAI #LegalAI #LegalTech."
+            "Focus on AI and law. Include #VeritasQAI #LegalTech #LawAI."
         )
         response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
         content = response.text
 
-        # 2. Instagram'ın Kabul Ettiği %100 Statik Görsel Havuzu
-        # Bu ID'ler doğrudan Unsplash'in ana sunucusundan gelir
-        photo_pool = [
-            "1589829545856-d10d557cf95f", "1505664194779-8beaceb93744",
-            "1450101499163-c8848c66ca85", "1473186578172-c141e6798ee4",
-            "1521791136364-79c0640a52c1", "1507679799987-c73779587ccf",
-            "1453722751126-97e51e4863e6", "1593113598332-cd288d649433",
-            "1575505506539-8b10420a4c82", "1521790821163-f30007821e8c",
-            "1504384308000-525207b6f247", "1486312338239-5e58a2f5915a",
-            "1553484771-047a44efe27b", "1528732163351-512c8b05988d"
-        ]
+        # 2. ADIM: INSTAGRAM'IN HATA VEREMEYECEĞİ GÖRSEL SİSTEMİ
+        # Unsplash bazen redirect yaptığı için Instagram kızıyor. 
+        # LoremFlickr doğrudan görsel dosyası gibi davranır.
+        keywords = ["lawyer", "justice", "technology", "office", "court"]
+        selected_keyword = random.choice(keywords)
+        random_id = random.randint(1, 1000)
         
-        selected_id = random.choice(photo_pool)
-        # Link yapısını Instagram'ın en sevdiği statik formata getirdik
-        image_url = f"https://images.unsplash.com/photo-{selected_id}?w=1080&q=80&fm=jpg"
+        # Bu URL yapısı Instagram tarafından daha kolay kabul edilir
+        image_url = f"https://loremflickr.com/1080/1080/{selected_keyword}?lock={random_id}"
 
-        print(f"Görsel Seçildi: {image_url}")
+        print(f"Kategori: {selected_keyword} | Görsel URL: {image_url}")
 
-        # 3. Instagram Paylaşımı
+        # 3. ADIM: Instagram API İşlemleri
         post_url = f"https://graph.facebook.com/v21.0/{insta_id}/media"
         payload = {
             'image_url': image_url, 
@@ -48,10 +41,17 @@ def create_post():
             'access_token': insta_token
         }
         
+        # Instagram'ın indirmesi için deneme
         r = requests.post(post_url, data=payload)
         
         if r.status_code != 200:
-            print(f"Instagram Hatası: {r.text}")
+            # B PLANI: Eğer yine hata verirse, statik bir imgur veya benzeri sabit link dene
+            print(f"Hata alındı, B planı (sabit görsel) deneniyor...")
+            payload['image_url'] = "https://images.pexels.com/photos/6077368/pexels-photo-6077368.jpeg?auto=compress&cs=tinysrgb&w=1080"
+            r = requests.post(post_url, data=payload)
+
+        if r.status_code != 200:
+            print(f"Instagram Kesin Hata: {r.text}")
             return
 
         creation_id = r.json()['id']
@@ -59,7 +59,7 @@ def create_post():
         publish_res = requests.post(publish_url, data={'creation_id': creation_id, 'access_token': insta_token})
         
         if publish_res.status_code == 200:
-            print("BAŞARILI! Veritas Q-AI profesyonel bir görselle paylaşıldı.")
+            print("BAŞARILI! Veritas Q-AI paylaşımı yapıldı.")
         else:
             print(f"Yayınlama hatası: {publish_res.text}")
 
