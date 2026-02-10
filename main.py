@@ -7,12 +7,12 @@ gemini_key = os.getenv("GEMINI_API_KEY")
 insta_token = os.getenv("INSTA_TOKEN")
 insta_id = os.getenv("INSTA_ACCOUNT_ID")
 
-# Gemini istemcisini oluşturuyoruz
+# Gemini istemcisi
 client = genai.Client(api_key=gemini_key)
 
 def create_post():
     try:
-        # 1. ADIM: İNGİLİZCE METİN ÜRETİMİ
+        # 1. Metin Üretimi
         caption_prompt = (
             "Write a short, professional Instagram caption in English for Veritas Q-AI. "
             "Focus: AI-powered legal analysis. Mention speed and accuracy. "
@@ -21,8 +21,7 @@ def create_post():
         caption_res = client.models.generate_content(model="gemini-2.0-flash", contents=caption_prompt)
         content = caption_res.text
 
-        # 2. ADIM: GEMINI İLE ÖZGÜN GÖRSEL ÜRETİMİ
-        # Burada 'imagen-3' modelini kullanarak sıfırdan görsel üretiyoruz
+        # 2. Görsel Üretimi (Model ismi 'imagen-3.0-generate-001' veya 'imagen-3.0-fast-generate-001' olarak güncellendi)
         image_prompt = (
             "A professional, high-quality, futuristic legal concept image. "
             "A glowing digital scale of justice or a gavel made of blue circuit lines. "
@@ -30,17 +29,16 @@ def create_post():
         )
         
         print("Gemini özgün görseli üretiyor...")
-        # NOT: Bazı hesaplarda model ismi 'imagen-3' veya 'gemini-2.0-flash'ın görsel yeteneği olarak değişebilir
+        # En güncel ve genel model ismini deniyoruz
         image_response = client.models.generate_images(
-            model="imagen-3", # Gemini'nin en iyi görsel modeli
+            model="imagen-3.0-generate-001", 
             prompt=image_prompt,
             config={'number_of_images': 1}
         )
         
-        # Üretilen görselin geçici URL'sini alıyoruz
         image_url = image_response.generated_images[0].url
 
-        # 3. ADIM: INSTAGRAM'A GÖNDERME
+        # 3. Instagram Paylaşımı
         post_url = f"https://graph.facebook.com/v21.0/{insta_id}/media"
         payload = {
             'image_url': image_url, 
@@ -55,13 +53,12 @@ def create_post():
             print(f"Instagram Hatası: {r.text}")
             return
 
-        # Yayına alma
         creation_id = r.json()['id']
         publish_url = f"https://graph.facebook.com/v21.0/{insta_id}/media_publish"
         publish_res = requests.post(publish_url, data={'creation_id': creation_id, 'access_token': insta_token})
         
         if publish_res.status_code == 200:
-            print("BAŞARILI! Gemini hem metni hem görseli sıfırdan üretti ve paylaştı.")
+            print("BAŞARILI! Veritas Q-AI postu yayında.")
         else:
             print(f"Yayınlama hatası: {publish_res.text}")
 
