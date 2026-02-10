@@ -1,4 +1,5 @@
 import os
+import random
 from google import genai
 import requests
 
@@ -7,46 +8,41 @@ gemini_key = os.getenv("GEMINI_API_KEY")
 insta_token = os.getenv("INSTA_TOKEN")
 insta_id = os.getenv("INSTA_ACCOUNT_ID")
 
-# Gemini istemcisi
 client = genai.Client(api_key=gemini_key)
 
 def create_post():
     try:
-        # 1. Metin Üretimi
-        caption_prompt = (
-            "Write a short, professional Instagram caption in English for Veritas Q-AI. "
-            "Focus: AI-powered legal analysis. Mention speed and accuracy. "
-            "Include exactly these 5 hashtags: #VeritasQAI #LegalTech #AIforLawyers #Innovation #LawTech."
-        )
-        caption_res = client.models.generate_content(model="gemini-2.0-flash", contents=caption_prompt)
-        content = caption_res.text
-
-        # 2. Görsel Üretimi (Model ismi 'imagen-3.0-generate-001' veya 'imagen-3.0-fast-generate-001' olarak güncellendi)
-        image_prompt = (
-            "A professional, high-quality, futuristic legal concept image. "
-            "A glowing digital scale of justice or a gavel made of blue circuit lines. "
-            "Modern, corporate, trustworthy, 4k resolution, cinematic lighting."
+        # 1. ADIM: GEMINI KONUYU VE METNİ BELİRLİYOR
+        prompt = (
+            "Select a specific legal topic (e.g., Intellectual Property, Cyber Law, or Corporate Ethics). "
+            "Write a short, professional Instagram caption for Veritas Q-AI in English. "
+            "Then, provide ONLY ONE keyword that best describes this topic for an image search. "
+            "Format: CAPTION: [your caption] KEYWORD: [one word]"
         )
         
-        print("Gemini özgün görseli üretiyor...")
-        # En güncel ve genel model ismini deniyoruz
-        image_response = client.models.generate_images(
-            model="imagen-3.0-generate-001", 
-            prompt=image_prompt,
-            config={'number_of_images': 1}
-        )
+        response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
+        raw_text = response.text
         
-        image_url = image_response.generated_images[0].url
+        # Metni ve anahtar kelimeyi ayırıyoruz
+        caption = raw_text.split("KEYWORD:")[0].replace("CAPTION:", "").strip()
+        keyword = raw_text.split("KEYWORD:")[1].strip() if "KEYWORD:" in raw_text else "law"
 
-        # 3. Instagram Paylaşımı
+        # 2. ADIM: DİNAMİK VE HATASIZ GÖRSEL SEÇİMİ
+        # Gemini'den gelen keyword'ü kullanarak Unsplash'ten taze görsel çekiyoruz
+        random_sig = random.randint(1, 9999)
+        # Instagram'ın sevdiği temiz link yapısı
+        image_url = f"https://images.unsplash.com/featured/1080x1080/?{keyword},legal&sig={random_sig}.jpg"
+
+        print(f"Konu: {keyword} | Görsel: {image_url}")
+
+        # 3. ADIM: INSTAGRAM PAYLAŞIMI
         post_url = f"https://graph.facebook.com/v21.0/{insta_id}/media"
         payload = {
             'image_url': image_url, 
-            'caption': content, 
+            'caption': caption + "\n\n#VeritasQAI #LegalTech #AI #Innovation", 
             'access_token': insta_token
         }
         
-        print(f"Görsel üretildi, Instagram'a yükleniyor...")
         r = requests.post(post_url, data=payload)
         
         if r.status_code != 200:
@@ -58,12 +54,12 @@ def create_post():
         publish_res = requests.post(publish_url, data={'creation_id': creation_id, 'access_token': insta_token})
         
         if publish_res.status_code == 200:
-            print("BAŞARILI! Veritas Q-AI postu yayında.")
+            print(f"BAŞARILI! Gemini '{keyword}' konusunu seçti ve paylaştı.")
         else:
             print(f"Yayınlama hatası: {publish_res.text}")
 
     except Exception as e:
-        print(f"Hata oluştu: {e}")
+        print(f"Hata: {e}")
 
 if __name__ == "__main__":
     create_post()
