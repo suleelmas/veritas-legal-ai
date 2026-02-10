@@ -1,48 +1,56 @@
 import os
-import random
 from google import genai
 import requests
+import time
 
 # GitHub Secrets
 gemini_key = os.getenv("GEMINI_API_KEY")
 insta_token = os.getenv("INSTA_TOKEN")
 insta_id = os.getenv("INSTA_ACCOUNT_ID")
 
+# Gemini istemcisi
 client = genai.Client(api_key=gemini_key)
 
 def create_post():
     try:
-        # 1. ADIM: GEMINI KONUYU VE METNİ BELİRLİYOR
-        prompt = (
-            "Select a specific legal topic (e.g., Intellectual Property, Cyber Law, or Corporate Ethics). "
-            "Write a short, professional Instagram caption for Veritas Q-AI in English. "
-            "Then, provide ONLY ONE keyword that best describes this topic for an image search. "
-            "Format: CAPTION: [your caption] KEYWORD: [one word]"
+        # 1. Metin Üretimi
+        print("Gemini içerik üretiyor...")
+        caption_prompt = (
+            "Write a short, professional Instagram caption in English for Veritas Q-AI. "
+            "Focus: AI in legal analysis. "
+            "Include these hashtags: #VeritasQAI #LegalTech #AIforLawyers."
+        )
+        caption_res = client.models.generate_content(model="gemini-2.0-flash", contents=caption_prompt)
+        content = caption_res.text
+
+        # 2. Görsel Üretimi (Imagen 3.0)
+        # Hata aldığımız model ismini en güncel haliyle güncelledim
+        print("Gemini özgün görsel üretiyor (Imagen 3)...")
+        image_prompt = (
+            "A high-end, professional photography of a modern legal gavel next to a glowing blue digital circuit board, "
+            "representing AI in law. Corporate, cinematic lighting, 4k, realistic."
         )
         
-        response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
-        raw_text = response.text
+        # Imagen modelini çağırıyoruz
+        generate_t2i = client.models.generate_images(
+            model='imagen-3.0-generate-001',
+            prompt=image_prompt,
+            config={'number_of_images': 1}
+        )
         
-        # Metni ve anahtar kelimeyi ayırıyoruz
-        caption = raw_text.split("KEYWORD:")[0].replace("CAPTION:", "").strip()
-        keyword = raw_text.split("KEYWORD:")[1].strip() if "KEYWORD:" in raw_text else "law"
+        # Gemini'nin ürettiği görselin doğrudan linki
+        image_url = generate_t2i.generated_images[0].url
+        print(f"Görsel üretildi: {image_url}")
 
-        # 2. ADIM: DİNAMİK VE HATASIZ GÖRSEL SEÇİMİ
-        # Gemini'den gelen keyword'ü kullanarak Unsplash'ten taze görsel çekiyoruz
-        random_sig = random.randint(1, 9999)
-        # Instagram'ın sevdiği temiz link yapısı
-        image_url = f"https://images.unsplash.com/featured/1080x1080/?{keyword},legal&sig={random_sig}.jpg"
-
-        print(f"Konu: {keyword} | Görsel: {image_url}")
-
-        # 3. ADIM: INSTAGRAM PAYLAŞIMI
+        # 3. Instagram Paylaşımı
         post_url = f"https://graph.facebook.com/v21.0/{insta_id}/media"
         payload = {
             'image_url': image_url, 
-            'caption': caption + "\n\n#VeritasQAI #LegalTech #AI #Innovation", 
+            'caption': content, 
             'access_token': insta_token
         }
         
+        print("Instagram'a gönderiliyor...")
         r = requests.post(post_url, data=payload)
         
         if r.status_code != 200:
@@ -50,16 +58,20 @@ def create_post():
             return
 
         creation_id = r.json()['id']
+        
+        # Instagram'ın görseli işlemesi için 5 saniye bekleyelim
+        time.sleep(5)
+        
         publish_url = f"https://graph.facebook.com/v21.0/{insta_id}/media_publish"
         publish_res = requests.post(publish_url, data={'creation_id': creation_id, 'access_token': insta_token})
         
         if publish_res.status_code == 200:
-            print(f"BAŞARILI! Gemini '{keyword}' konusunu seçti ve paylaştı.")
+            print("BAŞARILI! Veritas Q-AI artık kendi ürettiği görsellerle yayında.")
         else:
             print(f"Yayınlama hatası: {publish_res.text}")
 
     except Exception as e:
-        print(f"Hata: {e}")
+        print(f"Hata oluştu: {e}")
 
 if __name__ == "__main__":
     create_post()
