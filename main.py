@@ -1,5 +1,6 @@
 import os
 import random
+import time # Bekleme süresi için eklendi
 from google import genai
 import requests
 
@@ -12,7 +13,7 @@ client = genai.Client(api_key=gemini_key)
 
 def create_post():
     try:
-        # 1. ADIM: Gemini ile İçerik Üretimi
+        # 1. Gemini İçerik Üretimi
         print("Gemini içerik üretiyor...")
         prompt = (
             "Write a short, professional Instagram caption in English for Veritas Q-AI. "
@@ -21,19 +22,15 @@ def create_post():
         response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
         content = response.text
 
-        # 2. ADIM: INSTAGRAM'IN HATA VEREMEYECEĞİ GÖRSEL SİSTEMİ
-        # Unsplash bazen redirect yaptığı için Instagram kızıyor. 
-        # LoremFlickr doğrudan görsel dosyası gibi davranır.
+        # 2. Görsel Seçimi (Instagram'ın kabul ettiği format)
         keywords = ["lawyer", "justice", "technology", "office", "court"]
         selected_keyword = random.choice(keywords)
         random_id = random.randint(1, 1000)
-        
-        # Bu URL yapısı Instagram tarafından daha kolay kabul edilir
         image_url = f"https://loremflickr.com/1080/1080/{selected_keyword}?lock={random_id}"
 
         print(f"Kategori: {selected_keyword} | Görsel URL: {image_url}")
 
-        # 3. ADIM: Instagram API İşlemleri
+        # 3. Instagram Medya Konteynırı Oluşturma
         post_url = f"https://graph.facebook.com/v21.0/{insta_id}/media"
         payload = {
             'image_url': image_url, 
@@ -41,25 +38,24 @@ def create_post():
             'access_token': insta_token
         }
         
-        # Instagram'ın indirmesi için deneme
         r = requests.post(post_url, data=payload)
         
         if r.status_code != 200:
-            # B PLANI: Eğer yine hata verirse, statik bir imgur veya benzeri sabit link dene
-            print(f"Hata alındı, B planı (sabit görsel) deneniyor...")
-            payload['image_url'] = "https://images.pexels.com/photos/6077368/pexels-photo-6077368.jpeg?auto=compress&cs=tinysrgb&w=1080"
-            r = requests.post(post_url, data=payload)
-
-        if r.status_code != 200:
-            print(f"Instagram Kesin Hata: {r.text}")
+            print(f"Instagram Yükleme Hatası: {r.text}")
             return
 
         creation_id = r.json()['id']
+        print(f"Medya yüklendi (ID: {creation_id}). İşlenmesi için 20 saniye bekleniyor...")
+        
+        # --- KRİTİK ADIM: Instagram'ın görseli işlemesi için bekliyoruz ---
+        time.sleep(20) 
+        
+        # 4. Medyayı Yayınlama
         publish_url = f"https://graph.facebook.com/v21.0/{insta_id}/media_publish"
         publish_res = requests.post(publish_url, data={'creation_id': creation_id, 'access_token': insta_token})
         
         if publish_res.status_code == 200:
-            print("BAŞARILI! Veritas Q-AI paylaşımı yapıldı.")
+            print("BAŞARILI! Veritas Q-AI paylaşımı şu an yayında.")
         else:
             print(f"Yayınlama hatası: {publish_res.text}")
 
