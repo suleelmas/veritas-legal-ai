@@ -1,6 +1,6 @@
 import os
 import random
-import time # Bekleme süresi için eklendi
+import time
 from google import genai
 import requests
 
@@ -17,20 +17,23 @@ def create_post():
         print("Gemini içerik üretiyor...")
         prompt = (
             "Write a short, professional Instagram caption in English for Veritas Q-AI. "
-            "Focus on AI and law. Include #VeritasQAI #LegalTech #LawAI."
+            "Focus: AI-driven legal precision. Include #VeritasQAI #LegalTech #Innovation."
         )
         response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
         content = response.text
 
-        # 2. Görsel Seçimi (Instagram'ın kabul ettiği format)
-        keywords = ["lawyer", "justice", "technology", "office", "court"]
-        selected_keyword = random.choice(keywords)
-        random_id = random.randint(1, 1000)
-        image_url = f"https://loremflickr.com/1080/1080/{selected_keyword}?lock={random_id}"
+        # 2. GÖRSEL SEÇİMİ (Şarap şişesi falan gelmemesi için kısıtlandı)
+        # Sadece ciddi ve kurumsal kelimeler bıraktım
+        safe_keywords = ["law-office", "gavel", "justice-scale", "cyber-security", "modern-lawyer"]
+        selected = random.choice(safe_keywords)
+        random_seed = random.randint(1, 5000)
+        
+        # Instagram'ın reddetmemesi için kaynak dosyaya doğrudan giden yapı
+        image_url = f"https://loremflickr.com/1080/1080/{selected}?lock={random_seed}"
 
-        print(f"Kategori: {selected_keyword} | Görsel URL: {image_url}")
+        print(f"Konsept: {selected} | Görsel URL: {image_url}")
 
-        # 3. Instagram Medya Konteynırı Oluşturma
+        # 3. Instagram Medya Hazırlama
         post_url = f"https://graph.facebook.com/v21.0/{insta_id}/media"
         payload = {
             'image_url': image_url, 
@@ -41,26 +44,26 @@ def create_post():
         r = requests.post(post_url, data=payload)
         
         if r.status_code != 200:
-            print(f"Instagram Yükleme Hatası: {r.text}")
+            print(f"Yükleme Hatası: {r.text}")
             return
 
         creation_id = r.json()['id']
-        print(f"Medya yüklendi (ID: {creation_id}). İşlenmesi için 20 saniye bekleniyor...")
+        print(f"Medya işleniyor (ID: {creation_id})...")
         
-        # --- KRİTİK ADIM: Instagram'ın görseli işlemesi için bekliyoruz ---
-        time.sleep(20) 
+        # 30 saniye bekleyelim, garanti olsun
+        time.sleep(30) 
         
-        # 4. Medyayı Yayınlama
+        # 4. Yayınlama
         publish_url = f"https://graph.facebook.com/v21.0/{insta_id}/media_publish"
         publish_res = requests.post(publish_url, data={'creation_id': creation_id, 'access_token': insta_token})
         
         if publish_res.status_code == 200:
-            print("BAŞARILI! Veritas Q-AI paylaşımı şu an yayında.")
+            print("BAŞARILI! Profesyonel görsel paylaşıldı.")
         else:
-            print(f"Yayınlama hatası: {publish_res.text}")
+            print(f"Yayınlama Hatası: {publish_res.text}")
 
     except Exception as e:
-        print(f"Hata oluştu: {e}")
+        print(f"Hata: {e}")
 
 if __name__ == "__main__":
     create_post()
