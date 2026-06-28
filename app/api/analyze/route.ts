@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
-import { streamText } from 'ai';
-import { openai } from '@ai-sdk/openai';
 import OpenAI from 'openai';
 import { supabase } from "@/lib/supabase";
 import PDFParser from 'pdf2json';
+import { applyWeightedRanking, getWeightedDocuments } from "@/lib/weightedSearch";
 
 // Runtime configuration for Next.js App Router
 export const runtime = 'nodejs';
@@ -55,6 +54,160 @@ function getUserKey(req: Request) {
   return `${ip}_${ua}`;
 }
 
+
+function getJurisdictionFilter(targetLang: string): Record<string, any> {
+  const normalized = (targetLang || '').toLowerCase();
+
+  if (normalized === 'tr' || normalized.includes('turkish')) {
+    return { country: 'TR', embedding_model: 'text-embedding-3-small' };
+  }
+
+  if (normalized === 'de' || normalized.includes('german')) {
+    return { country: 'DE', embedding_model: 'text-embedding-3-small' };
+  }
+
+  if (normalized === 'en-us' || normalized.includes('us') || normalized.includes('usa')) {
+    return { country: 'US', embedding_model: 'text-embedding-3-large' };
+  }
+
+  if (normalized === 'en-gb' || normalized.includes('uk') || normalized.includes('british')) {
+    // Mevcut upsertDocument fonksiyonunda UK ayrı ülke olarak işaretlenmemiş olabilir.
+    // Bu yüzden önce UK aranır, sonuç yoksa küçük embedding modelindeki genel kaynaklara düşülür.
+    return { country: 'UK', embedding_model: 'text-embedding-3-small' };
+  }
+
+  return { embedding_model: 'text-embedding-3-small' };
+}
+
+function getQueryEmbeddingModel(targetLang: string): string {
+  const normalized = (targetLang || '').toLowerCase();
+
+  // upsertDocument.ts içinde US kaynakları text-embedding-3-large ile kaydediliyor.
+  if (normalized === 'en-us' || normalized.includes('us') || normalized.includes('usa')) {
+    return 'text-embedding-3-large';
+  }
+
+  return 'text-embedding-3-small';
+}
+
+async function createQueryEmbedding(text: string, targetLang: string): Promise<number[]> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error("OPENAI_API_KEY missing");
+
+  const model = getQueryEmbeddingModel(targetLang);
+
+  const resp = await fetch("https://api.openai.com/v1/embeddings", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      input: text.slice(0, 12000),
+      model,
+    }),
+  });
+
+  const data = await resp.json();
+
+  if (!resp.ok || !data.data?.[0]?.embedding) {
+    throw new Error(data.error?.message || "Embedding failed");
+  }
+
+  return data.data[0].embedding;
+}
+
+async function runVectorSearch(queryEmbedding: number[], filter: Record<string, any>, matchCount = 20) {
+  console.log("[RAG DEBUG] vector search filter:", JSON.stringify(filter));
+
+  return supabase.rpc("match_documents", {
+    query_embedding: queryEmbedding,
+    match_count: matchCount,
+    filter,
+  });
+}
+
+async function retrieveLegalContext(pdfText: string, targetLang: string): Promise<string> {
+  try {
+    const normalizedLang = (targetLang || "").toLowerCase();
+
+    const country =
+      normalizedLang.includes("türk") || normalizedLang.includes("tr") ? "TR" :
+      normalizedLang.includes("deutsch") || normalizedLang.includes("german") || normalizedLang.includes("de") ? "DE" :
+      undefined;
+
+    const embeddingModel = "text-embedding-3-small";
+    const queryEmbedding = await createQueryEmbedding(pdfText, embeddingModel);
+    const primaryFilter = country ? { country } : {};
+
+    console.log("[RAG DEBUG] primary filter:", JSON.stringify(primaryFilter));
+
+    let searchResult = await runVectorSearch(queryEmbedding, primaryFilter, 20);
+    let data = searchResult.data;
+    let error = searchResult.error;
+
+    if (error) {
+      console.error("RAG primary search error:", error);
+    }
+
+    if ((!data || data.length === 0) && country) {
+      console.warn("[RAG DEBUG] Country filter returned no docs. Retrying without country filter.");
+      searchResult = await runVectorSearch(queryEmbedding, {}, 20);
+      data = searchResult.data;
+      error = searchResult.error;
+    }
+
+    if (error) {
+      console.error("RAG search error:", error);
+      return "";
+    }
+
+    if (!data || data.length === 0) {
+      console.warn("RAG search returned no documents");
+      return "";
+    }
+
+    const similarityByContent = new Map<string, number>();
+    for (const d of data as any[]) {
+      similarityByContent.set(d.content, d.similarity);
+    }
+
+    const weighted = applyWeightedRanking(
+      (data as any[]).map((d: any) => ({
+        content: d.content,
+        metadata: d.metadata || {},
+      })),
+      pdfText
+    );
+
+    const finalDocs = getWeightedDocuments(weighted).slice(0, 12);
+
+    return finalDocs
+      .map((doc, index) => {
+        const source = doc.metadata?.source || "unknown";
+        const docCountry = doc.metadata?.country || doc.metadata?.source_country || "unknown";
+        const date = doc.metadata?.date || doc.metadata?.updated || "unknown";
+        const type = doc.metadata?.type || "legal_source";
+        const similarity = similarityByContent.get(doc.content);
+
+        return `
+[KAYNAK ${index + 1}]
+Source: ${source}
+Country: ${docCountry}
+Type: ${type}
+Date: ${date}
+Similarity: ${typeof similarity === "number" ? similarity.toFixed(4) : "unknown"}
+Content:
+${doc.content.slice(0, 2200)}
+`;
+      })
+      .join("\n\n");
+  } catch (err) {
+    console.error("retrieveLegalContext error:", err);
+    return "";
+  }
+}
+
 async function performLegalAnalysis(pdfText: string, targetLang: string, onFinish?: (text: string) => Promise<void>) {
   console.log('[performLegalAnalysis] ========================================');
   console.log('[performLegalAnalysis] FONKSİYON ÇAĞRILDI!');
@@ -62,8 +215,24 @@ async function performLegalAnalysis(pdfText: string, targetLang: string, onFinis
   console.log('[performLegalAnalysis] Target lang:', targetLang);
   console.log('[performLegalAnalysis] PDF metin ilk 200 karakter:', pdfText?.substring(0, 200) || 'BOŞ');
   console.log('[performLegalAnalysis] ========================================');
+
+  const legalContext = await retrieveLegalContext(pdfText, targetLang);
+  console.log('[performLegalAnalysis] RAG kaynak uzunluğu:', legalContext.length);
   
   const analysisPrompt = `Sen bir yardımcı hukuk asistanısın ve verilen metne göre nesnel analizler yaparsın. Aşağıdaki hukuki metni derinlemesine ve kapsamlı bir şekilde analiz et. Analizini yaparken tüm yasal çerçeveleri, risk faktörlerini, uyum gerekliliklerini, potansiyel yasal sonuçları, yargı içtihatlarını ve akademik görüşleri göz önünde bulundur.
+
+=== VERİTABANINDAN GETİRİLEN GÜNCEL HUKUKİ KAYNAKLAR ===
+
+Aşağıdaki kaynaklar Supabase vektör veritabanından, yüklenen belgeyle anlamsal benzerliğe göre getirilmiştir. Analizinde öncelikle bu kaynakları kullan. Kaynaklarda bulunmayan kanun maddesi, karar, yönetmelik veya hüküm uydurma. Kaynak yetersizse bunu açıkça belirt.
+
+${legalContext || "İlgili kaynak bulunamadı. Bu durumda analiz genel hukuk bilgisiyle yapılmalı ve kesin hukuki görüş gibi sunulmamalıdır."}
+
+=== KAYNAK KULLANIM TALİMATI ===
+- Kaynaklarda geçen madde, karar ve hukuki metinleri öncelikli kullan.
+- Kaynaklarda bulunmayan spesifik madde, karar numarası veya resmi kaynak uydurma.
+- Emin olmadığın yerde "kaynak doğrulaması gerekir" de.
+- Analizi hukuki tavsiye gibi değil, avukat incelemesini destekleyen kaynaklı ön analiz gibi sun.
+- JSON cevabındaki "references", "affected_articles", "case_law_references" ve "legal_basis" alanlarında mümkün olduğunca yukarıdaki KAYNAK numaralarına atıf yap.
 
 === KAPSAMLI HUKUK KÜTÜPHANESİ VE ANALİZ ÇERÇEVESİ ===
 
@@ -351,7 +520,8 @@ PLACEHOLDER_PDF_TEXT`;
   
   // Prompt'u güncelle - PDF metnini kısaltılmış versiyonla değiştir
   const finalAnalysisPrompt = analysisPrompt.replace('PLACEHOLDER_PDF_TEXT', truncatedPdfText);
-  
+  console.log("[RAG DEBUG] finalAnalysisPrompt ilk 3000:", finalAnalysisPrompt.substring(0, 3000));
+console.log("[RAG DEBUG] kaynak bölümü var mı:", finalAnalysisPrompt.includes("VERİTABANINDAN GETİRİLEN GÜNCEL HUKUKİ KAYNAKLAR"));
   // Prompt uzunluğunu kontrol et
   const promptLength = finalAnalysisPrompt.length;
   console.log('[performLegalAnalysis] Prompt uzunluğu:', promptLength, 'PDF metin uzunluğu:', cleanedPdfText.length, 'Kısaltılmış PDF uzunluğu:', truncatedPdfText.length);
@@ -366,7 +536,7 @@ PLACEHOLDER_PDF_TEXT`;
       messages: [
         {
           role: "system",
-          content: `Sen bir yardımcı hukuk asistanısın ve verilen metne göre nesnel analizler yaparsın. Analizini sadece ${targetLang} dilinde yap. Mümkün olduğunca spesifik yasal madde referansları, yargı içtihatları ve akademik görüşler ver. Analizini derinlemesine ve kapsamlı yap.`
+          content: `Sen bir yardımcı hukuk asistanısın ve verilen metne göre nesnel analizler yaparsın. Analizini sadece ${targetLang} dilinde yap. Öncelikle kullanıcı promptunda verilen VERİTABANINDAN GETİRİLEN GÜNCEL HUKUKİ KAYNAKLAR bölümüne dayan. Kaynaklarda bulunmayan kanun maddesi, karar numarası veya resmi kaynak uydurma. Kaynak yetersizse bunu açıkça belirt. Analiz avukat incelemesinin yerine geçmez; kaynak destekli ön incelemedir.`
         },
         { role: "user", content: finalAnalysisPrompt }
       ],

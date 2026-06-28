@@ -2211,28 +2211,18 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
     <>
       <style jsx global>{`
         @media print {
-          /* 1. SAYFA YAPISI */
+          /* 1. SAYFA AYARLARI */
           @page { size: A4; margin: 10mm; }
-          body { 
-            margin: 0; 
-            padding: 0; 
-            background-color: white !important; 
-            -webkit-print-color-adjust: exact;
-          }
+          body { -webkit-print-color-adjust: exact; background-color: white !important; margin: 0; padding: 0; }
 
-          /* 2. HER ŞEYİ GİZLE (RESET) */
-          body * {
-            visibility: hidden;
-          }
+          /* 2. SAHNE IŞIĞI (sadece raporu göster) */
+          body * { visibility: hidden; }
+          #analysis-report, #analysis-report *,
+          #printable-area, #printable-area * { visibility: visible !important; }
 
-          /* 3. BEYAZ PERDE TAKTİĞİ (Raporu en üste al ve arkasını kapat) */
-          #printable-area, #printable-area *,
-          #analysis-report, #analysis-report * {
-            visibility: visible !important;
-          }
-
-          #printable-area,
-          #analysis-report {
+          /* 3. BEYAZ PERDE (arkadaki katmanları kapat) */
+          #analysis-report,
+          #printable-area {
             position: absolute !important;
             left: 0 !important;
             top: 0 !important;
@@ -2240,54 +2230,33 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
             min-height: 100vh !important;
             margin: 0 !important;
             padding: 20px !important;
-            
-            /* KRİTİK: Arka planı KİREÇ BEYAZI yap ki arkadaki dev ikon görünmesin */
-            background-color: #ffffff !important; 
-            
-            /* KRİTİK: Raporu diğer her şeyin üstüne çıkar */
-            z-index: 99999 !important; 
+            background-color: #ffffff !important;
+            z-index: 99999 !important;
           }
 
-          /* 4. GRAFİKLERİ GERİ GETİR (Eski Çalışan Yöntem) */
-          /* Grafiğin olduğu kutuya kesin boyut ver */
-          #printable-area .recharts-wrapper,
-          #printable-area .recharts-surface,
-          #printable-area .recharts-responsive-container,
-          #analysis-report .recharts-wrapper,
-          #analysis-report .recharts-surface,
-          #analysis-report .recharts-responsive-container {
+          /* 4. RECHARTS (GRAFİK) KURTARMA OPERASYONU - Piksel Doping */
+          .recharts-wrapper,
+          .recharts-surface,
+          .recharts-responsive-container {
             display: block !important;
             visibility: visible !important;
-            width: 100% !important;
-            height: 400px !important; /* Bu satır grafiği görünür kılan kilit koddu */
+            width: 700px !important;
+            height: 400px !important;
             overflow: visible !important;
-          }
-          
-          /* Çizgileri siyah yap */
-          #printable-area path,
-          #printable-area line,
-          #printable-area text,
-          #analysis-report path,
-          #analysis-report line,
-          #analysis-report text {
-            fill: #000 !important;
-            stroke: #000 !important;
-            opacity: 1 !important;
+            margin: 0 auto !important;
           }
 
-          /* 5. DEV İKONU VE BUTONU "GRAFİĞE DOKUNMADAN" SİL */
-          /* Sadece butonları ve linkleri gizle, SVG genelini gizleme! */
-          button,
-          .no-print,
-          a[href],
-          [role="button"],
-          .download-section {
-            display: none !important;
+          .recharts-wrapper svg {
+            display: block !important;
+            width: 700px !important;
+            height: 400px !important;
+            transform: none !important;
           }
-          
-          /* Eğer butonun içindeki SVG (ikon) ayrı bir elemansa onu buton üzerinden hedefle */
-          button svg, .no-print svg {
-            display: none !important;
+
+          .recharts-text,
+          path {
+            fill: #000 !important;
+            stroke-opacity: 1 !important;
           }
         }
       `}</style>
@@ -4091,7 +4060,6 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
                         isGlobalPackage={isGlobalPackage}
                         legalReferences={legalReferences}
                         riskAssessments={riskAssessments}
-                        isAdmin={isAdmin}
                       />
                     )}
                   </div>

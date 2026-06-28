@@ -27,7 +27,7 @@ interface AnalysisResultProps {
   effectivePackage?: UserPackage;
   isAdmin?: boolean;
   parseAnalysisResult?: (text: string) => { summary: string; detailed: string };
-  extractRiskScore?: (score: number) => number;
+  extractRiskScore?: (text: string) => number;
   getRiskColor?: (score: number) => string;
   getRiskLevel?: (score: number) => string;
   riskScore?: number | null;
@@ -477,6 +477,50 @@ export default function AnalysisResult({
     }
   };
   
+  // Ham Markdown benzeri metni başlık, kalın, liste olarak formatla (npm paketi yok, saf React)
+  const formatText = (text: string | string[] | undefined | null, gold: string): React.ReactNode => {
+    if (text == null || text === '') return null;
+    const str: string = Array.isArray(text) ? text.join('\n') : typeof text === 'string' ? text : String(text);
+    if (!str.trim()) return null;
+    const lines = str.split(/\r?\n/);
+    const headingColor = gold;
+    const listItemStyle = { marginLeft: '20px', marginBottom: '6px', display: 'flex', gap: '8px' as const };
+    const paragraphStyle = { marginBottom: '12px', lineHeight: 1.6 };
+
+    const formatInline = (s: string): React.ReactNode => {
+      const parts: React.ReactNode[] = [];
+      let lastIndex = 0;
+      const re = /\*\*(.+?)\*\*/g;
+      let m;
+      while ((m = re.exec(s)) !== null) {
+        if (m.index > lastIndex) parts.push(s.slice(lastIndex, m.index));
+        parts.push(<strong key={`b-${m.index}`}>{m[1]}</strong>);
+        lastIndex = re.lastIndex;
+      }
+      if (lastIndex < s.length) parts.push(s.slice(lastIndex));
+      return parts.length === 1 ? parts[0] : <>{parts}</>;
+    };
+
+    const out: React.ReactNode[] = [];
+    lines.forEach((line, idx) => {
+      const trimmed = line.trim();
+      if (/^###\s+/.test(line)) {
+        out.push(<h3 key={idx} style={{ color: headingColor, fontSize: '1.25rem', fontWeight: 'bold', marginTop: '16px', marginBottom: '8px' }}>{formatInline(trimmed.replace(/^###\s+/, ''))}</h3>);
+      } else if (/^##\s+/.test(line)) {
+        out.push(<h2 key={idx} style={{ color: headingColor, fontSize: '1.4rem', fontWeight: 'bold', marginTop: '20px', marginBottom: '10px' }}>{formatInline(trimmed.replace(/^##\s+/, ''))}</h2>);
+      } else if (/^#\s+/.test(line)) {
+        out.push(<h1 key={idx} style={{ color: headingColor, fontSize: '1.6rem', fontWeight: 'bold', marginTop: '24px', marginBottom: '12px' }}>{formatInline(trimmed.replace(/^#\s+/, ''))}</h1>);
+      } else if (/^-\s+/.test(line)) {
+        out.push(<div key={idx} style={listItemStyle}><span style={{ color: headingColor }}>•</span><span>{formatInline(trimmed.replace(/^-\s+/, ''))}</span></div>);
+      } else if (trimmed === '') {
+        out.push(<div key={idx} style={{ height: '8px' }} />);
+      } else {
+        out.push(<p key={idx} style={paragraphStyle}>{formatInline(trimmed)}</p>);
+      }
+    });
+    return <>{out}</>;
+  };
+
   // Metni tooltip'li terimlerle zenginleştir
   const enrichTextWithTooltips = (text: string): React.ReactNode => {
     if (!text || typeof text !== 'string') return text;
@@ -578,6 +622,7 @@ export default function AnalysisResult({
   // Ana analiz metnini göster
   const reportContainerRef = useRef<HTMLDivElement>(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
   
   // VIP kontrolü
   const isVIP = isAdmin || effectivePackage === 'enterprise' || effectivePackage === 'quantum_global' || effectivePackage === 'professional';
@@ -599,10 +644,17 @@ export default function AnalysisResult({
     
     console.log('PDF: VIP kontrolü başarılı');
     
+    // React State Strategy: Yazdırma modunu aç
+    setIsPrinting(true);
+    
     // Grafiklerin render olması için bekleme süresi
     setTimeout(() => {
       window.print();
-    }, 500);
+      // Yazdırma bitince modu kapat
+      setTimeout(() => {
+        setIsPrinting(false);
+      }, 500);
+    }, 1000); // Render olması için 1 saniye bekle
   };
   
   return (
@@ -869,7 +921,7 @@ export default function AnalysisResult({
           )}
           
           {/* PDF İndir Butonu - Sağ üst köşe */}
-          {(handleDownloadPDF || handlePDFDownload) && (
+          {displayResult && !isPrinting && (
             <button
               onClick={handlePDFDownload}
               disabled={isGeneratingPDF}
@@ -1073,11 +1125,14 @@ export default function AnalysisResult({
           border: `2px solid ${goldColor}44`,
           pageBreakInside: 'avoid',
           breakInside: 'avoid',
+          width: '100%',
+          height: isPrinting ? '500px' : 'auto',
+          minHeight: isPrinting ? '500px' : 'auto',
         }}>
           <div style={{ color: goldColor, fontSize: '1.1rem', marginBottom: '20px', fontWeight: 'bold', textAlign: 'center' }}>
             {language === 'TR' ? 'Risk Dağılım Grafiği' : language === 'EN' ? 'Risk Distribution Chart' : language === 'DE' ? 'Risikoverteilungsdiagramm' : 'Risk Distribution Chart'}
           </div>
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={isPrinting ? 500 : 300}>
             {(() => {
               const riskScore = calculateRiskScore();
               const complianceScore = calculateComplianceScore();
@@ -1103,7 +1158,6 @@ export default function AnalysisResult({
                 <BarChart
                   data={chartData}
                   margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                  isAnimationActive={false}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke={goldColor} opacity={0.2} />
                   <XAxis 
@@ -1128,7 +1182,7 @@ export default function AnalysisResult({
                       color: lightTextColor
                     }}
                   />
-                  <Bar dataKey="value" className="pdf-bar-chart">
+                  <Bar dataKey="value" className="pdf-bar-chart" isAnimationActive={false}>
                     {chartData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color || '#8884d8'} className="pdf-bar-cell" data-original-color={entry.color || '#8884d8'} />
                     ))}
@@ -1255,7 +1309,7 @@ export default function AnalysisResult({
                     orphans: 3,
                     widows: 3,
                   }}>
-                    {enrichTextWithTooltips(parsedData.summary)}
+                    {formatText(parsedData.summary, goldColor)}
                   </div>
                 </div>
               )}
@@ -1361,7 +1415,7 @@ export default function AnalysisResult({
                             orphans: 3,
                             widows: 3,
                           }}>
-                            {enrichTextWithTooltips(risk.description)}
+                            {formatText(risk.description, goldColor)}
                           </div>
                         )}
                         
@@ -1408,7 +1462,7 @@ export default function AnalysisResult({
                               orphans: 3,
                               widows: 3,
                             }}>
-                              {risk.potential_consequences}
+                              {formatText(risk.potential_consequences, goldColor)}
                             </div>
                           </div>
                         )}
@@ -1431,7 +1485,7 @@ export default function AnalysisResult({
                               orphans: 3,
                               widows: 3,
                             }}>
-                              {risk.mitigation_suggestions}
+                              {formatText(risk.mitigation_suggestions, goldColor)}
                             </div>
                           </div>
                         )}
@@ -1630,7 +1684,7 @@ export default function AnalysisResult({
                           orphans: 3,
                           widows: 3,
                         }}>
-                          {parsedData.legal_opinion.enforceability}
+                          {formatText(parsedData.legal_opinion.enforceability, goldColor)}
                         </div>
                       </div>
                     )}
@@ -1674,7 +1728,7 @@ export default function AnalysisResult({
                           orphans: 3,
                           widows: 3,
                         }}>
-                          {parsedData.legal_opinion.alternative_approaches}
+                          {formatText(parsedData.legal_opinion.alternative_approaches, goldColor)}
                         </div>
                       </div>
                     )}
@@ -1996,7 +2050,7 @@ export default function AnalysisResult({
     </div>
     
     {/* PDF İndir Butonu - #analysis-report dışında (PDF'te görünmemesi için) */}
-    {(handleDownloadPDF || handlePDFDownload) && (
+    {displayResult && !isPrinting && (
       <button
         onClick={handlePDFDownload}
         disabled={isGeneratingPDF}
