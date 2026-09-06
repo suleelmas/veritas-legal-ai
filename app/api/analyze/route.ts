@@ -3,6 +3,8 @@ import OpenAI from 'openai';
 import { supabase } from "@/lib/supabase";
 import PDFParser from 'pdf2json';
 import { applyWeightedRanking, getWeightedDocuments } from "@/lib/weightedSearch";
+import { detectJurisdiction } from "@/lib/jurisdictionDetection";
+import { getJurisdictionAnalysisInstructions } from "@/lib/legalSources/jurisdictionAnalysisInstructions";
 
 // Runtime configuration for Next.js App Router
 export const runtime = 'nodejs';
@@ -126,35 +128,45 @@ async function runVectorSearch(queryEmbedding: number[], filter: Record<string, 
     filter,
   });
 }
+type SupportedJurisdiction = "TR" | "US" | "UK" | "DE";
 
-async function retrieveLegalContext(pdfText: string, targetLang: string): Promise<string> {
+async function retrieveLegalContext(
+  pdfText: string,
+  jurisdiction: SupportedJurisdiction
+): Promise<string> {
   try {
-    const normalizedLang = (targetLang || "").toLowerCase();
-
-    const country =
-      normalizedLang.includes("türk") || normalizedLang.includes("tr") ? "TR" :
-      normalizedLang.includes("deutsch") || normalizedLang.includes("german") || normalizedLang.includes("de") ? "DE" :
-      undefined;
-
     const embeddingModel = "text-embedding-3-small";
-    const queryEmbedding = await createQueryEmbedding(pdfText, embeddingModel);
-    const primaryFilter = country ? { country } : {};
 
-    console.log("[RAG DEBUG] primary filter:", JSON.stringify(primaryFilter));
+    const queryEmbedding = await createQueryEmbedding(
+      pdfText,
+      embeddingModel
+    );
 
-    let searchResult = await runVectorSearch(queryEmbedding, primaryFilter, 20);
+    const primaryFilter = {
+      country: jurisdiction,
+    };
+
+    console.log(
+      "[RAG DEBUG] selected jurisdiction:",
+      jurisdiction
+    );
+
+    console.log(
+      "[RAG DEBUG] strict country filter:",
+      JSON.stringify(primaryFilter)
+    );
+
+    let searchResult = await runVectorSearch(
+      queryEmbedding,
+      primaryFilter,
+      20
+    );
+    
     let data = searchResult.data;
     let error = searchResult.error;
 
     if (error) {
       console.error("RAG primary search error:", error);
-    }
-
-    if ((!data || data.length === 0) && country) {
-      console.warn("[RAG DEBUG] Country filter returned no docs. Retrying without country filter.");
-      searchResult = await runVectorSearch(queryEmbedding, {}, 20);
-      data = searchResult.data;
-      error = searchResult.error;
     }
 
     if (error) {
@@ -207,8 +219,488 @@ ${doc.content.slice(0, 2200)}
     return "";
   }
 }
+function getValidSourceNumbers(legalContext: string): Set<number> {
+  const validSources = new Set<number>();
+  const matches = legalContext.matchAll(/\[KAYNAK\s+(\d+)\]/gi);
 
-async function performLegalAnalysis(pdfText: string, targetLang: string, onFinish?: (text: string) => Promise<void>) {
+  for (const match of matches) {
+    const sourceNumber = Number(match[1]);
+
+    if (Number.isInteger(sourceNumber) && sourceNumber > 0) {
+      validSources.add(sourceNumber);
+    }
+  }
+
+  return validSources;
+}
+
+function hasValidSourceCitation(
+  text: unknown,
+  validSources: Set<number>
+): boolean {
+  if (typeof text !== "string") {
+    return false;
+  }
+
+  const matches = text.matchAll(/\[KAYNAK\s+(\d+)\]/gi);
+
+  for (const match of matches) {
+    const sourceNumber = Number(match[1]);
+
+    if (validSources.has(sourceNumber)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function parseLegalSources(legalContext: string): Map<number, string> {
+  const sources = new Map<number, string>();
+
+  const blocks = legalContext.split(/(?=\[KAYNAK\s+\d+\])/gi);
+
+  for (const block of blocks) {
+    const match = block.match(/\[KAYNAK\s+(\d+)\]/i);
+
+    if (!match) continue;
+
+    const sourceNumber = Number(match[1]);
+
+    if (Number.isInteger(sourceNumber)) {
+      sources.set(sourceNumber, block);
+    }
+  }
+
+  return sources;
+}
+
+function normalizeForGrounding(value: string): string {
+  return value
+    .toLocaleLowerCase("tr-TR")
+    .replace(/[§.,:;()[\]{}"'’`]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getCitedSourceNumbers(text: string): number[] {
+  return Array.from(text.matchAll(/\[KAYNAK\s+(\d+)\]/gi))
+    .map((match) => Number(match[1]))
+    .filter((value) => Number.isInteger(value) && value > 0);
+}
+
+function extractLegalClaims(text: string): string[] {
+  const patterns = [
+    /\bKVKK\s*(?:m\.?|madde)?\s*\d+(?:\/\d+)?/gi,
+    /\b6698\s+sayılı\b/gi,
+    /\bTBK\s*(?:m\.?|madde)?\s*\d+(?:\/\d+)?/gi,
+    /\bTTK\s*(?:m\.?|madde)?\s*\d+(?:\/\d+)?/gi,
+    /\bGDPR\s*(?:Art\.?|Article)?\s*\d+(?:\(\d+\))?/gi,
+    /\bBGB\s*§+\s*\d+[a-z]?/gi,
+    /\bUCC\s*(?:Article)?\s*\d+(?:-\d+)?/gi,
+    /\bCISG\s*(?:Art\.?|Article)?\s*\d+/gi,
+    /\b\d{4}\/\d+\s*E\.?\s*,?\s*\d{4}\/\d+\s*K\.?/gi,
+    /\b\d[\d.,]*\s*(?:TL|TRY|EUR|USD|€|\$)\b/gi,
+  ];
+
+  const claims: string[] = [];
+
+  for (const pattern of patterns) {
+    const matches = text.match(pattern);
+
+    if (matches) claims.push(...matches);
+  }
+
+  return claims;
+}
+
+function isClaimSupported(
+  text: unknown,
+  sources: Map<number, string>
+): boolean {
+  if (typeof text !== "string") return false;
+
+  const citedNumbers = getCitedSourceNumbers(text);
+
+  if (citedNumbers.length === 0) return false;
+
+  const citedText = citedNumbers
+    .map((number) => sources.get(number) || "")
+    .join("\n");
+
+  if (!citedText.trim()) return false;
+
+  const claims = extractLegalClaims(text);
+
+  // Spesifik hukuk iddiası yoksa, geçerli bir kaynak etiketi yeterlidir.
+  if (claims.length === 0) return true;
+
+  const normalizedSource = normalizeForGrounding(citedText);
+
+  return claims.every((claim) => {
+    const normalizedClaim = normalizeForGrounding(claim);
+
+    return (
+      normalizedClaim.length > 0 &&
+      normalizedSource.includes(normalizedClaim)
+    );
+  });
+}
+
+function removeUnsupportedSentences(
+  text: unknown,
+  sources: Map<number, string>
+): string {
+  if (typeof text !== "string") return "";
+
+  const sentences = text
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean);
+
+  const cleaned = sentences.filter((sentence) => {
+    const specificClaims = extractLegalClaims(sentence);
+
+    // Spesifik kanun, karar veya tutar içermeyen genel açıklamayı koru.
+    if (specificClaims.length === 0) return true;
+
+    return isClaimSupported(sentence, sources);
+  });
+
+  return cleaned.join(" ").trim();
+}
+
+function sanitizeGroundedAnalysis(
+  rawAnalysis: string,
+  legalContext: string,
+  pdfText: string
+): string {
+  try {
+    const jsonStart = rawAnalysis.indexOf("{");
+    const jsonEnd = rawAnalysis.lastIndexOf("}");
+
+    if (jsonStart === -1 || jsonEnd === -1 || jsonEnd <= jsonStart) {
+      console.warn("[GROUNDING] Geçerli JSON bulunamadı.");
+      return rawAnalysis;
+    }
+
+    const parsed = JSON.parse(
+      rawAnalysis.substring(jsonStart, jsonEnd + 1)
+    );
+
+    const sources = parseLegalSources(legalContext);
+    const normalizedDocument = normalizeForGrounding(pdfText || "");
+
+    console.log(
+      "[GROUNDING] İçeriği kontrol edilen kaynaklar:",
+      Array.from(sources.keys())
+    );
+
+    const cleanReferenceArray = (value: unknown): string[] => {
+      if (!Array.isArray(value)) return [];
+
+      return value.filter(
+        (item): item is string =>
+          typeof item === "string" &&
+          isClaimSupported(item, sources)
+      );
+    };
+
+    const isMentionedInDocument = (text: unknown): boolean => {
+      if (typeof text !== "string") return false;
+
+      const normalizedText = normalizeForGrounding(text);
+
+      const identifiers = [
+        ...Array.from(normalizedText.matchAll(/\b\d{4}\b/g)).map(
+          (match) => match[0]
+        ),
+        "kişisel verilerin korunması kanunu",
+        "kvkk",
+        "türk borçlar kanunu",
+        "tbk",
+        "türk ticaret kanunu",
+        "ttk",
+        "gdpr",
+        "bgb",
+        "ucc",
+        "cisg",
+      ].filter((identifier) =>
+        normalizedText.includes(identifier)
+      );
+
+      return identifiers.some((identifier) =>
+        normalizedDocument.includes(identifier)
+      );
+    };
+
+    const containsExactDeadline = (text: string): boolean => {
+      return /\b\d+\s*(gün|hafta|ay|yıl|saat)\b/iu.test(text);
+    };
+
+    const containsExactCost = (text: string): boolean => {
+      return /\b\d[\d.,]*\s*(tl|try|eur|usd|€|\$)\b/iu.test(text);
+    };
+
+    const containsUnsupportedLegalConclusion = (
+      text: string
+    ): boolean => {
+      return /\b(uyumludur|uygun olarak hazırlanmıştır|hukuki geçerliliğe sahiptir|bağlayıcıdır|uygulanabilir|yaptırım uygulanabilir|yaptırıma yol açabilir|hukuki sonuç doğurabilir|ciddi hukuki sonuçlar doğurabilir|yasal süreç başlatılabilir|hukuki ihtilaf doğabilir|sözleşmenin feshi|sözleşme feshedilebilir|tazminat talebi|tazminat talepleri|tazminata yol açabilir|idari para cezası|idari para cezaları|para cezasına neden olabilir|cezai sorumluluk|hukuki sorumluluk|yasal sorumluluk|sorumluluk doğurur|yaptırım gücü vardır)\b/iu.test(text);
+    };
+    const sanitizeNarrative = (
+      value: unknown,
+      allowDocumentMentions = true
+    ): string => {
+      if (typeof value !== "string") return "";
+
+      const sentences = value
+        .split(/(?<=[.!?])\s+/)
+        .map((sentence) => sentence.trim())
+        .filter(Boolean);
+
+      const cleaned = sentences.filter((sentence) => {
+        const hasSpecificClaim =
+          extractLegalClaims(sentence).length > 0;
+
+        const hasLegalConclusion =
+          containsUnsupportedLegalConclusion(sentence);
+
+        const hasExactValue =
+          containsExactDeadline(sentence) ||
+          containsExactCost(sentence);
+
+        if (
+          !hasSpecificClaim &&
+          !hasLegalConclusion &&
+          !hasExactValue
+        ) {
+          return true;
+        }
+
+        if (isClaimSupported(sentence, sources)) {
+          return true;
+        }
+
+        // PDF'nin kendisinde geçen kanuna yalnızca "belgede atıf var"
+        // şeklindeki açıklamalarda izin ver.
+        if (
+          allowDocumentMentions &&
+          isMentionedInDocument(sentence) &&
+          /\b(atıf|belirt|düzenle|yer veril|bahsed|ifade edil)\b/iu.test(
+            sentence
+          ) &&
+          !hasLegalConclusion &&
+          !hasExactValue
+        ) {
+          return true;
+        }
+
+        return false;
+      });
+
+      return cleaned.join(" ").trim();
+    };
+
+    // Uygulanabilir kanunlar: en azından PDF içinde adı geçmeli
+    // veya bir hukuk kaynağı tarafından desteklenmeli.
+    if (Array.isArray(parsed.applicable_laws)) {
+      parsed.applicable_laws = parsed.applicable_laws.filter(
+        (law: unknown) =>
+          typeof law === "string" &&
+          (
+            isMentionedInDocument(law) ||
+            isClaimSupported(law, sources)
+          )
+      );
+    } else {
+      parsed.applicable_laws = [];
+    }
+
+    // Hukuki referanslar.
+    if (parsed.references && typeof parsed.references === "object") {
+      for (const key of Object.keys(parsed.references)) {
+        parsed.references[key] = cleanReferenceArray(
+          parsed.references[key]
+        );
+      }
+    }
+
+    // Risk kartları.
+    if (Array.isArray(parsed.risk_cards)) {
+      parsed.risk_cards = parsed.risk_cards.map((card: any) => {
+        if (
+          card?.affected_articles &&
+          typeof card.affected_articles === "object"
+        ) {
+          for (const key of Object.keys(card.affected_articles)) {
+            card.affected_articles[key] = cleanReferenceArray(
+              card.affected_articles[key]
+            );
+          }
+        }
+
+        card.case_law_references = cleanReferenceArray(
+          card?.case_law_references
+        );
+
+        card.description = sanitizeNarrative(
+          card?.description,
+          true
+        );
+
+        card.potential_consequences = sanitizeNarrative(
+          card?.potential_consequences,
+          false
+        );
+
+        card.mitigation_suggestions = sanitizeNarrative(
+          card?.mitigation_suggestions,
+          true
+        );
+
+        return card;
+      });
+    }
+
+    // Eylem planı.
+    if (Array.isArray(parsed.action_plan)) {
+      parsed.action_plan = parsed.action_plan.map((action: any) => {
+        if (!isClaimSupported(action?.legal_basis, sources)) {
+          action.legal_basis =
+            "Veritabanında doğrulanamadı.";
+        }
+
+        const originalDeadline =
+          typeof action?.deadline_note === "string"
+            ? action.deadline_note
+            : "";
+
+        if (
+          containsExactDeadline(originalDeadline) &&
+          !isClaimSupported(originalDeadline, sources)
+        ) {
+          action.deadline_note =
+            "Kesin süre veritabanında doğrulanamadı.";
+        } else {
+          action.deadline_note =
+            sanitizeNarrative(originalDeadline, false) ||
+            "Kesin süre veritabanında doğrulanamadı.";
+        }
+
+        const originalCost =
+          typeof action?.estimated_cost === "string"
+            ? action.estimated_cost
+            : "";
+
+        if (
+          containsExactCost(originalCost) &&
+          !isClaimSupported(originalCost, sources)
+        ) {
+          action.estimated_cost =
+            "Kesin maliyet veritabanında doğrulanamadı.";
+        } else {
+          action.estimated_cost =
+            sanitizeNarrative(originalCost, false) ||
+            "Kesin maliyet veritabanında doğrulanamadı.";
+        }
+
+        return action;
+      });
+    }
+
+    // Özet: PDF'de geçen kanun atıfları kalabilir,
+    // fakat doğrulanmamış uyumluluk veya yaptırım hükümleri silinir.
+    parsed.summary = sanitizeNarrative(
+      parsed.summary,
+      true
+    );
+
+    // Kaynaklarla doğrulanmış en az bir hukuki referans var mı?
+    const verifiedReferenceCount =
+      parsed.references &&
+      typeof parsed.references === "object"
+        ? Object.values(parsed.references).reduce(
+            (total: number, value: any) =>
+              total + (Array.isArray(value) ? value.length : 0),
+            0
+          )
+        : 0;
+// Doğrulanmış hukuk kaynağı yoksa serbest metindeki
+// kesin hukuki sonuçları güvenli açıklamalarla değiştir.
+if (verifiedReferenceCount === 0) {
+  if (Array.isArray(parsed.risk_cards)) {
+    parsed.risk_cards = parsed.risk_cards.map((card: any) => ({
+      ...card,
+
+      description:
+        "Belge metninde gizli bilgilerin korunmasına ilişkin yükümlülükler ve olası ihlal alanları tespit edilmiştir. Ancak mevcut Veritas hukuk kaynakları, bu durumun doğurabileceği spesifik hukuki yaptırım, tazminat veya sorumluluk sonuçlarını doğrulamak için yeterli değildir.",
+
+      potential_consequences:
+        "Bilgi güvenliği, itibar ve iş ilişkileri bakımından operasyonel riskler oluşabilir. İdari para cezası, tazminat, fesih veya diğer hukuki sonuçlar veritabanındaki mevcut kaynaklarla doğrulanamamıştır.",
+
+      case_law_references: [],
+
+      affected_articles:
+        card?.affected_articles &&
+        typeof card.affected_articles === "object"
+          ? Object.fromEntries(
+              Object.keys(card.affected_articles).map((key) => [
+                key,
+                [],
+              ])
+            )
+          : {},
+    }));
+  }
+
+  parsed.summary =
+    sanitizeNarrative(parsed.summary, true) +
+    " Mevzuata uygunluk, hukuki geçerlilik ve yaptırım sonuçları mevcut hukuk kaynaklarıyla kesin olarak doğrulanamamıştır.";
+}
+    if (parsed.compliance_status) {
+      parsed.compliance_status.details =
+        sanitizeNarrative(
+          parsed.compliance_status.details,
+          false
+        );
+
+      if (verifiedReferenceCount === 0) {
+        // Mevcut arayüz üç değer beklediği için geçici olarak
+        // kısmen_uyumlu kullanılıyor; açıklama kesin karar olmadığını söyler.
+        parsed.compliance_status.overall =
+          "kısmen_uyumlu";
+
+        parsed.compliance_status.details =
+          "Veritabanındaki mevcut hukuk kaynakları kesin bir uyumluluk değerlendirmesi yapmak için yeterli değildir. Belge metninde yer alan hükümler incelenmiştir; ancak mevzuata uygunluk sonucu kaynaklarla doğrulanamamıştır.";
+
+        parsed.compliance_status.critical_issues = [];
+
+        parsed.compliance_status.recommendations = [
+          "Kesin uyumluluk değerlendirmesi için ilgili mevzuat ve resmî kararların Veritas hukuk veritabanına eklenmesi gerekir."
+        ];
+      }
+    }
+
+    // Kesin hukuki görüş de kaynak gerektirir.
+    if (parsed.legal_opinion && verifiedReferenceCount === 0) {
+      parsed.legal_opinion.validity =
+        "Belgenin hukuki geçerliliği veritabanındaki mevcut kaynaklarla kesin olarak doğrulanamadı.";
+
+      parsed.legal_opinion.enforceability =
+        "Belgenin uygulanabilirliği ve yaptırım gücü veritabanındaki mevcut kaynaklarla kesin olarak doğrulanamadı.";
+    }
+
+    return JSON.stringify(parsed);
+  } catch (error) {
+    console.error(
+      "[GROUNDING] Analiz doğrulama hatası:",
+      error
+    );
+
+    return rawAnalysis;
+  }
+}
+async function performLegalAnalysis(pdfText: string, targetLang: string, jurisdiction: SupportedJurisdiction, onFinish?: (text: string) => Promise<void>) {
   console.log('[performLegalAnalysis] ========================================');
   console.log('[performLegalAnalysis] FONKSİYON ÇAĞRILDI!');
   console.log('[performLegalAnalysis] PDF metin uzunluğu:', pdfText?.length || 0);
@@ -216,8 +708,11 @@ async function performLegalAnalysis(pdfText: string, targetLang: string, onFinis
   console.log('[performLegalAnalysis] PDF metin ilk 200 karakter:', pdfText?.substring(0, 200) || 'BOŞ');
   console.log('[performLegalAnalysis] ========================================');
 
-  const legalContext = await retrieveLegalContext(pdfText, targetLang);
+  const legalContext = await retrieveLegalContext(pdfText, jurisdiction);
   console.log('[performLegalAnalysis] RAG kaynak uzunluğu:', legalContext.length);
+
+  const jurisdictionInstructions =
+    getJurisdictionAnalysisInstructions(jurisdiction);
   
   const analysisPrompt = `Sen bir yardımcı hukuk asistanısın ve verilen metne göre nesnel analizler yaparsın. Aşağıdaki hukuki metni derinlemesine ve kapsamlı bir şekilde analiz et. Analizini yaparken tüm yasal çerçeveleri, risk faktörlerini, uyum gerekliliklerini, potansiyel yasal sonuçları, yargı içtihatlarını ve akademik görüşleri göz önünde bulundur.
 
@@ -228,165 +723,22 @@ Aşağıdaki kaynaklar Supabase vektör veritabanından, yüklenen belgeyle anla
 ${legalContext || "İlgili kaynak bulunamadı. Bu durumda analiz genel hukuk bilgisiyle yapılmalı ve kesin hukuki görüş gibi sunulmamalıdır."}
 
 === KAYNAK KULLANIM TALİMATI ===
-- Kaynaklarda geçen madde, karar ve hukuki metinleri öncelikli kullan.
-- Kaynaklarda bulunmayan spesifik madde, karar numarası veya resmi kaynak uydurma.
-- Emin olmadığın yerde "kaynak doğrulaması gerekir" de.
-- Analizi hukuki tavsiye gibi değil, avukat incelemesini destekleyen kaynaklı ön analiz gibi sun.
-- JSON cevabındaki "references", "affected_articles", "case_law_references" ve "legal_basis" alanlarında mümkün olduğunca yukarıdaki KAYNAK numaralarına atıf yap.
+- Yukarıdaki VERİTABANINDAN GETİRİLEN GÜNCEL HUKUKİ KAYNAKLAR analiz için birincil kaynaktır.
+- Her hukuki iddianın, kanun maddesinin, kararın, yaptırımın ve hukuki sonucun sonunda mutlaka ilgili kaynak numarasını yaz: [KAYNAK 1], [KAYNAK 2] gibi.
+- Aynı cümle birden fazla kaynağa dayanıyorsa tüm kaynakları yaz: [KAYNAK 1] [KAYNAK 3].
+- Kaynaklarda bulunmayan spesifik madde, karar numarası, para cezası tutarı, içtihat veya resmi kaynak yazma.
+- Kaynaklarda destek bulunmuyorsa açıkça "Veritabanında doğrulanamadı" yaz.
+- Modelin genel hukuk bilgisini yalnızca açıklayıcı arka plan için kullan; doğrulanmamış spesifik hukuki iddia üretme.
+- "references", "affected_articles", "case_law_references", "legal_basis", "potential_consequences" ve "compliance_status.details" alanlarında kaynak numarası bulunması zorunludur.
+- Hiçbir uygun kaynak yoksa ilgili alanı boş bırak veya "Veritabanında doğrulanamadı" yaz.
+- Kaynak numarası olmadan karar numarası, madde numarası veya yaptırım tutarı verme.
+- Analiz hukuki tavsiye değildir; kaynak destekli ön incelemedir.
 
-=== KAPSAMLI HUKUK KÜTÜPHANESİ VE ANALİZ ÇERÇEVESİ ===
+=== SEÇİLİ HUKUK SİSTEMİ VE YARGI ALANI TALİMATLARI ===
 
-Analizinde MUTLAKA ve ÇOK DETAYLI şekilde şu yasal düzenlemeleri, hukuk sistemlerini ve yasal alanları göz önünde bulundur:
+Seçilen hukuk sistemi: ${jurisdiction}
 
-1. BGB (Bürgerliches Gesetzbuch - Almanya Medeni Kanunu):
-   - Tüm ilgili maddeleri, alt maddeleri (Absätze), paragrafları ve hükümleri belirt
-   - Sözleşme hukuku (Vertragsrecht): BGB § 145-157 (Angebot und Annahme), BGB § 241-304 (Schuldverhältnisse), BGB § 305-310 (Allgemeine Geschäftsbedingungen)
-   - Borçlar hukuku: BGB § 275-304 (Leistungsstörungen), BGB § 433-480 (Kaufvertrag), BGB § 535-580a (Miete, Pacht)
-   - Tazminat hukuku: BGB § 280 (Schadensersatz wegen Pflichtverletzung), BGB § 823 (Schadensersatzpflicht), BGB § 826 (Sittenwidrige vorsätzliche Schädigung)
-   - Haksız fiil hukuku: BGB § 823-853 (Deliktsrecht)
-   - Genel hükümler: BGB § 1-240 (Allgemeiner Teil)
-   - Alman hukuk sistemine özgü yükümlülükleri, hakları, yaptırımları ve içtihatları analiz et
-   - BGH (Bundesgerichtshof) kararları ve Alman yargı içtihatlarını değerlendir
-
-2. UCC (Uniform Commercial Code - ABD Birleşik Ticaret Kanunu):
-   - Tüm ilgili bölümler (Article 1-11), maddeler, alt maddeler ve yorumları referans al
-   - Article 1: Genel Hükümler (General Provisions) - UCC 1-201, 1-302, 1-303
-   - Article 2: Satış Sözleşmeleri (Sales) - UCC 2-201 (Statute of Frauds), UCC 2-207 (Additional Terms), UCC 2-314 (Implied Warranty), UCC 2-315 (Fitness for Particular Purpose), UCC 2-601 (Perfect Tender Rule)
-   - Article 2A: Kiralama (Leases) - UCC 2A-101 ve devamı
-   - Article 3: Kambiyo Senetleri (Negotiable Instruments) - UCC 3-101 ve devamı
-   - Article 4: Banka Mevduatları ve Tahsilat (Bank Deposits and Collections) - UCC 4-101 ve devamı
-   - Article 4A: Fon Transferleri (Fund Transfers) - UCC 4A-101 ve devamı
-   - Article 5: Akreditifler (Letters of Credit) - UCC 5-101 ve devamı
-   - Article 6: Toplu Satışlar (Bulk Sales) - UCC 6-101 ve devamı
-   - Article 7: Belge Başlıkları (Documents of Title) - UCC 7-101 ve devamı
-   - Article 8: Menkul Kıymetler (Investment Securities) - UCC 8-101 ve devamı
-   - Article 9: Güvenlik Hakları (Secured Transactions) - UCC 9-101, UCC 9-203 (Attachment), UCC 9-308 (Perfection), UCC 9-609 (Default)
-   - Article 10: Etkin Tarih Hükümleri (Effective Date and Repealer)
-   - Article 11: Etkilenmeyen İşlemler (Effective Date and Transition Provisions)
-   - ABD ticaret hukukuna özgü gereklilikleri, yorumları ve federal/eyalet içtihatlarını belirt
-   - Uniform Law Commission yorumlarını ve Restatement of Law referanslarını değerlendir
-
-3. KVKK (Kişisel Verilerin Korunması Kanunu - Türkiye, 6698 sayılı Kanun):
-   - Tüm ilgili maddeleri, yükümlülükleri, yaptırımları ve idari para cezalarını detaylı analiz et
-   - KVKK m.3: Tanımlar (kişisel veri, özel nitelikli kişisel veri, veri sorumlusu, veri işleyen, açık rıza)
-   - KVKK m.4: Genel İlkeler (hukuka ve dürüstlük kurallarına uygunluk, doğru ve gerektiğinde güncel olma, belirli açık ve meşru amaçlar için işleme)
-   - KVKK m.5: Kişisel verilerin işlenme şartları (açık rıza, kanunlarda açıkça öngörülme, sözleşmenin kurulması veya ifası)
-   - KVKK m.6: Özel nitelikli kişisel verilerin işlenme şartları (sağlık, cinsel hayat, biyometrik veriler)
-   - KVKK m.7: Silme, yok etme veya anonim hale getirme
-   - KVKK m.8: Veri sorumlusunun aydınlatma yükümlülüğü
-   - KVKK m.9: Kişisel verilerin yurt dışına aktarılması
-   - KVKK m.10: Veri sahibinin hakları (bilgi talep etme, düzeltme, silme, itiraz etme)
-   - KVKK m.11: Başvuru hakkı
-   - KVKK m.12: Veri güvenliğine ilişkin yükümlülükler
-   - KVKK m.13: Veri ihlali bildirimi
-   - KVKK m.14: Veri Koruma Kurulu
-   - KVKK m.15-18: Yaptırımlar ve idari para cezaları (2024 güncel tutarları ile)
-   - KVKK Yönetmeliği ve KVKK Kurulu kararlarını referans al
-   - Türk hukuk sistemindeki içtihatları ve KVKK Kurulu uygulamalarını değerlendir
-
-4. GDPR (General Data Protection Regulation - AB Genel Veri Koruma Yönetmeliği, Regulation (EU) 2016/679):
-   - Tüm ilgili maddeleri (Articles), gereklilikleri, yaptırımları ve yönergeleri değerlendir
-   - GDPR Art. 4: Tanımlar (Definitions)
-   - GDPR Art. 5: Veri işleme ilkeleri (Principles relating to processing of personal data)
-   - GDPR Art. 6: İşleme için yasal dayanak (Lawfulness of processing) - 6(1)(a) Consent, 6(1)(b) Contract, 6(1)(c) Legal obligation, 6(1)(f) Legitimate interests
-   - GDPR Art. 7: Rıza koşulları (Conditions for consent)
-   - GDPR Art. 8: Çocukların rızası (Conditions applicable to child's consent)
-   - GDPR Art. 9: Özel veri kategorileri (Processing of special categories of personal data)
-   - GDPR Art. 12-23: Veri sahibi hakları (Rights of the data subject) - Bilgi edinme, erişim, düzeltme, silme ("right to be forgotten"), işlemeye itiraz, veri taşınabilirliği
-   - GDPR Art. 24-31: Veri sorumlusu ve veri işleyen yükümlülükleri
-   - GDPR Art. 32: Güvenlik işleme (Security of processing)
-   - GDPR Art. 33: Veri ihlali bildirimi (Notification of a personal data breach to the supervisory authority)
-   - GDPR Art. 34: Veri sahibine bildirim (Communication of a personal data breach to the data subject)
-   - GDPR Art. 35: Veri koruma etki değerlendirmesi (Data protection impact assessment)
-   - GDPR Art. 36: Ön istişare (Prior consultation)
-   - GDPR Art. 37-39: Veri koruma görevlisi (Data protection officer)
-   - GDPR Art. 44-49: Üçüncü ülkelere veya uluslararası örgütlere aktarım (Transfers of personal data)
-   - GDPR Art. 77-84: Yaptırımlar ve tazminat (Remedies, liability and penalties) - Art. 83: 20 milyon EUR veya küresel cirosun %4'üne kadar idari para cezası
-   - GDPR Recitals (Gerekçeler) ve EDPB (European Data Protection Board) yönergelerini referans al
-   - AB Adalet Divanı (CJEU) kararlarını ve ulusal veri koruma otoritelerinin kararlarını değerlendir
-
-5. CISG (United Nations Convention on Contracts for the International Sale of Goods - BM Uluslararası Mal Satımına İlişkin Sözleşmeler Hakkında Sözleşme, 1980):
-   - CISG Art. 1-6: Uygulama alanı ve genel hükümler
-   - CISG Art. 14-24: Sözleşmenin kurulması (Formation of the contract)
-   - CISG Art. 25-88: Satıcı ve alıcının yükümlülükleri (Obligations of the seller and buyer)
-   - CISG Art. 45-52: Satıcının sözleşmeyi ihlal etmesi durumunda alıcının hakları
-   - CISG Art. 61-65: Alıcının sözleşmeyi ihlal etmesi durumunda satıcının hakları
-   - CISG Art. 74-77: Tazminat (Damages)
-   - CISG Art. 78: Faiz (Interest)
-   - CISG Art. 79-80: Mücbir sebep (Exemptions)
-   - CISG'in uygulanabilirliği, çekilme hükümleri ve uluslararası içtihatları değerlendir
-
-6. Türk Borçlar Kanunu (TBK - 6098 sayılı Kanun):
-   - TBK m.1-48: Genel Hükümler
-   - TBK m.49-118: Sözleşmelerin Kurulması (İcap, kabul, sözleşme özgürlüğü)
-   - TBK m.119-206: Sözleşmelerin Hükümsüzlüğü (İptal, butlan, eksiklik)
-   - TBK m.207-320: Borçların İfası ve İfa Edilmemesi
-   - TBK m.321-420: Borçların Sona Ermesi
-   - TBK m.421-480: Özel Borç İlişkileri (Satış, kira, hizmet sözleşmeleri)
-   - TBK m.481-650: Haksız Fiil ve Sebepsiz Zenginleşme
-   - TBK m.650-700: Tazminat Hukuku
-   - Yargıtay içtihatlarını ve Türk hukuk doktrinini referans al
-
-7. Türk Ticaret Kanunu (TTK - 6102 sayılı Kanun):
-   - TTK m.1-150: Ticari İşletme
-   - TTK m.151-400: Ticari İşler, Ticari Defterler
-   - TTK m.401-800: Şirketler Hukuku (Kollektif, komandit, limited, anonim şirketler)
-   - TTK m.801-1200: Kıymetli Evrak Hukuku
-   - TTK m.1201-1530: Deniz Ticareti
-   - TTK m.1531-1600: Sigorta Hukuku
-   - Yargıtay ticaret dairesi kararlarını değerlendir
-
-8. Rekabet Hukuku:
-   - AB Rekabet Hukuku: TFEU Art. 101 (Kartel yasakları), TFEU Art. 102 (Hakim durumun kötüye kullanılması)
-   - Türk Rekabet Hukuku: 4054 sayılı Rekabetin Korunması Hakkında Kanun
-   - Sherman Act (ABD), Clayton Act (ABD)
-   - Rekabet Kurulu kararları ve AB Komisyonu kararlarını referans al
-
-9. Fikri Mülkiyet Hukuku:
-   - Telif Hukuku: Bern Sözleşmesi, WIPO Copyright Treaty
-   - Marka Hukuku: Paris Sözleşmesi, Madrid Protokolü, Türk Markalar Kanunu (6769 sayılı)
-   - Patent Hukuku: Paris Sözleşmesi, PCT, Türk Patent ve Marka Kurumu mevzuatı
-   - Ticari Sır ve Know-How koruması
-
-10. Tüketici Hukuku:
-    - AB Tüketici Hakları Direktifi (2011/83/EU)
-    - Türk Tüketicinin Korunması Hakkında Kanun (6502 sayılı)
-    - Mesafeli Sözleşmeler Yönetmeliği
-    - Tüketici Hakem Heyetleri ve Tüketici Mahkemeleri uygulamaları
-
-11. İş Hukuku ve Çalışma Mevzuatı:
-    - AB İş Hukuku Direktifleri (Çalışma Süresi, İş Sağlığı ve Güvenliği)
-    - Türk İş Kanunu (4857 sayılı)
-    - Toplu İş Sözleşmesi, Grev ve Lokavt Kanunu (6356 sayılı)
-    - İş Sağlığı ve Güvenliği Kanunu (6331 sayılı)
-
-12. Çevre Hukuku:
-    - AB Çevre Direktifleri
-    - Türk Çevre Kanunu (2872 sayılı)
-    - Atık Yönetimi, Hava Kalitesi, Su Kirliliği mevzuatı
-
-13. Vergi Hukuku (İlgiliyse):
-    - Gelir Vergisi Kanunu, Kurumlar Vergisi Kanunu
-    - KDV Kanunu, Özel Tüketim Vergisi Kanunu
-    - Çifte Vergilendirmeyi Önleme Anlaşmaları
-
-14. Uluslararası Ticaret Hukuku:
-    - INCOTERMS 2020 (FOB, CIF, EXW, DDP vb.)
-    - UCP 600 (Akreditif Kuralları)
-    - URDG 758 (Teminat Mektupları Kuralları)
-    - ICC Yönergeleri ve Model Sözleşmeleri
-
-15. Elektronik Ticaret ve Dijital Hukuk:
-    - eIDAS Yönetmeliği (AB - Elektronik Kimlik ve Güvenilir Hizmetler)
-    - Elektronik Ticaretin Düzenlenmesi Hakkında Kanun (6563 sayılı)
-    - Elektronik İmza Kanunu (5070 sayılı)
-    - Dijital Hizmetler Yasası (DSA - AB), Dijital Piyasalar Yasası (DMA - AB)
-
-16. Finansal Hizmetler ve Sermaye Piyasaları:
-    - MiFID II (Markets in Financial Instruments Directive)
-    - PSD2 (Payment Services Directive)
-    - Türk Sermaye Piyasası Kanunu (6362 sayılı)
-    - Bankacılık Kanunu (5411 sayılı)
+${jurisdictionInstructions}
 
 === ANALİZ METODOLOJİSİ VE DERİNLİK GEREKSİNİMLERİ ===
 
@@ -445,16 +797,32 @@ Yanıtın MUTLAKA şu JSON yapısında olmalı (başka hiçbir metin ekleme, sad
       "timeline": "Riskin gerçekleşme zamanlaması ve aciliyet durumu"
     }
   ],
-  "references": {
-    "BGB": ["İlgili BGB maddeleri, alt maddeleri, paragrafları ve detaylı açıklamaları. Her madde için madde numarası, başlık, içerik özeti ve belgeye uygulanabilirliği belirtilmeli."],
-    "UCC": ["İlgili UCC bölüm/maddeleri, alt maddeleri ve detaylı açıklamaları. Her bölüm için Article numarası, başlık, içerik özeti ve belgeye uygulanabilirliği belirtilmeli."],
-    "KVKK": ["İlgili KVKK maddeleri, yönetmelik hükümleri, KVKK Kurulu kararları ve detaylı açıklamaları. Her madde için madde numarası, başlık, içerik özeti, yaptırımlar ve belgeye uygulanabilirliği belirtilmeli."],
-    "GDPR": ["İlgili GDPR maddeleri, Recitals, EDPB yönergeleri, CJEU kararları ve detaylı açıklamaları. Her madde için Article numarası, başlık, içerik özeti, yaptırımlar ve belgeye uygulanabilirliği belirtilmeli."],
-    "CISG": ["İlgili CISG maddeleri ve açıklamaları (varsa)"],
-    "TBK": ["İlgili TBK maddeleri, Yargıtay içtihatları ve açıklamaları (varsa)"],
-    "TTK": ["İlgili TTK maddeleri, Yargıtay içtihatları ve açıklamaları (varsa)"],
-    "Other": ["Diğer ilgili yasal düzenlemeler, uluslararası sözleşmeler, direktifler, yönetmelikler, içtihatlar ve referanslar (varsa)"]
-  },
+ "references": {
+  "BGB": [
+    "Yalnızca VERİTABANINDAN GETİRİLEN GÜNCEL HUKUKİ KAYNAKLAR içinde açıkça bulunan BGB hükümlerini yaz. Her kaydın sonunda mutlaka [KAYNAK X] bulunmalı. Kaynakta açıkça yer almıyorsa bu diziyi boş bırak."
+  ],
+  "UCC": [
+    "Yalnızca getirilen kaynaklarda açıkça bulunan UCC hükümlerini yaz. Her kaydın sonunda mutlaka [KAYNAK X] bulunmalı. Kaynakta yoksa bu diziyi boş bırak."
+  ],
+  "KVKK": [
+    "Yalnızca getirilen kaynaklarda açıkça bulunan KVKK maddelerini veya KVKK Kurulu kararlarını yaz. Her kaydın sonunda mutlaka [KAYNAK X] bulunmalı. Modelin genel bilgisinden KVKK madde numarası ekleme. Kaynaklarda doğrulanamıyorsa bu diziyi boş bırak."
+  ],
+  "GDPR": [
+    "Yalnızca getirilen kaynaklarda açıkça bulunan GDPR maddelerini, kararlarını veya yönergelerini yaz. Her kaydın sonunda mutlaka [KAYNAK X] bulunmalı. Kaynakta yoksa bu diziyi boş bırak."
+  ],
+  "CISG": [
+    "Yalnızca getirilen kaynaklarda açıkça bulunan CISG maddelerini yaz ve sonunda [KAYNAK X] göster. Kaynakta yoksa boş bırak."
+  ],
+  "TBK": [
+    "Yalnızca getirilen kaynaklarda açıkça bulunan TBK maddelerini veya Yargıtay içtihatlarını yaz. Her kaydın sonunda mutlaka [KAYNAK X] bulunmalı. Kaynakta yoksa boş bırak."
+  ],
+  "TTK": [
+    "Yalnızca getirilen kaynaklarda açıkça bulunan TTK maddelerini veya Yargıtay içtihatlarını yaz. Her kaydın sonunda mutlaka [KAYNAK X] bulunmalı. Kaynakta yoksa boş bırak."
+  ],
+  "Other": [
+    "Yalnızca getirilen kaynaklarda açıkça bulunan diğer düzenlemeleri yaz. Her kaydın sonunda mutlaka [KAYNAK X] bulunmalı. Kaynakta yoksa boş bırak."
+  ]
+},
   "action_plan": [
     {
       "priority": "yüksek|orta|düşük",
@@ -489,18 +857,22 @@ Yanıtın MUTLAKA şu JSON yapısında olmalı (başka hiçbir metin ekleme, sad
 }
 
 ÖNEMLİ TALİMATLAR VE GEREKSİNİMLER:
-- Analizini ${targetLang} dilinde yap
-- Tüm risk kartlarında, referanslarda ve eylem planında ilgili yasal düzenlemelerin SPESİFİK madde numaralarını, alt maddelerini ve paragraflarını belirt
-- Her yasal referans için kapsamlı, bilgilendirici ve teknik açıklamalar ekle
-- Risk değerlendirmelerini objektif, kapsamlı ve detaylı yap
-- Eylem planındaki önerileri uygulanabilir, spesifik, ölçülebilir ve adım adım formüle et
-- Yargı içtihatlarını, akademik görüşleri ve uygulama örneklerini referans al
-- Yanıtını JSON formatında döndür, ek açıklama, önsöz, sonuç metni, markdown formatı veya başka herhangi bir metin ekleme
-- JSON formatında hata olmamasına dikkat et (tırnak işaretleri, virgüller, köşeli parantezler, süslü parantezler doğru olmalı)
-- Tüm string değerlerde özel karakterleri (tırnak, ters eğik çizgi, yeni satır) düzgün escape et
-- Array'lerde en az bir örnek ver, boş array yerine ilgili örnekler ekle
-- Her alanı doldur, "varsa" notu olan alanlar için bile ilgili bilgileri eklemeye çalış
-- Analiz derinliğini maksimuma çıkar, yüzeysel değerlendirmeler yapma
+- Analizini ${targetLang} dilinde yap.
+- Yukarıdaki VERİTABANINDAN GETİRİLEN GÜNCEL HUKUKİ KAYNAKLAR bölümü analiz için birincil kaynaktır.
+- Her spesifik kanun maddesi, karar numarası, yaptırım tutarı, içtihat veya hukuki sonuç yalnızca getirilen kaynaklarda açıkça yer alıyorsa yazılabilir.
+- Her doğrulanmış hukuki iddianın sonunda mutlaka ilgili kaynak numarasını belirt: [KAYNAK 1], [KAYNAK 2] gibi.
+- Kaynak numarası gösterilemiyorsa spesifik madde, karar, ceza tutarı veya içtihat yazma.
+- Kaynaklarda doğrulanamayan bilgiler için "Veritabanında doğrulanamadı" yaz.
+- Modelin genel hukuk bilgisini yalnızca genel açıklama ve bağlam için kullan; spesifik hukuki referans üretmek için kullanma.
+- Tüm risk kartlarında, referanslarda ve eylem planında yalnızca doğrulanmış yasal düzenlemeleri kullan.
+- Risk değerlendirmelerini objektif, kapsamlı ve detaylı yap.
+- Eylem planındaki önerileri uygulanabilir, spesifik, ölçülebilir ve adım adım formüle et.
+- Uygun kaynak bulunmayan array alanlarını boş dizi [] olarak bırak.
+- Kaynakta bulunmayan alanları doldurmak için örnek veya tahmin üretme.
+- Yanıtını yalnızca geçerli JSON formatında döndür; ek açıklama, önsöz, sonuç metni veya markdown ekleme.
+- JSON formatında hata olmamasına dikkat et.
+- Tüm string değerlerde özel karakterleri düzgün escape et.
+- Analiz derinliğini artır; ancak doğrulanmamış ayrıntı ekleme.
 
 Analiz edilecek metin:
 PLACEHOLDER_PDF_TEXT`;
@@ -536,7 +908,7 @@ console.log("[RAG DEBUG] kaynak bölümü var mı:", finalAnalysisPrompt.include
       messages: [
         {
           role: "system",
-          content: `Sen bir yardımcı hukuk asistanısın ve verilen metne göre nesnel analizler yaparsın. Analizini sadece ${targetLang} dilinde yap. Öncelikle kullanıcı promptunda verilen VERİTABANINDAN GETİRİLEN GÜNCEL HUKUKİ KAYNAKLAR bölümüne dayan. Kaynaklarda bulunmayan kanun maddesi, karar numarası veya resmi kaynak uydurma. Kaynak yetersizse bunu açıkça belirt. Analiz avukat incelemesinin yerine geçmez; kaynak destekli ön incelemedir.`
+          content: `Sen bir yardımcı hukuk asistanısın ve verilen metne göre nesnel analizler yaparsın. Analizini sadece ${targetLang} dilinde yap. Seçilen yargı alanı (jurisdiction): ${jurisdiction}. ${jurisdictionInstructions} Başka bir yargı alanına sessizce geçme. Spesifik kanun maddeleri, kararlar, cezalar, süreler ve hukuki sonuçlar yalnızca getirilen doğrulanmış kaynaklarla desteklenebilir. targetLang yalnızca ÇIKTI DİLİNİ belirler; yargı alanını asla belirlemez. Öncelikle kullanıcı promptunda verilen VERİTABANINDAN GETİRİLEN GÜNCEL HUKUKİ KAYNAKLAR bölümüne dayan. Kaynaklarda bulunmayan kanun maddesi, karar numarası veya resmi kaynak uydurma. Kaynak yetersizse bunu açıkça belirt. Analiz avukat incelemesinin yerine geçmez; kaynak destekli ön incelemedir.`
         },
         { role: "user", content: finalAnalysisPrompt }
       ],
@@ -546,7 +918,14 @@ console.log("[RAG DEBUG] kaynak bölümü var mı:", finalAnalysisPrompt.include
     
     console.log('[performLegalAnalysis] OpenAI yanıtı başarıyla alındı');
     
-    const analysisResult = response.choices[0]?.message?.content || 'Analysis complete';
+    const rawAnalysisResult =
+    response.choices[0]?.message?.content || "Analysis complete";
+  
+    const analysisResult = sanitizeGroundedAnalysis(
+      rawAnalysisResult,
+      legalContext,
+      pdfText
+    );
     
     console.log('[performLegalAnalysis] YANIT DETAYLI:', {
       yanitUzunlugu: analysisResult.length,
@@ -586,7 +965,7 @@ export async function POST(req: Request) {
   
   try {
     console.log('[API] Request body parse ediliyor...');
-    const { pdfText, pdfBase64, targetLang, userEmail, userId, fileName } = await req.json();
+    const { pdfText, pdfBase64, targetLang, userSelectedCountry, userEmail, userId, fileName } = await req.json();
     console.log('[API] Request body parse edildi!');
     console.log('[API] Request body alındı:', {
       hasPdfText: !!pdfText,
@@ -649,6 +1028,35 @@ export async function POST(req: Request) {
     if (!finalPdfText) {
       return NextResponse.json({ reply: "PDF metni bulunamadı!" }, { status: 400 });
     }
+
+    const supportedJurisdictions: SupportedJurisdiction[] = ["TR", "US", "UK", "DE"];
+
+    let resolvedJurisdiction: SupportedJurisdiction;
+
+    if (
+      userSelectedCountry &&
+      supportedJurisdictions.includes(userSelectedCountry as SupportedJurisdiction)
+    ) {
+      resolvedJurisdiction = userSelectedCountry as SupportedJurisdiction;
+    } else {
+      const detection = await detectJurisdiction(finalPdfText, { useVectorConfirmation: false });
+      const primary = detection.primary_country;
+
+      if (
+        primary === "TR" ||
+        primary === "US" ||
+        primary === "UK" ||
+        primary === "DE"
+      ) {
+        resolvedJurisdiction = primary;
+      } else {
+        return NextResponse.json(
+          { reply: "Jurisdiction could not be reliably determined." },
+          { status: 422 }
+        );
+      }
+    }
+
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json({ reply: "API Key eksik!" }, { status: 500 });
     }
@@ -797,6 +1205,7 @@ export async function POST(req: Request) {
       const result = performLegalAnalysis(
         finalPdfText, 
         targetLang || 'tr',
+        resolvedJurisdiction,
         async (text) => {
           await saveAnalysisAndNotify(text, fileName || 'admin-document.pdf', userId);
         }
@@ -845,6 +1254,7 @@ export async function POST(req: Request) {
         const result = performLegalAnalysis(
           finalPdfText, 
           targetLang || 'tr',
+          resolvedJurisdiction,
           async (text) => {
             await saveAnalysisAndNotify(text, fileName || 'document.pdf', userId);
           }
@@ -859,6 +1269,7 @@ export async function POST(req: Request) {
         const result = performLegalAnalysis(
           finalPdfText, 
           targetLang || 'tr',
+          resolvedJurisdiction,
           async (text) => {
             // Kredi bir azaltılır
             await supabase.from("user_credits")
@@ -875,6 +1286,7 @@ export async function POST(req: Request) {
         const result = performLegalAnalysis(
           finalPdfText, 
           targetLang || 'tr',
+          resolvedJurisdiction,
           async (text) => {
             await supabase.from("user_analysis_rights").insert({ user_key: userKey });
             await saveAnalysisAndNotify(text, fileName || 'document.pdf', userId);
@@ -896,6 +1308,7 @@ export async function POST(req: Request) {
         const result = performLegalAnalysis(
           finalPdfText, 
           targetLang || 'tr',
+          resolvedJurisdiction,
           async (text) => {
             await saveAnalysisAndNotify(text, fileName || 'document.pdf', userId);
           }
@@ -910,6 +1323,7 @@ export async function POST(req: Request) {
       const result = performLegalAnalysis(
         finalPdfText, 
         targetLang || 'tr',
+        resolvedJurisdiction,
         async (text) => {
           await saveAnalysisAndNotify(text, fileName || 'document.pdf', userId);
         }

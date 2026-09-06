@@ -411,34 +411,62 @@ async function syncAllSources(): Promise<SyncResult[]> {
   return results;
 }
 
-export async function GET(req: Request) {
-  const authHeader = req.headers.get("authorization");
+function isAuthorizedCronRequest(req: Request): boolean {
   const cronSecret = process.env.CRON_SECRET;
+  const authHeader = req.headers.get("authorization");
 
-  if (cronSecret && authHeader && authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!cronSecret) {
+    console.error("[SYNC] CRON_SECRET is not configured.");
+    return false;
+  }
+
+  return authHeader === `Bearer ${cronSecret}`;
+}
+
+export async function GET(req: Request) {
+  if (!isAuthorizedCronRequest(req)) {
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      { status: 401 }
+    );
   }
 
   const results = await syncAllSources();
-  const successCount = results.filter((r) => r.success).length;
-  const totalNew = results.reduce((sum, r) => sum + r.new, 0);
-  const totalUpdated = results.reduce((sum, r) => sum + r.updated, 0);
 
-  return NextResponse.json({
-    success: successCount > 0,
-    timestamp: new Date().toISOString(),
-    results,
-    summary: {
-      totalSources: results.length,
-      successful: successCount,
-      failed: results.length - successCount,
-      totalNew,
-      totalUpdated,
+  const successCount = results.filter(
+    (result) => result.success
+  ).length;
+
+  const failedCount = results.length - successCount;
+
+  const totalNew = results.reduce(
+    (sum, result) => sum + result.new,
+    0
+  );
+
+  const totalUpdated = results.reduce(
+    (sum, result) => sum + result.updated,
+    0
+  );
+
+  const allSuccessful =
+    results.length > 0 && failedCount === 0;
+
+  return NextResponse.json(
+    {
+      success: allSuccessful,
+      timestamp: new Date().toISOString(),
+      results,
+      summary: {
+        totalSources: results.length,
+        successful: successCount,
+        failed: failedCount,
+        totalNew,
+        totalUpdated,
+      },
     },
-  });
-}
-
-export async function POST() {
-  const results = await syncAllSources();
-  return NextResponse.json({ results });
+    {
+      status: allSuccessful ? 200 : 207,
+    }
+  );
 }

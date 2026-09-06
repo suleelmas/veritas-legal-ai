@@ -10,7 +10,22 @@ export async function syncYargitay(supabase: SupabaseClient) {
 
     for (const decision of decisions) {
       const content = `${decision.title}${decision.content ? "\n" + decision.content : ""}`;
+      const normalizedContent = content.toLowerCase();
 
+      const isInvalidPage =
+        content.length < 500 ||
+        normalizedContent.includes("yargıtay karar arama") ||
+        normalizedContent.includes("emsal karar arama") ||
+        normalizedContent.includes("dosya sorgu") ||
+        normalizedContent.includes("birim seçilmediğinde tüm birimlerde arama yapılır");
+      
+      if (isInvalidPage) {
+        console.warn(
+          "[YARGITAY SYNC] Geçersiz sayfa atlandı:",
+          decision.title
+        );
+        continue;
+      }
       const { data: existing } = await supabase
         .from("documents")
         .select("id")
