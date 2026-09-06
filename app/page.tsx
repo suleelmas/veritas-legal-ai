@@ -4943,34 +4943,40 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
       )}
 
       {/* Test Mode Region Switch Button */}
-      <button
-        onClick={() => setTestMode(testMode === null ? false : testMode === false ? true : null)}
-        style={{
-          position: 'fixed',
-          bottom: '20px',
-          right: '20px',
-          background: testMode === null ? 'rgba(23, 35, 50, 0.8)' : testMode ? 'rgba(199, 176, 121, 0.3)' : 'rgba(199, 176, 121, 0.5)',
-          color: gold,
-          border: `1px solid ${gold}`,
-          borderRadius: '8px',
-          padding: '8px 12px',
-          fontSize: '11px',
-          fontWeight: 'bold',
-          cursor: 'pointer',
-          zIndex: 9999,
-          opacity: 0.7,
-          transition: 'opacity 0.2s',
-          boxShadow: `0 2px 8px rgba(0,0,0,0.3)`
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.opacity = '1';
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.opacity = '0.7';
-        }}
-      >
-        {testMode === null ? 'Mode: Auto' : testMode ? 'Mode: TR' : 'Mode: Global'}
-      </button>
+{user?.email === 'elmas7853@gmail.com' && (
+  <button
+    onClick={() => setTestMode(testMode === null ? false : testMode === false ? true : null)}
+    style={{
+      position: 'fixed',
+      bottom: '20px',
+      right: '20px',
+      background: testMode === null
+        ? 'rgba(23, 35, 50, 0.8)'
+        : testMode
+          ? 'rgba(199, 176, 121, 0.3)'
+          : 'rgba(199, 176, 121, 0.5)',
+      color: gold,
+      border: `1px solid ${gold}`,
+      borderRadius: '8px',
+      padding: '8px 12px',
+      fontSize: '11px',
+      fontWeight: 'bold',
+      cursor: 'pointer',
+      zIndex: 9999,
+      opacity: 0.7,
+      transition: 'opacity 0.2s',
+      boxShadow: `0 2px 8px rgba(0,0,0,0.3)`
+    }}
+    onMouseEnter={(e) => {
+      e.currentTarget.style.opacity = '1';
+    }}
+    onMouseLeave={(e) => {
+      e.currentTarget.style.opacity = '0.7';
+    }}
+  >
+    {testMode === null ? 'Mode: Auto' : testMode ? 'Mode: TR' : 'Mode: Global'}
+  </button>
+)}
 
       {/* Limit Reached Modal */}
       {/* Credit Purchase Modal */}
