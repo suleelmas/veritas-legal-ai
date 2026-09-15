@@ -284,14 +284,22 @@ export default function Header({
                         fontWeight: 'bold',
                         marginBottom: '2px'
                       }}>
-                        {language === 'TR' ? 'Plan: Veritas VIP / Developer' : 'Plan: Veritas VIP / Developer'}
+                        Plan: Veritas VIP / Developer
                       </div>
                       <div style={{
                         color: lightText,
                         fontSize: '10px',
                         opacity: 0.7
                       }}>
-                        {language === 'TR' ? 'Sınırsız Analiz' : 'Unlimited Analysis'}
+                        {{
+  TR: 'Sınırsız Analiz',
+  EN: 'Unlimited Analysis',
+  FR: 'Analyses illimitées',
+  DE: 'Unbegrenzte Analysen',
+  RU: 'Неограниченный анализ',
+  ZH: '无限分析',
+  AR: 'تحليل غير محدود'
+}[language] || 'Unlimited Analysis'}
                       </div>
                     </div>
                   </div>
