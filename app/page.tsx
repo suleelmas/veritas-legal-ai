@@ -546,6 +546,162 @@ export default function Home() {
       feature4: "✓ دعم متعدد اللغات"
     }
   };
+  const localeMap: Record<string, string> = {
+    TR: 'tr-TR',
+    EN: 'en-US',
+    FR: 'fr-FR',
+    DE: 'de-DE',
+    RU: 'ru-RU',
+    ZH: 'zh-CN',
+    AR: 'ar-SA',
+  };
+  
+  const commonText: Record<string, Record<string, string>> = {
+    TR: {
+      chatFallback: 'Üzgünüm, isteğinizi işleyemedim.',
+      genericError: 'Bir hata oluştu. Lütfen tekrar deneyin.',
+      packageUpgradeRequired: 'Paket yükseltmesi gerekli',
+      comparisonError: 'Karşılaştırma sırasında bir hata oluştu.',
+      selectTwoFiles: 'Lütfen karşılaştırma için iki dosya seçin.',
+      comparePackageRequired: 'Dosya karşılaştırma özelliği Professional veya Global paket gerektirir.',
+      detailedAnalysis: 'Ayrıntılı Analiz',
+      analysisError: 'Analiz sırasında bir hata oluştu.',
+      connectionError: 'Bağlantı hatası',
+      apiUnavailable: 'API’ye ulaşılamadı',
+      checkInternet: 'Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin.',
+      apiError: 'API hatası',
+    },
+  
+    EN: {
+      chatFallback: 'Sorry, I could not process your request.',
+      genericError: 'An error occurred. Please try again.',
+      packageUpgradeRequired: 'Package upgrade required',
+      comparisonError: 'An error occurred during comparison.',
+      selectTwoFiles: 'Please select both documents for comparison.',
+      comparePackageRequired: 'Document comparison requires Professional or Global package.',
+      detailedAnalysis: 'Detailed Analysis',
+      analysisError: 'An error occurred during analysis.',
+      connectionError: 'Connection error',
+      apiUnavailable: 'Could not reach API',
+      checkInternet: 'Please check your internet connection and try again.',
+      apiError: 'API error',
+    },
+  
+    FR: {
+      chatFallback: 'Désolé, je n’ai pas pu traiter votre demande.',
+      genericError: 'Une erreur est survenue. Veuillez réessayer.',
+      packageUpgradeRequired: 'Une mise à niveau du forfait est requise',
+      comparisonError: 'Une erreur est survenue lors de la comparaison.',
+      selectTwoFiles: 'Veuillez sélectionner les deux documents à comparer.',
+      comparePackageRequired: 'La comparaison de documents nécessite le forfait Professional ou Global.',
+      detailedAnalysis: 'Analyse détaillée',
+      analysisError: 'Une erreur est survenue pendant l’analyse.',
+      connectionError: 'Erreur de connexion',
+      apiUnavailable: 'Impossible de joindre l’API',
+      checkInternet: 'Veuillez vérifier votre connexion Internet et réessayer.',
+      apiError: 'Erreur API',
+    },
+  
+    DE: {
+      chatFallback: 'Ihre Anfrage konnte leider nicht verarbeitet werden.',
+      genericError: 'Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.',
+      packageUpgradeRequired: 'Ein Paket-Upgrade ist erforderlich',
+      comparisonError: 'Beim Vergleich ist ein Fehler aufgetreten.',
+      selectTwoFiles: 'Bitte wählen Sie beide Dokumente für den Vergleich aus.',
+      comparePackageRequired: 'Der Dokumentvergleich erfordert das Professional- oder Global-Paket.',
+      detailedAnalysis: 'Detaillierte Analyse',
+      analysisError: 'Bei der Analyse ist ein Fehler aufgetreten.',
+      connectionError: 'Verbindungsfehler',
+      apiUnavailable: 'API konnte nicht erreicht werden',
+      checkInternet: 'Bitte überprüfen Sie Ihre Internetverbindung und versuchen Sie es erneut.',
+      apiError: 'API-Fehler',
+    },
+  
+    RU: {
+      chatFallback: 'К сожалению, не удалось обработать ваш запрос.',
+      genericError: 'Произошла ошибка. Пожалуйста, попробуйте ещё раз.',
+      packageUpgradeRequired: 'Необходимо обновить тариф',
+      comparisonError: 'Во время сравнения произошла ошибка.',
+      selectTwoFiles: 'Выберите оба документа для сравнения.',
+      comparePackageRequired: 'Для сравнения документов требуется тариф Professional или Global.',
+      detailedAnalysis: 'Подробный анализ',
+      analysisError: 'Во время анализа произошла ошибка.',
+      connectionError: 'Ошибка подключения',
+      apiUnavailable: 'Не удалось подключиться к API',
+      checkInternet: 'Проверьте подключение к интернету и повторите попытку.',
+      apiError: 'Ошибка API',
+    },
+  
+    ZH: {
+      chatFallback: '抱歉，无法处理您的请求。',
+      genericError: '发生错误，请重试。',
+      packageUpgradeRequired: '需要升级套餐',
+      comparisonError: '比较过程中发生错误。',
+      selectTwoFiles: '请选择两个要比较的文档。',
+      comparePackageRequired: '文档比较功能需要 Professional 或 Global 套餐。',
+      detailedAnalysis: '详细分析',
+      analysisError: '分析过程中发生错误。',
+      connectionError: '连接错误',
+      apiUnavailable: '无法连接到 API',
+      checkInternet: '请检查您的网络连接并重试。',
+      apiError: 'API 错误',
+    },
+  
+    AR: {
+      chatFallback: 'عذرًا، تعذر معالجة طلبك.',
+      genericError: 'حدث خطأ. يرجى المحاولة مرة أخرى.',
+      packageUpgradeRequired: 'يلزم ترقية الباقة',
+      comparisonError: 'حدث خطأ أثناء المقارنة.',
+      selectTwoFiles: 'يرجى تحديد المستندين للمقارنة.',
+      comparePackageRequired: 'تتطلب مقارنة المستندات باقة Professional أو Global.',
+      detailedAnalysis: 'التحليل التفصيلي',
+      analysisError: 'حدث خطأ أثناء التحليل.',
+      connectionError: 'خطأ في الاتصال',
+      apiUnavailable: 'تعذر الوصول إلى API',
+      checkInternet: 'يرجى التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى.',
+      apiError: 'خطأ في API',
+    },
+  };
+  
+  const text = commonText[language] || commonText.EN;
+  
+  const loadingMessages: Record<string, string[]> = {
+    TR: [
+      'Qubit Matrisleri Senkronize Ediliyor...',
+      'Kuantum Olasılık Algoritması Çalışıyor...',
+      'Dolanık Veri Setleri Analiz Ediliyor...',
+    ],
+    EN: [
+      'Synchronizing Qubit Matrices...',
+      'Quantum Probability Algorithm Running...',
+      'Analyzing Entangled Data Sets...',
+    ],
+    FR: [
+      'Synchronisation des matrices de qubits...',
+      'Exécution de l’algorithme de probabilité quantique...',
+      'Analyse des ensembles de données intriquées...',
+    ],
+    DE: [
+      'Qubit-Matrizen werden synchronisiert...',
+      'Quanten-Wahrscheinlichkeitsalgorithmus wird ausgeführt...',
+      'Verschränkte Datensätze werden analysiert...',
+    ],
+    RU: [
+      'Синхронизация матриц кубитов...',
+      'Выполняется квантовый вероятностный алгоритм...',
+      'Анализ запутанных наборов данных...',
+    ],
+    ZH: [
+      '正在同步量子比特矩阵...',
+      '正在运行量子概率算法...',
+      '正在分析纠缠数据集...',
+    ],
+    AR: [
+      'جارٍ مزامنة مصفوفات الكيوبت...',
+      'جارٍ تشغيل خوارزمية الاحتمالات الكمية...',
+      'جارٍ تحليل مجموعات البيانات المتشابكة...',
+    ],
+  };
 
   // Check for payment success
   useEffect(() => {
@@ -659,7 +815,7 @@ export default function Home() {
               const history = analyses.map(a => ({
                 id: a.id,
                 title: a.file_name,
-                date: new Date(a.created_at).toLocaleString(language === 'TR' ? 'tr-TR' : 'en-US'),
+                date: new Date(a.created_at).toLocaleString(localeMap[language] || 'en-US'),
                 summary: a.analysis_summary || (typeof a.analysis_result === 'string' ? a.analysis_result.substring(0, 200) + '...' : 'Analysis completed'),
                 fullResult: typeof a.analysis_result === 'string' ? a.analysis_result : JSON.stringify(a.analysis_result),
                 riskScore: a.risk_score || extractRiskScore(typeof a.analysis_result === 'string' ? a.analysis_result : JSON.stringify(a.analysis_result))
@@ -1077,13 +1233,28 @@ export default function Home() {
     if (!text) return { summary: '', detailed: '' };
     
     // Metni bölümlere ayır (başlıklara göre)
-    const summaryKeywords = language === 'TR' 
-      ? ['Özet', 'Anahtar Noktalar', 'Genel Bakış', 'Sonuç', 'Yönetici Özeti']
-      : ['Summary', 'Key Points', 'Overview', 'Conclusion', 'Executive Summary'];
+    const summaryKeywordMap: Record<string, string[]> = {
+      TR: ['Özet', 'Anahtar Noktalar', 'Genel Bakış', 'Sonuç', 'Yönetici Özeti'],
+      EN: ['Summary', 'Key Points', 'Overview', 'Conclusion', 'Executive Summary'],
+      FR: ['Résumé', 'Points clés', 'Vue d’ensemble', 'Conclusion', 'Résumé exécutif'],
+      DE: ['Zusammenfassung', 'Kernpunkte', 'Überblick', 'Fazit', 'Management-Zusammenfassung'],
+      RU: ['Резюме', 'Ключевые моменты', 'Обзор', 'Заключение', 'Исполнительное резюме'],
+      ZH: ['摘要', '关键要点', '概述', '结论', '执行摘要'],
+      AR: ['الملخص', 'النقاط الرئيسية', 'نظرة عامة', 'الخلاصة', 'الملخص التنفيذي'],
+    };
     
-    const detailedKeywords = language === 'TR'
-      ? ['Risk Analizi', 'Madde İncelemesi', 'Detaylı Analiz', 'Teknik Detaylar', 'Ayrıntılı', 'Risk', 'Madde']
-      : ['Risk Analysis', 'Article Review', 'Detailed Analysis', 'Technical Details', 'Detailed', 'Risk', 'Article'];
+    const detailedKeywordMap: Record<string, string[]> = {
+      TR: ['Risk Analizi', 'Madde İncelemesi', 'Detaylı Analiz', 'Teknik Detaylar', 'Ayrıntılı', 'Risk', 'Madde'],
+      EN: ['Risk Analysis', 'Article Review', 'Detailed Analysis', 'Technical Details', 'Detailed', 'Risk', 'Article'],
+      FR: ['Analyse des risques', 'Examen des articles', 'Analyse détaillée', 'Détails techniques', 'Détaillé', 'Risque', 'Article'],
+      DE: ['Risikoanalyse', 'Artikelprüfung', 'Detaillierte Analyse', 'Technische Details', 'Detailliert', 'Risiko', 'Artikel'],
+      RU: ['Анализ рисков', 'Обзор статьи', 'Подробный анализ', 'Технические детали', 'Подробно', 'Риск', 'Статья'],
+      ZH: ['风险分析', '条款审查', '详细分析', '技术细节', '详细', '风险', '条款'],
+      AR: ['تحليل المخاطر', 'مراجعة المادة', 'التحليل التفصيلي', 'التفاصيل الفنية', 'تفصيلي', 'المخاطر', 'المادة'],
+    };
+    
+    const summaryKeywords = summaryKeywordMap[language] || summaryKeywordMap.EN;
+    const detailedKeywords = detailedKeywordMap[language] || detailedKeywordMap.EN;
     
     const lines = text.split('\n');
     let summaryParts: string[] = [];
@@ -1206,17 +1377,7 @@ export default function Home() {
       return;
     }
 
-    const messages = language === 'TR' 
-      ? [
-          'Qubit Matrisleri Senkronize Ediliyor...',
-          'Kuantum Olasılık Algoritması Çalışıyor...',
-          'Dolanık Veri Setleri Analiz Ediliyor...'
-        ]
-      : [
-          'Synchronizing Qubit Matrices...',
-          'Quantum Probability Algorithm Running...',
-          'Analyzing Entangled Data Sets...'
-        ];
+    const messages = loadingMessages[language] || loadingMessages.EN;
 
     const interval = setInterval(() => {
       setCurrentLoadingMessageIndex((prev) => (prev + 1) % messages.length);
@@ -1288,14 +1449,12 @@ export default function Home() {
       });
       
       const data = await res.json();
-      const assistantMessage = data.reply || data.error || (language === 'TR' ? 'Üzgünüm, isteğinizi işleyemedim.' : 'Sorry, I could not process your request.');
+      const assistantMessage = data.reply || data.error || text.chatFallback;
       
       setChatMessages(prev => [...prev, { role: 'assistant', content: assistantMessage }]);
     } catch (error) {
       console.error('Chat error:', error);
-      const errorMessage = language === 'TR' 
-        ? 'Bir hata oluştu. Lütfen tekrar deneyin.' 
-        : 'An error occurred. Please try again.';
+      const errorMessage = text.genericError;
       setChatMessages(prev => [...prev, { role: 'assistant', content: errorMessage }]);
     } finally {
       setChatLoading(false);
@@ -1367,7 +1526,7 @@ export default function Home() {
       
       if (!res.ok) {
         if (data.requiresUpgrade) {
-          alert(data.error || (language === 'TR' ? 'Paket yükseltmesi gerekli' : 'Package upgrade required'));
+          alert(data.error || text.packageUpgradeRequired);
           // setActiveTab('pricing'); // YORUM SATIRINA ALINDI - Redirect yapmasın
           return;
         }
@@ -1379,7 +1538,7 @@ export default function Home() {
       setAnalysisStatus('');
     } catch (error: any) {
       console.error('Comparison error:', error);
-      alert(error.message || (language === 'TR' ? 'Karşılaştırma sırasında bir hata oluştu.' : 'An error occurred during comparison.'));
+      alert(error.message || text.comparisonError);
     } finally {
       setLoading(false);
     }
@@ -1413,15 +1572,13 @@ export default function Home() {
     if ((uploadMode as any) === 'compare') {
       console.log('[handleAnalyze] Compare mode aktif');
       if (!file || !file2) {
-        alert(language === 'TR' ? 'Lütfen karşılaştırma için iki dosya seçin.' : 'Please select both documents for comparison.');
+        alert(text.selectTwoFiles);
         return;
       }
       
       // Paket kontrolü
       if (!effectivePackage || effectivePackage === 'free') {
-        alert(language === 'TR' 
-          ? 'Dosya karşılaştırma özelliği Professional veya Global paket gerektirir.' 
-          : 'Document comparison requires Professional or Global package.');
+        alert(text.comparePackageRequired);
         // setActiveTab('pricing'); // YORUM SATIRINA ALINDI - Redirect yapmasın
         return;
       }
@@ -1790,13 +1947,13 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
               
               if (allAnalyses) {
                 const history = allAnalyses.map(a => ({
-                  id: a.id,
-                  title: a.file_name,
-                  date: new Date(a.created_at).toLocaleString(language === 'TR' ? 'tr-TR' : 'en-US'),
-                  summary: a.analysis_summary || a.analysis_result.substring(0, 200) + '...',
-                  fullResult: a.analysis_result,
-                  riskScore: a.risk_score || null
-                }));
+  id: a.id,
+  title: a.file_name,
+  date: new Date(a.created_at).toLocaleString(localeMap[language] || 'en-US'),
+  summary: a.analysis_summary || a.analysis_result.substring(0, 200) + '...',
+  fullResult: a.analysis_result,
+  riskScore: a.risk_score || null
+}));
                 setAnalysisHistory(history);
               }
             }
@@ -1985,7 +2142,7 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
     try {
       // Tüm analizi al (özet + detaylı)
       const { summary, detailed } = parseAnalysisResult(result);
-      const fullContent = `${summary}\n\n--- ${language === 'TR' ? 'Ayrıntılı Analiz' : 'Detailed Analysis'} ---\n\n${detailed}`;
+      const fullContent = `${summary}\n\n--- ${text.detailedAnalysis} ---\n\n${detailed}`; 
       
       const title = reportRef.current.querySelector('h3')?.textContent || ui[language].resultTitle;
       const content = fullContent || result;
@@ -3939,10 +4096,7 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
                             textShadow: `0 0 15px ${gold}88, 0 0 30px ${gold}66`
                           }}
                         >
-                          {language === 'TR' 
-                            ? ['Qubit Matrisleri Senkronize Ediliyor...', 'Kuantum Olasılık Algoritması Çalışıyor...', 'Dolanık Veri Setleri Analiz Ediliyor...'][currentLoadingMessageIndex]
-                            : ['Synchronizing Qubit Matrices...', 'Quantum Probability Algorithm Running...', 'Analyzing Entangled Data Sets...'][currentLoadingMessageIndex]
-                          }
+                          {(loadingMessages[language] || loadingMessages.EN)[currentLoadingMessageIndex]}
                         </motion.div>
                       </motion.div>
                     )}

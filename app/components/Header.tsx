@@ -171,7 +171,7 @@ export default function Header({
               zIndex: 1100,
               overflow: 'hidden'
             }}>
-              {["EN", "TR", "FR", "DE", "RU", "ZH", "AR"].map(l => (
+              {["EN", "TR", "FR", "DE"].map(l => (
                 <button 
                   key={l} 
                   onClick={() => {
