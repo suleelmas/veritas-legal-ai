@@ -1,5 +1,6 @@
 "use client";
 import React, { useState } from 'react';
+import { ct } from '@/lib/componentTranslations';
 
 interface BetaBannerProps {
   language: string;
@@ -27,11 +28,7 @@ export default function BetaBanner({ language, onReportClick }: BetaBannerProps)
       zIndex: 1000
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '15px', flexWrap: 'wrap' }}>
-        <span>
-          {language === 'TR' 
-            ? 'Veritas Q-AI Beta: Hata bul, bildir ve Professional pakette %50 indirim kazan!'
-            : 'Veritas Q-AI Beta: Find bugs, report them and get 50% off on Professional package!'}
-        </span>
+        <span>{ct(language, 'betaMessage')}</span>
         <button
           onClick={onReportClick}
           style={{
@@ -61,7 +58,7 @@ export default function BetaBanner({ language, onReportClick }: BetaBannerProps)
             e.currentTarget.style.transform = 'scale(1)';
           }}
         >
-          {language === 'TR' ? 'Hata Bildir' : 'Report Bug'}
+          {ct(language, 'reportBug')}
         </button>
         <button
           onClick={() => setDismissed(true)}
@@ -77,7 +74,7 @@ export default function BetaBanner({ language, onReportClick }: BetaBannerProps)
           }}
           onMouseEnter={(e) => e.currentTarget.style.opacity = '1'}
           onMouseLeave={(e) => e.currentTarget.style.opacity = '0.7'}
-          aria-label={language === 'TR' ? 'Kapat' : 'Close'}
+          aria-label={ct(language, 'close')}
         >
           ×
         </button>
@@ -85,7 +82,3 @@ export default function BetaBanner({ language, onReportClick }: BetaBannerProps)
     </div>
   );
 }
-
-
-
-
