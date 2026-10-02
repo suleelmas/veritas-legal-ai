@@ -1,6 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ct } from '@/lib/componentTranslations';
 
 interface FeedbackHubProps {
   isOpen: boolean;
@@ -49,7 +50,7 @@ export default function FeedbackHub({
     e.preventDefault();
     
     if (!suggestion.trim()) {
-      alert(language === 'TR' ? 'Lütfen önerinizi girin.' : 'Please enter your suggestion.');
+      alert(ct(language, 'enterSuggestion'));
       return;
     }
 
@@ -76,16 +77,13 @@ export default function FeedbackHub({
       setSuggestion('');
       setEmail(userEmail || '');
       
-      // 2 saniye sonra kapat
       setTimeout(() => {
         setSuccess(false);
         onClose();
       }, 2000);
     } catch (error: any) {
       console.error('Feedback submission error:', error);
-      alert(error.message || (language === 'TR' 
-        ? 'Öneri gönderilirken bir sorun oluştu.' 
-        : 'An error occurred while submitting your suggestion.'));
+      alert(error.message || ct(language, 'feedbackSubmitError'));
     } finally {
       setLoading(false);
     }
@@ -102,7 +100,6 @@ export default function FeedbackHub({
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -121,7 +118,6 @@ export default function FeedbackHub({
             }}
           />
           
-          {/* Slide-over Panel */}
           <motion.div
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
@@ -144,7 +140,6 @@ export default function FeedbackHub({
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header */}
             <div style={{
               padding: '24px',
               borderBottom: `1px solid ${gold}33`,
@@ -162,10 +157,11 @@ export default function FeedbackHub({
                   fontWeight: 'bold',
                   margin: 0
                 }}>
-                  {language === 'TR' ? 'İstek & Öneri' : 'Feedback Hub'}
+                  {ct(language, 'feedbackHub')}
                 </h2>
                 <button
                   onClick={handleClose}
+                  aria-label={ct(language, 'close')}
                   style={{
                     background: 'transparent',
                     border: 'none',
@@ -201,13 +197,10 @@ export default function FeedbackHub({
                 opacity: 0.8,
                 lineHeight: '1.5'
               }}>
-                {language === 'TR' 
-                  ? 'Veritas Q-AI\'da ne görmek istersiniz? (Yeni ülkeler, daha hızlı analiz, özel hukuk araçları...)'
-                  : 'What would you like to see in Veritas Q-AI? (New countries, faster analysis, specific legal tools...)'}
+                {ct(language, 'feedbackIntro')}
               </p>
             </div>
 
-            {/* Content */}
             <div style={{
               flex: 1,
               padding: '24px',
@@ -249,7 +242,7 @@ export default function FeedbackHub({
                     fontWeight: 'bold',
                     marginBottom: '16px'
                   }}>
-                    {language === 'TR' ? 'Teşekkürler!' : 'Thank You!'}
+                    {ct(language, 'thankYou')}
                   </h3>
                   <p style={{
                     color: lightText,
@@ -257,9 +250,7 @@ export default function FeedbackHub({
                     lineHeight: '1.6',
                     opacity: 0.9
                   }}>
-                    {language === 'TR' 
-                      ? 'Öneriniz ekibimize iletildi. Geri bildiriminiz için teşekkürler!'
-                      : 'Thank you! Your suggestion has been beamed to our core team.'}
+                    {ct(language, 'feedbackSuccess')}
                   </p>
                 </motion.div>
               ) : (
@@ -268,7 +259,6 @@ export default function FeedbackHub({
                   flexDirection: 'column',
                   gap: '20px'
                 }}>
-                  {/* Email Input */}
                   <div>
                     <label style={{
                       display: 'block',
@@ -277,21 +267,21 @@ export default function FeedbackHub({
                       fontWeight: '600',
                       fontSize: '14px'
                     }}>
-                      {language === 'TR' ? 'E-posta (Opsiyonel)' : 'Email (Optional)'}
+                      {ct(language, 'emailOptional')}
                       <span style={{
                         color: '#666',
                         fontSize: '0.85rem',
                         fontWeight: 'normal',
                         marginLeft: '6px'
                       }}>
-                        {language === 'TR' ? '- Dönüş yapabilmemiz için' : '- So we can get back to you'}
+                        {ct(language, 'emailReason')}
                       </span>
                     </label>
                     <input
                       type="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      placeholder={language === 'TR' ? 'ornek@email.com' : 'example@email.com'}
+                      placeholder="example@email.com"
                       style={{
                         width: '100%',
                         padding: '14px',
@@ -315,7 +305,6 @@ export default function FeedbackHub({
                     />
                   </div>
 
-                  {/* Suggestion Textarea */}
                   <div>
                     <label style={{
                       display: 'block',
@@ -324,14 +313,12 @@ export default function FeedbackHub({
                       fontWeight: '600',
                       fontSize: '14px'
                     }}>
-                      {language === 'TR' ? 'Öneri / Düşünce *' : 'Suggestion / Idea *'}
+                      {ct(language, 'suggestionIdea')}
                     </label>
                     <textarea
                       value={suggestion}
                       onChange={(e) => setSuggestion(e.target.value)}
-                      placeholder={language === 'TR' 
-                        ? 'Örneğin: "Fransa hukuku desteği eklenebilir mi?" veya "Analiz süresini kısaltmak için...'
-                        : 'E.g., "Can you add France legal support?" or "To speed up analysis..."'}
+                      placeholder={ct(language, 'suggestionPlaceholder')}
                       required
                       rows={8}
                       style={{
@@ -359,7 +346,6 @@ export default function FeedbackHub({
                     />
                   </div>
 
-                  {/* Submit Button */}
                   <button
                     type="submit"
                     disabled={loading}
@@ -393,10 +379,7 @@ export default function FeedbackHub({
                       }
                     }}
                   >
-                    {loading 
-                      ? (language === 'TR' ? 'Gönderiliyor...' : 'Sending...')
-                      : (language === 'TR' ? 'Geliştiricilere Gönder' : 'Send to Developers')
-                    }
+                    {loading ? ct(language, 'sending') : ct(language, 'sendDevelopers')}
                   </button>
                 </form>
               )}
@@ -407,4 +390,3 @@ export default function FeedbackHub({
     </AnimatePresence>
   );
 }
-
