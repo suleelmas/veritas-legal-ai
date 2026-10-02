@@ -1,116 +1,22 @@
 "use client";
 import { useEffect, useState } from "react";
 
-const MESAFE_TR = (
-  <div style={{maxWidth:750,margin:'60px auto',background:'#171c2d',borderRadius:22,padding:36,color:'#ffe18d',boxShadow:'0 10px 30px #0007'}}>
-    <h1 style={{fontWeight:800,fontSize:'2.1rem',marginBottom:18}}>MESAFELİ SATIŞ SÖZLEŞMESİ</h1>
-    <div style={{color:'#eaeaea',fontWeight:600,marginBottom:28, fontSize:'1.07rem'}}>
-      <ol style={{ marginLeft: 18 }}>
-        <li><b>TARAFLAR</b><br/>
-          1.1. SATICI:<br/>
-          Ünvan/Ad-Soyad: Şule Elmas<br/>
-          Adres: Türkiye/Antalya<br/>
-          E-posta: suleelmas13@gmail.com<br/>
-          Web Sitesi: veritasai.com<br/>
-          1.2. ALICI (Tüketici):<br/>
-          Veritas Q-AI (veritasai.com) platformuna üye olan ve hizmet satın alan kişidir. Alıcının üye olurken kullandığı iletişim bilgileri esas alınır.
-        </li>
-        <li><b>SÖZLEŞMENİN KONUSU</b><br/>
-          Bu Sözleşme’nin konusu, Alıcı’nın Satıcı’ya ait veritasai.com web sitesi üzerinden elektronik ortamda siparişini verdiği, nitelikleri ve satış fiyatı web sitesinde belirtilen Yapay Zeka Tabanlı Hukuki Analiz Hizmeti’nin satışı ve teslimi ile ilgili tarafların hak ve yükümlülüklerinin belirlenmesidir.
-        </li>
-        <li><b>HİZMETİN NİTELİĞİ VE ÖDEME BİLGİLERİ</b><br/>
-          <b>Hizmet Tanımı:</b> Seçilen paket tipine göre (Basic, Pro, Elite) belirli sayıda veya sınırsız analiz hakkı sağlayan dijital üyelik.<br/>
-          <b>Satış Bedeli:</b> Kullanıcı tarafından seçilen paketin web sitesinde gösterilen KDV dahil fiyatıdır.<br/>
-          <b>Ödeme Şekli:</b> Kredi Kartı / Banka Kartı (Shopier veya Lemon Squeezy aracılığıyla)
-        </li>
-        <li><b>HİZMETİN İFASI VE TESLİMATI</b><br/>
-          Bu hizmet dijital içerik niteliğindedir. Alıcı ödeme yaptıktan sonra, hizmet kullanıcı hesabına anında tanımlanır. Hizmetin tanımlanması ile Satıcı’nın teslimat yükümlülüğü sona ermiş sayılır.
-        </li>
-        <li><b>CAYMA HAKKI VE İSTİSNALARI</b><br/>
-          <b>ÖNEMLİ:</b> Mesafeli Sözleşmeler Yönetmeliği m. 15/ğ’ye göre "Elektronik ortamda anında ifa edilen hizmetlerde" cayma hakkı bulunmaz.<br/>
-          Veritas Q-AI’dan alınan paketler, anında ifa/dijital içerik kapsamında olduğundan, üye olduktan/ödeme yaptıktan sonra cayma hakkı ve ücret iadesi yoktur. Ödeme ile bu koşullar kabul edilmiş sayılır.
-        </li>
-        <li><b>GENEL HÜKÜMLER</b><br/>
-          <ul>
-            <li>Alıcı, hizmetin niteliklerini, fiyatını ve ödeme/teslimat esaslarını öğrendiğini önceden kabul eder.</li>
-            <li>Satıcı, teknik arızalar/aksaklıklarda Alıcı’nın hakkını korumakla yükümlüdür.</li>
-            <li>Veritas Q-AI raporları bir avukatlık hizmeti değildir; kullanıcı, raporların kesin hukuki görüş olmadığını onaylar.</li>
-          </ul>
-        </li>
-        <li><b>YETKİLİ MAHKEME</b><br/>
-          T.C. Ticaret Bakanlığı’nın açıkladığı parasal sınıra kadar Tüketici Hakem Heyetleri, fazlası için ise tarafların yerleşim yerindeki Tüketici Mahkemeleri yetkilidir.
-        </li>
-        <li><b>YÜRÜRLÜK</b><br/>
-          Alıcı, web sitesinde sipariş verip ödeme yaptığında bu sözleşmenin tüm şartlarını kabul etmiş sayılır.
-        </li>
-      </ol>
-    </div>
-  </div>
-)
+type Lang = 'TR' | 'EN' | 'DE' | 'FR';
+const box = {maxWidth:750,margin:'60px auto',background:'#171c2d',borderRadius:22,padding:36,color:'#ffe18d',boxShadow:'0 10px 30px #0007'} as const;
+const body = {color:'#eaeaea',fontWeight:600,marginBottom:28,fontSize:'1.07rem'} as const;
 
-const MESAFE_EN = (
-  <div style={{maxWidth:750,margin:'60px auto',background:'#171c2d',borderRadius:22,padding:36,color:'#ffe18d',boxShadow:'0 10px 30px #0007'}}>
-    <h1 style={{fontWeight:800,fontSize:'2.1rem',marginBottom:18}}>DISTANCE SALES AGREEMENT</h1>
-    <div style={{color:'#eaeaea',fontWeight:600,marginBottom:28, fontSize:'1.07rem'}}>
-      <ol style={{ marginLeft: 18 }}>
-        <li><b>PARTIES</b><br/>
-          1.1. SELLER:<br/>
-          Title: Şule Elmas<br/>
-          Address: Türkiye/Antalya<br/>
-          E-mail: suleelmas13@gmail.com<br/>
-          Website: veritasai.com<br/>
-          1.2. BUYER (Consumer):<br/>
-          Any person registered on veritasai.com platform who purchases the service. Buyer's registration info is regarded.
-        </li>
-        <li><b>SUBJECT OF THE AGREEMENT</b><br/>
-          The subject of this Agreement is to determine the rights and obligations of the parties concerning the sale and delivery of AI-powered Legal Analysis Service offered online via veritasai.com at prices and natures shown.
-        </li>
-        <li><b>SERVICE DESCRIPTION & PAYMENT</b><br/>
-          <b>Service:</b> Digital membership entitling the user to a certain (or unlimited) number of legal analyses according to the package.<br/>
-          <b>Sales Price:</b> The price (including VAT) as selected and seen on the site by the user.<br/>
-          <b>Payment Method:</b> Credit/Debit Card (via Shopier or Lemon Squeezy)
-        </li>
-        <li><b>PERFORMANCE & DELIVERY</b><br/>
-          The Service is a digital product. As soon as the Buyer completes payment, the service will be immediately defined under the buyer’s account. Seller’s obligation is fulfilled once access is granted.
-        </li>
-        <li><b>RIGHT OF WITHDRAWAL & EXCLUSIONS</b><br/>
-          <b>IMPORTANT:</b> According to Distance Contracts Regulation Art. 15/ğ; no right of withdrawal is available for instantly performed digital services.<br/>
-          Any package purchased on Veritas Q-AI is a digital/instantly delivered service, so no right of withdrawal or refund is provided after access is granted. Buyer is deemed to have accepted these terms at payment.
-        </li>
-        <li><b>GENERAL TERMS</b><br/>
-          <ul>
-            <li>Buyer acknowledges the package details, price, payment, and delivery principles in advance.</li>
-            <li>Seller is obliged to safeguard Buyer’s rights in case of technical failures.</li>
-            <li>Veritas Q-AI reports are not a definitive legal/professional advice; Buyer accepts this.</li>
-          </ul>
-        </li>
-        <li><b>JURISDICTION</b><br/>
-          Consumer Arbitration Committees for disputes up to the limit set by the Ministry of Trade; for higher values, Consumer Courts at Buyer’s or Seller’s location apply.
-        </li>
-        <li><b>ENTRY INTO FORCE</b><br/>
-          Buyer is deemed to have accepted all terms of this Agreement by completing the order and payment.
-        </li>
-      </ol>
-    </div>
-  </div>
-)
+const content = {
+  TR: <div style={box}><h1 style={{fontWeight:800,fontSize:'2.1rem',marginBottom:18}}>MESAFELİ SATIŞ SÖZLEŞMESİ</h1><div style={body}><ol style={{marginLeft:18}}><li><b>TARAFLAR</b><br/>Satıcı: Şule Elmas, Türkiye/Antalya, suleelmas13@gmail.com, veritasai.com.<br/>Alıcı: Veritas Q-AI platformuna üye olan ve hizmet satın alan kişidir.</li><li><b>SÖZLEŞMENİN KONUSU</b><br/>Bu sözleşme, veritasai.com üzerinden sunulan Yapay Zeka Tabanlı Hukuki Analiz Hizmeti’nin satışı ve dijital teslimine ilişkin tarafların hak ve yükümlülüklerini düzenler.</li><li><b>HİZMET VE ÖDEME</b><br/>Seçilen pakete göre belirli sayıda veya sınırsız analiz hakkı sağlayan dijital üyelik sunulur. Satış bedeli sitede gösterilen fiyattır. Ödeme kredi/banka kartıyla Shopier veya Lemon Squeezy üzerinden yapılabilir.</li><li><b>İFA VE TESLİMAT</b><br/>Hizmet dijital içeriktir ve ödeme sonrası kullanıcı hesabına tanımlanır.</li><li><b>CAYMA HAKKI</b><br/>Dijital ve anında ifa edilen hizmetlerde uygulanabilecek cayma hakkı istisnaları geçerlidir. Ödeme öncesinde ilgili koşulların kullanıcı tarafından incelenmesi gerekir.</li><li><b>GENEL HÜKÜMLER</b><br/>Kullanıcı hizmetin niteliklerini, fiyatını ve teslim esaslarını kabul eder. Veritas Q-AI raporları avukatlık hizmeti veya kesin hukuki görüş değildir.</li><li><b>YETKİ</b><br/>Uyuşmazlıklarda yürürlükteki tüketici mevzuatı uyarınca görevli ve yetkili merciler uygulanır.</li><li><b>YÜRÜRLÜK</b><br/>Alıcı sipariş ve ödeme işlemini tamamladığında sözleşme koşullarını kabul etmiş sayılır.</li></ol></div></div>,
+  EN: <div style={box}><h1 style={{fontWeight:800,fontSize:'2.1rem',marginBottom:18}}>DISTANCE SALES AGREEMENT</h1><div style={body}><ol style={{marginLeft:18}}><li><b>PARTIES</b><br/>Seller: Şule Elmas, Türkiye/Antalya, suleelmas13@gmail.com, veritasai.com.<br/>Buyer: The person registered on the Veritas Q-AI platform who purchases the service.</li><li><b>SUBJECT</b><br/>This Agreement governs the rights and obligations of the parties concerning the sale and digital delivery of the AI-Powered Legal Analysis Service offered through veritasai.com.</li><li><b>SERVICE AND PAYMENT</b><br/>The selected package provides a specified or unlimited number of analyses. The sales price is the price shown on the site. Payment may be made by credit/debit card through Shopier or Lemon Squeezy.</li><li><b>PERFORMANCE AND DELIVERY</b><br/>The service is digital content and is assigned to the user account after payment.</li><li><b>RIGHT OF WITHDRAWAL</b><br/>Exceptions applicable to instantly performed digital services may apply. Users should review the applicable conditions before payment.</li><li><b>GENERAL TERMS</b><br/>The user accepts the service characteristics, price and delivery terms. Veritas Q-AI reports are not legal representation or definitive legal advice.</li><li><b>JURISDICTION</b><br/>Competent consumer authorities and courts are determined under applicable consumer law.</li><li><b>ENTRY INTO FORCE</b><br/>The Buyer is deemed to accept the Agreement by completing the order and payment.</li></ol></div></div>,
+  DE: <div style={box}><h1 style={{fontWeight:800,fontSize:'2.1rem',marginBottom:18}}>FERNABSATZVERTRAG</h1><div style={body}><ol style={{marginLeft:18}}><li><b>PARTEIEN</b><br/>Verkäuferin: Şule Elmas, Türkiye/Antalya, suleelmas13@gmail.com, veritasai.com.<br/>Käufer: Die auf der Veritas Q-AI-Plattform registrierte Person, die den Dienst erwirbt.</li><li><b>VERTRAGSGEGENSTAND</b><br/>Dieser Vertrag regelt die Rechte und Pflichten der Parteien im Zusammenhang mit dem Verkauf und der digitalen Bereitstellung des über veritasai.com angebotenen KI-gestützten Rechtsanalysedienstes.</li><li><b>DIENST UND ZAHLUNG</b><br/>Das gewählte Paket umfasst eine bestimmte oder unbegrenzte Zahl von Analysen. Der Verkaufspreis entspricht dem auf der Website angegebenen Preis. Die Zahlung kann per Kredit-/Debitkarte über Shopier oder Lemon Squeezy erfolgen.</li><li><b>LEISTUNG UND BEREITSTELLUNG</b><br/>Der Dienst ist digitaler Inhalt und wird nach Zahlung dem Benutzerkonto zugeordnet.</li><li><b>WIDERRUFSRECHT</b><br/>Für sofort erbrachte digitale Dienstleistungen können gesetzliche Ausnahmen vom Widerrufsrecht gelten. Die geltenden Bedingungen sollten vor der Zahlung geprüft werden.</li><li><b>ALLGEMEINE BESTIMMUNGEN</b><br/>Der Nutzer akzeptiert Leistungsmerkmale, Preis und Bereitstellungsbedingungen. Veritas Q-AI-Berichte stellen keine anwaltliche Vertretung oder verbindliche Rechtsberatung dar.</li><li><b>ZUSTÄNDIGKEIT</b><br/>Zuständige Verbraucherstellen und Gerichte bestimmen sich nach dem anwendbaren Verbraucherrecht.</li><li><b>INKRAFTTRETEN</b><br/>Mit Abschluss von Bestellung und Zahlung gilt der Vertrag als angenommen.</li></ol></div></div>,
+  FR: <div style={box}><h1 style={{fontWeight:800,fontSize:'2.1rem',marginBottom:18}}>CONTRAT DE VENTE À DISTANCE</h1><div style={body}><ol style={{marginLeft:18}}><li><b>PARTIES</b><br/>Vendeuse : Şule Elmas, Türkiye/Antalya, suleelmas13@gmail.com, veritasai.com.<br/>Acheteur : La personne inscrite sur la plateforme Veritas Q-AI qui achète le service.</li><li><b>OBJET DU CONTRAT</b><br/>Le présent contrat régit les droits et obligations des parties concernant la vente et la fourniture numérique du service d’analyse juridique assisté par IA proposé via veritasai.com.</li><li><b>SERVICE ET PAIEMENT</b><br/>Le forfait choisi donne droit à un nombre déterminé ou illimité d’analyses. Le prix est celui affiché sur le site. Le paiement peut être effectué par carte bancaire via Shopier ou Lemon Squeezy.</li><li><b>EXÉCUTION ET LIVRAISON</b><br/>Le service constitue un contenu numérique et est attribué au compte utilisateur après le paiement.</li><li><b>DROIT DE RÉTRACTATION</b><br/>Des exceptions légales peuvent s’appliquer aux services numériques exécutés immédiatement. L’utilisateur doit consulter les conditions applicables avant le paiement.</li><li><b>DISPOSITIONS GÉNÉRALES</b><br/>L’utilisateur accepte les caractéristiques du service, son prix et ses modalités de fourniture. Les rapports Veritas Q-AI ne constituent ni une représentation par avocat ni un avis juridique définitif.</li><li><b>JURIDICTION</b><br/>Les autorités de consommation et juridictions compétentes sont déterminées par le droit de la consommation applicable.</li><li><b>ENTRÉE EN VIGUEUR</b><br/>L’Acheteur est réputé accepter le contrat en finalisant la commande et le paiement.</li></ol></div></div>
+} as const;
 
 export default function DistanceAgreement() {
-  const [lang, setLang] = useState('EN');
+  const [lang, setLang] = useState<Lang>('EN');
   useEffect(() => {
-    const ln = typeof window !== 'undefined' ? (window.localStorage.getItem('lang') || window.navigator.language.slice(0,2).toUpperCase()) : 'EN';
-    setLang(ln === 'TR' ? 'TR' : 'EN');
+    const saved = typeof window !== 'undefined' ? (localStorage.getItem('language') || localStorage.getItem('lang') || navigator.language.slice(0,2).toUpperCase()) : 'EN';
+    setLang(saved === 'TR' || saved === 'DE' || saved === 'FR' ? saved : 'EN');
   }, []);
-  return lang === 'TR' ? MESAFE_TR : MESAFE_EN;
+  return content[lang];
 }
-
-
-
-
-
-
-
-
-
-
-
