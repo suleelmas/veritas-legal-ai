@@ -1,23 +1,77 @@
 "use client";
 import { useEffect, useState } from "react";
 
-type Lang = 'TR' | 'EN' | 'DE' | 'FR';
-const box = {maxWidth:750,margin:'60px auto',background:'#171c2d',borderRadius:22,padding:36,color:'#ffe18d',boxShadow:'0 10px 30px #0007'} as const;
-const body = {color:'#eaeaea',fontWeight:600,marginBottom:28,fontSize:'1.07rem'} as const;
-const contact = <a href="mailto:suleelmas13@gmail.com" style={{color:'#ffe18d'}}>suleelmas13@gmail.com</a>;
+const PRIVACY_TR = (
+  <div style={{maxWidth:750,margin:'60px auto',background:'#171c2d',borderRadius:22,padding:36,color:'#ffe18d',boxShadow:'0 10px 30px #0007'}}>
+    <h1 style={{fontWeight:800,fontSize:'2.1rem',marginBottom:18}}>VERITAS Q-AI GİZLİLİK SÖZLEŞMESİ VE POLİTİKASI</h1>
+    <div style={{color:'#eaeaea',fontWeight:600,marginBottom:28, fontSize:'1.07rem'}}>
+      <b>Son Güncelleme Tarihi: [Günün Tarihi]</b>
+      <ol style={{ marginLeft: 18 }}>
+        <li><b>Giriş ve Kapsam:</b> Bu Politika, Veritas Q-AI ("Platform") kullanıcılarının kişisel verilerinin işlenmesinin usul ve esaslarını kapsar. Veritas Q-AI, 6698 sayılı KVKK'ya ve uluslararası mevzuata tam uyumu taahhüt eder.</li>
+        <li><b>İşlenen Veriler ve Toplama Yöntemleri:</b>
+          <ul>
+            <li>Kimlik ve İletişim Bilgileri: Ad-soyad, e-posta adresi</li>
+            <li>Ödeme ve Finansal Bilgiler: Ödeme aracı kuruluşlar aracılığıyla işlenen işlem kayıtları (Kredi kartı verileri tutulmaz)</li>
+            <li>Kullanım ve Teknik Veriler: IP adresi, tarayıcı tipi, oturum kayıtları ve çerez bilgileri</li>
+            <li>Analiz İçerikleri: Sisteme yüklenen hukuki metin ve dökümanlar</li>
+          </ul>
+        </li>
+        <li><b>Verilerin İşlenme Amaçları:</b> Kullanıcı hesabı oluşturulması, analiz raporlarının üretilmesi, ödeme/faturalama, sistem güvenliği, yasal yükümlülükler ile sınırlı olarak veriler işlenir.</li>
+        <li><b>Analiz İçeriklerinin Gizliliği ve Güvenliği:</b>
+          <ul>
+            <li>Model eğitimi: Girilen veriler anonimleştirilmeden AI eğitimi için kullanılmaz.</li>
+            <li>Veri İşleyen Sıfatı: İçerikler "Veri İşleyen" sıfatıyla yalnızca analiz için işlenir.</li>
+            <li>Erişim Kısıtlaması: Hiçbir üçüncü şahıs içeriklere erişemez, tüm işler algoritmik, kapalı devre yürütülür.</li>
+          </ul>
+        </li>
+        <li><b>Verilerin Aktarımı ve Saklanması:</b> Yasal zorunluluklar hariç, veriler izinsiz üçüncü şahıslara satılmaz/kiralanmaz. Sunucu hizmetleri, ödeme altyapısı ve teknik destek kapsamında (KVKK m.8, m.9) aktarılabilir. Veriler hizmet süresince/yasal zamanaşımı boyunca saklanır.</li>
+        <li><b>Kullanıcı Hakları:</b> Kullanıcılar, Veritas Q-AI'ya başvurarak verilerinin işlenip işlenmediğini öğrenme, düzeltme, silme ve yok edilmesini talep etme hakkına sahiptir.</li>
+        <li><b>Çerezler (Cookies):</b> Kullanıcı deneyimini iyileştirmek ve güvenliği sağlamak için teknik çerezler kullanılır. Çerez reddi bazı işlevlerin çalışmasını engelleyebilir.</li>
+        <li><b>Yasal Uyarı ve Sorumluluk Reddi:</b> Raporlar AI çıktısıdır, kesin hukuki/avukatlık tavsiyesi değildir. Raporlara dayanarak yapılan işlemlerden kullanıcı sorumludur.</li>
+        <li><b>İletişim:</b> sorularınız için: <a href="mailto:suleelmas13@gmail.com" style={{color:'#ffe18d'}}>suleelmas13@gmail.com</a></li>
+      </ol>
+    </div>
+  </div>
+);
 
-const content = {
-  TR: <div style={box}><h1 style={{fontWeight:800,fontSize:'2.1rem',marginBottom:18}}>VERITAS Q-AI GİZLİLİK SÖZLEŞMESİ VE POLİTİKASI</h1><div style={body}><ol style={{marginLeft:18}}><li><b>Giriş ve Kapsam:</b> Bu Politika, Veritas Q-AI (“Platform”) kullanıcılarının kişisel verilerinin işlenmesine ilişkin esasları kapsar.</li><li><b>İşlenen Veriler:</b> Ad-soyad, e-posta, ödeme işlem kayıtları, IP adresi, tarayıcı/oturum bilgileri ve analiz için yüklenen içerikler işlenebilir. Kredi kartı bilgileri Platform tarafından saklanmaz.</li><li><b>İşleme Amaçları:</b> Kullanıcı hesabının oluşturulması, analiz raporlarının üretilmesi, ödeme/faturalama, sistem güvenliği ve yasal yükümlülüklerin yerine getirilmesi.</li><li><b>Analiz İçeriklerinin Gizliliği:</b> Yüklenen içerikler yalnızca hizmetin sunulması için işlenir ve anonimleştirilmeden model eğitimi için kullanılmaz.</li><li><b>Aktarım ve Saklama:</b> Veriler yasal zorunluluklar dışında satılmaz veya kiralanmaz; altyapı, ödeme ve teknik hizmet sağlayıcılarla gerekli ölçüde paylaşılabilir ve ilgili saklama süreleri boyunca tutulabilir.</li><li><b>Kullanıcı Hakları:</b> Kullanıcılar verilerinin işlenip işlenmediğini öğrenme, düzeltme ve silme/yok etme taleplerinde bulunabilir.</li><li><b>Çerezler:</b> Güvenlik ve kullanıcı deneyimi için teknik çerezler kullanılabilir.</li><li><b>Yasal Uyarı:</b> Platform raporları bilgilendirme ve risk değerlendirme amaçlıdır; hukuki danışmanlık yerine geçmez.</li><li><b>İletişim:</b> {contact}</li></ol></div></div>,
-  EN: <div style={box}><h1 style={{fontWeight:800,fontSize:'2.1rem',marginBottom:18}}>VERITAS Q-AI PRIVACY POLICY</h1><div style={body}><ol style={{marginLeft:18}}><li><b>Scope:</b> This Policy explains how personal data of Veritas Q-AI (“Platform”) users is processed.</li><li><b>Data Processed:</b> Name, email, payment transaction records, IP address, browser/session information and content uploaded for analysis may be processed. The Platform does not store credit-card details.</li><li><b>Purposes:</b> Account creation, generation of analysis reports, payments/billing, system security and compliance with legal obligations.</li><li><b>Confidentiality of Analysis Content:</b> Uploaded content is processed only to provide the service and is not used for model training in non-anonymized form.</li><li><b>Transfers and Retention:</b> Data is not sold or rented except where legally required; it may be shared as necessary with infrastructure, payment and technical service providers and retained for applicable retention periods.</li><li><b>User Rights:</b> Users may ask whether their data is processed and request correction or deletion where applicable.</li><li><b>Cookies:</b> Technical cookies may be used for security and user experience.</li><li><b>Disclaimer:</b> Platform reports are for information and risk assessment and do not replace legal advice.</li><li><b>Contact:</b> {contact}</li></ol></div></div>,
-  DE: <div style={box}><h1 style={{fontWeight:800,fontSize:'2.1rem',marginBottom:18}}>VERITAS Q-AI DATENSCHUTZERKLÄRUNG</h1><div style={body}><ol style={{marginLeft:18}}><li><b>Geltungsbereich:</b> Diese Erklärung erläutert die Verarbeitung personenbezogener Daten von Nutzern der Veritas Q-AI-Plattform.</li><li><b>Verarbeitete Daten:</b> Name, E-Mail-Adresse, Zahlungs-Transaktionsdaten, IP-Adresse, Browser-/Sitzungsinformationen und zur Analyse hochgeladene Inhalte können verarbeitet werden. Kreditkartendaten werden von der Plattform nicht gespeichert.</li><li><b>Zwecke:</b> Kontoerstellung, Erstellung von Analyseberichten, Zahlungsabwicklung, Systemsicherheit und Erfüllung gesetzlicher Pflichten.</li><li><b>Vertraulichkeit von Analyseinhalten:</b> Hochgeladene Inhalte werden nur zur Erbringung des Dienstes verarbeitet und nicht in nicht-anonymisierter Form zum Training von Modellen verwendet.</li><li><b>Übermittlung und Speicherung:</b> Daten werden außerhalb gesetzlicher Pflichten nicht verkauft oder vermietet; sie können im erforderlichen Umfang an Infrastruktur-, Zahlungs- und technische Dienstleister übermittelt und für geltende Aufbewahrungsfristen gespeichert werden.</li><li><b>Rechte der Nutzer:</b> Nutzer können Auskunft, Berichtigung und gegebenenfalls Löschung ihrer Daten verlangen.</li><li><b>Cookies:</b> Technische Cookies können für Sicherheit und Benutzererlebnis verwendet werden.</li><li><b>Haftungshinweis:</b> Berichte der Plattform dienen der Information und Risikobewertung und ersetzen keine Rechtsberatung.</li><li><b>Kontakt:</b> {contact}</li></ol></div></div>,
-  FR: <div style={box}><h1 style={{fontWeight:800,fontSize:'2.1rem',marginBottom:18}}>POLITIQUE DE CONFIDENTIALITÉ VERITAS Q-AI</h1><div style={body}><ol style={{marginLeft:18}}><li><b>Champ d’application :</b> Cette politique décrit le traitement des données personnelles des utilisateurs de la plateforme Veritas Q-AI.</li><li><b>Données traitées :</b> Le nom, l’adresse e-mail, les enregistrements de transaction de paiement, l’adresse IP, les informations de navigateur/session et les contenus téléversés pour analyse peuvent être traités. La Plateforme ne conserve pas les données de carte bancaire.</li><li><b>Finalités :</b> Création du compte, génération des rapports d’analyse, paiements/facturation, sécurité du système et respect des obligations légales.</li><li><b>Confidentialité des contenus d’analyse :</b> Les contenus téléversés sont traités uniquement pour fournir le service et ne sont pas utilisés sous une forme non anonymisée pour entraîner les modèles.</li><li><b>Transferts et conservation :</b> Les données ne sont ni vendues ni louées hors obligations légales; elles peuvent être partagées dans la mesure nécessaire avec des prestataires d’infrastructure, de paiement et de support technique, puis conservées pendant les durées applicables.</li><li><b>Droits des utilisateurs :</b> Les utilisateurs peuvent demander si leurs données sont traitées ainsi que leur rectification ou, le cas échéant, leur suppression.</li><li><b>Cookies :</b> Des cookies techniques peuvent être utilisés pour la sécurité et l’expérience utilisateur.</li><li><b>Avertissement :</b> Les rapports de la Plateforme sont fournis à titre informatif et d’évaluation des risques et ne remplacent pas un conseil juridique.</li><li><b>Contact :</b> {contact}</li></ol></div></div>
-} as const;
+const PRIVACY_EN = (
+  <div style={{maxWidth:750,margin:'60px auto',background:'#171c2d',borderRadius:22,padding:36,color:'#ffe18d',boxShadow:'0 10px 30px #0007'}}>
+    <h1 style={{fontWeight:800,fontSize:'2.1rem',marginBottom:18}}>VERITAS Q-AI PRIVACY POLICY</h1>
+    <div style={{color:'#eaeaea',fontWeight:600,marginBottom:28, fontSize:'1.07rem'}}>
+      <b>Last Updated: [Current Date]</b>
+      <ol style={{ marginLeft: 18 }}>
+        <li><b>Scope:</b> This Policy covers the processing of personal data of Veritas Q-AI ("Platform") users and legal compliance (in particular, EU GDPR and Turkish law).</li>
+        <li><b>Processed Data and Methods:</b>
+          <ul>
+            <li>Personal/Communication Data: Name-surname, e-mail address</li>
+            <li>Payment Data: Transaction logs processed via 3rd-party services (no credit card details are stored)</li>
+            <li>Usage/Technical Data: IP address, browser type, session and cookie data</li>
+            <li>Analysis Content: Legal texts and docs uploaded for analysis</li>
+          </ul>
+        </li>
+        <li><b>Purposes of Processing:</b> Creating user account, generating legal analysis reports, billing/payments, system security, and fulfilment of legal obligations.</li>
+        <li><b>Confidentiality and Security of Analysis Content:</b>
+          <ul>
+            <li>Model Training: Uploaded content is not used for AI training without anonymization.</li>
+            <li>Processor Role: Contents are processed solely to produce analysis output as a Processor.</li>
+            <li>Access Restriction: No human/third party can access uploads; all flows are algorithmic and closed-circuit.</li>
+          </ul>
+        </li>
+        <li><b>Transfer/Storage:</b> Except for legal obligations, no data is sold/shared to third parties. Data may be transferred (GDPR art.6, art.9) for infrastructure, payment, or technical purposes and is stored for service duration/statutory limitation.</li>
+        <li><b>User Rights:</b> You can request from Veritas Q-AI: to learn whether your data is processed, request correction/deletion, and object to processing.</li>
+        <li><b>Cookies:</b> Technical cookies are used for session security and UX. Cookie rejection may limit some functions.</li>
+        <li><b>Legal Disclaimer:</b> Reports generated by the Platform are AI outputs and not legal/professional advice. Users are responsible for any actions taken with regard to reports.</li>
+        <li><b>Contact:</b> For questions: <a href="mailto:suleelmas13@gmail.com" style={{color:'#ffe18d'}}>suleelmas13@gmail.com</a></li>
+      </ol>
+    </div>
+  </div>
+);
 
 export default function Privacy() {
-  const [lang, setLang] = useState<Lang>('EN');
+  const [lang, setLang] = useState('EN');
   useEffect(() => {
-    const saved = typeof window !== 'undefined' ? (localStorage.getItem('language') || localStorage.getItem('lang') || navigator.language.slice(0,2).toUpperCase()) : 'EN';
-    setLang(saved === 'TR' || saved === 'DE' || saved === 'FR' ? saved : 'EN');
+    const ln = typeof window !== 'undefined' ? (window.localStorage.getItem('lang') || window.navigator.language.slice(0,2).toUpperCase()) : 'EN';
+    setLang(ln === 'TR' ? 'TR' : 'EN');
   }, []);
-  return content[lang];
+  return lang === 'TR' ? PRIVACY_TR : PRIVACY_EN;
 }
