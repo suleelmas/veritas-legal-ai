@@ -1,22 +1,65 @@
 "use client";
 import { useEffect, useState } from "react";
 
-type Lang = 'TR' | 'EN' | 'DE' | 'FR';
-const box = {maxWidth:750,margin:'60px auto',background:'#171c2d',borderRadius:22,padding:36,color:'#ffe18d',boxShadow:'0 10px 30px #0007'} as const;
-const body = {color:'#eaeaea',fontWeight:600,marginBottom:28,fontSize:'1.07rem'} as const;
+const KVKK_TR = (
+  <div style={{maxWidth:750,margin:'60px auto',background:'#171c2d',borderRadius:22,padding:36,color:'#ffe18d',boxShadow:'0 10px 30px #0007'}}>
+    <h1 style={{fontWeight:800,fontSize:'2.1rem',marginBottom:18}}>KVKK Aydınlatma Metni</h1>
+    <div style={{color:'#eaeaea',fontWeight:600,marginBottom:28, fontSize:'1.07rem'}}>
+      <p><b>VERITAS Q-AI KİŞİSEL VERİLERİN İŞLENMESİNE İLİŞKİN AYDINLATMA METNİ</b></p>
+      <ol style={{ marginLeft: 18 }}>
+        <li><b>Veri Sorumlusu:</b> 6698 sayılı Kişisel Verilerin Korunması Kanunu (“KVKK”) uyarınca, Veritas Q-AI (Bundan sonra “Platform” olarak anılacaktır), kişisel verilerinizi hukuka ve dürüstlük kurallarına uygun, belirli, açık ve meşru amaçlar doğrultusunda işlemektedir.</li>
+        <li><b>İşlenen Kişisel Verileriniz ve İşleme Amaçları:</b> Kimlik bilgileriniz (ad-soyad), iletişim bilgileriniz (e-posta), finansal bilgileriniz (fatura adresi) ve kullanım verileriniz (IP adresi, log kayıtları);
+          <ul>
+            <li>Hizmet sözleşmesinin kurulması ve ifası,</li>
+            <li>Yapay zeka tabanlı analiz süreçlerinin yürütülmesi,</li>
+            <li>Finans ve muhasebe işlerinin takibi (Ödeme doğrulama),</li>
+            <li>Mevzuattan kaynaklanan saklama ve bilgilendirme yükümlülüklerinin yerine getirilmesi</li>
+          </ul>
+          amaçlarıyla sınırlı olarak işlenmektedir.
+        </li>
+        <li><b>Analiz İçeriklerinin Durumu (Özel Not):</b> Kullanıcı tarafından analiz edilmek üzere sisteme yüklenen metinler, 6698 sayılı Kanun kapsamında "Veri İşleyen" sıfatıyla, sadece talep edilen hizmetin sunulması amacıyla işlenir. Bu veriler yapay zeka modelinin eğitimi için anonimleştirilmeden kullanılmaz ve hiçbir surette üçüncü taraf veri havuzlarına aktarılmaz.
+        </li>
+        <li><b>İşlenen Kişisel Verilerin Aktarımı:</b> Kişisel verileriniz, yukarıda belirtilen amaçların gerçekleştirilmesi ile sınırlı olarak; yasal yükümlülüklerin yerine getirilmesi amacıyla yetkili kamu kurum ve kuruluşlarına (BTK, adli makamlar vb.) ve ödeme sistemlerinin tesisi amacıyla iş ortaklarımıza (Shopier/Lemon Squeezy) KVKK m.8 ve m.9 hükümleri çerçevesinde aktarılabilmektedir.
+        </li>
+        <li><b>Kişisel Veri Toplamanın Yöntemi ve Hukuki Sebebi:</b> Verileriniz, elektronik ortamda web sitemiz üzerinden; "bir sözleşmenin kurulması veya ifasıyla doğrudan doğruya ilgili olması" ve "veri sorumlusunun hukuki yükümlülüğünü yerine getirebilmesi için zorunlu olması" hukuki sebeplerine dayanarak toplanmaktadır.
+        </li>
+      </ol>
+    </div>
+  </div>
+);
 
-const content = {
-  TR: <div style={box}><h1 style={{fontWeight:800,fontSize:'2.1rem',marginBottom:18}}>KVKK Aydınlatma Metni</h1><div style={body}><p><b>VERITAS Q-AI KİŞİSEL VERİLERİN İŞLENMESİNE İLİŞKİN AYDINLATMA METNİ</b></p><ol style={{marginLeft:18}}><li><b>Veri Sorumlusu:</b> 6698 sayılı Kişisel Verilerin Korunması Kanunu (“KVKK”) uyarınca Veritas Q-AI (“Platform”), kişisel verilerinizi hukuka ve dürüstlük kurallarına uygun, belirli, açık ve meşru amaçlarla işler.</li><li><b>İşlenen Kişisel Veriler ve Amaçlar:</b> Ad-soyad, e-posta, fatura adresi, IP adresi ve log kayıtları; hizmet sözleşmesinin kurulması ve ifası, yapay zeka tabanlı analizlerin yürütülmesi, ödeme doğrulama ve yasal saklama/bilgilendirme yükümlülükleri için işlenir.</li><li><b>Analiz İçerikleri:</b> Analiz için yüklenen metinler yalnızca talep edilen hizmetin sunulması amacıyla veri işleyen sıfatıyla işlenir. Anonimleştirilmeden model eğitimi için kullanılmaz ve üçüncü taraf veri havuzlarına aktarılmaz.</li><li><b>Verilerin Aktarımı:</b> Kişisel veriler, yasal yükümlülüklerin yerine getirilmesi amacıyla yetkili kamu kurumlarına ve ödeme hizmetleri kapsamında Shopier/Lemon Squeezy gibi iş ortaklarına KVKK m.8 ve m.9 çerçevesinde aktarılabilir.</li><li><b>Toplama Yöntemi ve Hukuki Sebep:</b> Veriler elektronik ortamda; sözleşmenin kurulması/ifası ve veri sorumlusunun hukuki yükümlülüklerini yerine getirmesi hukuki sebeplerine dayanarak toplanır.</li></ol></div></div>,
-  EN: <div style={box}><h1 style={{fontWeight:800,fontSize:'2.1rem',marginBottom:18}}>GDPR / Data Privacy Notice</h1><div style={body}><p><b>VERITAS Q-AI DATA PROCESSING NOTICE</b></p><ol style={{marginLeft:18}}><li><b>Controller:</b> Under Turkish Law No. 6698 on the Protection of Personal Data (“KVKK”), Veritas Q-AI (“Platform”) processes personal data lawfully, fairly and for specified, explicit and legitimate purposes.</li><li><b>Data and Purposes:</b> Name, email, billing address, IP address and log records are processed to establish and perform the service agreement, provide AI-based analysis, verify payments, and meet statutory retention and disclosure obligations.</li><li><b>Analysis Content:</b> Texts uploaded for analysis are processed only to provide the requested service. They are not used to train AI models in non-anonymized form and are not transferred to third-party data pools.</li><li><b>Transfers:</b> Personal data may be shared with authorized public bodies when legally required and with payment partners such as Shopier/Lemon Squeezy within the scope of applicable data-protection rules.</li><li><b>Collection and Legal Basis:</b> Data is collected electronically through the website based on contractual necessity and compliance with the controller’s legal obligations.</li></ol></div></div>,
-  DE: <div style={box}><h1 style={{fontWeight:800,fontSize:'2.1rem',marginBottom:18}}>Datenschutzhinweis</h1><div style={body}><p><b>VERITAS Q-AI HINWEIS ZUR DATENVERARBEITUNG</b></p><ol style={{marginLeft:18}}><li><b>Verantwortlicher:</b> Veritas Q-AI („Plattform“) verarbeitet personenbezogene Daten gemäß dem türkischen Gesetz Nr. 6698 (KVKK) rechtmäßig, nach Treu und Glauben und für festgelegte, eindeutige und legitime Zwecke.</li><li><b>Verarbeitete Daten und Zwecke:</b> Name, E-Mail-Adresse, Rechnungsadresse, IP-Adresse und Protokolldaten werden zur Begründung und Durchführung des Dienstleistungsvertrags, für KI-gestützte Analysen, Zahlungsbestätigungen sowie gesetzliche Aufbewahrungs- und Informationspflichten verarbeitet.</li><li><b>Analyseinhalte:</b> Zur Analyse hochgeladene Texte werden ausschließlich zur Erbringung der angeforderten Dienstleistung verarbeitet. Sie werden nicht in nicht-anonymisierter Form zum Training von KI-Modellen verwendet und nicht an Datenpools Dritter übertragen.</li><li><b>Datenübermittlung:</b> Personenbezogene Daten können bei gesetzlicher Verpflichtung an zuständige Behörden sowie im Rahmen der Zahlungsabwicklung an Partner wie Shopier/Lemon Squeezy übermittelt werden.</li><li><b>Erhebung und Rechtsgrundlage:</b> Die Daten werden elektronisch über die Website auf Grundlage der Vertragserfüllung und der gesetzlichen Pflichten des Verantwortlichen erhoben.</li></ol></div></div>,
-  FR: <div style={box}><h1 style={{fontWeight:800,fontSize:'2.1rem',marginBottom:18}}>Notice relative à la protection des données</h1><div style={body}><p><b>NOTICE VERITAS Q-AI RELATIVE AU TRAITEMENT DES DONNÉES</b></p><ol style={{marginLeft:18}}><li><b>Responsable du traitement :</b> Veritas Q-AI (« Plateforme ») traite les données personnelles conformément à la loi turque n° 6698 (KVKK), de manière licite et loyale, pour des finalités déterminées, explicites et légitimes.</li><li><b>Données traitées et finalités :</b> Le nom, l’adresse e-mail, l’adresse de facturation, l’adresse IP et les journaux techniques sont traités afin de conclure et exécuter le contrat de service, fournir les analyses basées sur l’IA, vérifier les paiements et respecter les obligations légales de conservation et d’information.</li><li><b>Contenu des analyses :</b> Les textes téléversés pour analyse sont traités uniquement pour fournir le service demandé. Ils ne sont pas utilisés sous une forme non anonymisée pour entraîner les modèles d’IA et ne sont pas transférés vers des bases de données de tiers.</li><li><b>Transferts :</b> Les données personnelles peuvent être transmises aux autorités compétentes lorsque la loi l’exige et à des partenaires de paiement tels que Shopier/Lemon Squeezy dans le cadre des règles applicables de protection des données.</li><li><b>Collecte et base juridique :</b> Les données sont collectées électroniquement via le site sur la base de la nécessité contractuelle et du respect des obligations légales du responsable du traitement.</li></ol></div></div>
-} as const;
+const KVKK_EN = (
+  <div style={{maxWidth:750,margin:'60px auto',background:'#171c2d',borderRadius:22,padding:36,color:'#ffe18d',boxShadow:'0 10px 30px #0007'}}>
+    <h1 style={{fontWeight:800,fontSize:'2.1rem',marginBottom:18}}>GDPR / Data Privacy Notice</h1>
+    <div style={{color:'#eaeaea',fontWeight:600,marginBottom:28, fontSize:'1.07rem'}}>
+      <b>VERITAS Q-AI DATA PROCESSING NOTICE</b>
+      <ol style={{ marginLeft: 18 }}>
+        <li><b>Controller:</b> Pursuant to Law No.6698 on Protection of Personal Data ("KVKK"), Veritas Q-AI (hereinafter referred to as the "Platform") processes your personal data in accordance with legal and ethical rules for specific, clear and legitimate purposes.</li>
+        <li><b>Processed Data and Purposes:</b> Your identity information (name-surname), contact details (email), financial information (billing address), and usage data (IP address, logs) are processed for the following purposes:
+          <ul>
+            <li>Conclusion and execution of the service agreement,</li>
+            <li>Conducting AI-based analysis processes,</li>
+            <li>Finance and accounting operations (Payment confirmation),</li>
+            <li>Fulfilling statutory storage and disclosure obligations</li>
+          </ul>
+          (Limited to these purposes).
+        </li>
+        <li><b>Case Submission (Special Note):</b> Case texts uploaded to the system by the user for analysis are, as a Data Processor under Law no. 6698, processed only for the provision of the requested service. These texts are not used for training the AI model in a non-anonymized form and will never be transferred to any third-party data pool.
+        </li>
+        <li><b>Transfer of Personal Data:</b> Your personal data may be transferred, limited to the above-mentioned purposes, to legally authorized public agencies (BTK, judicial authorities, etc.) and our payment partners (Shopier/Lemon Squeezy) within the scope of Articles 8 and 9 of the KVKK for fulfillment of statutory obligations.
+        </li>
+        <li><b>Collection Method and Legal Basis:</b> Your data is collected electronically through our website, based on the legal grounds of "necessity for the performance of a contract" and "compliance with the controller's legal obligations".
+        </li>
+      </ol>
+    </div>
+  </div>
+);
 
 export default function KVKK() {
-  const [lang, setLang] = useState<Lang>('EN');
+  const [lang, setLang] = useState('EN');
   useEffect(() => {
-    const saved = typeof window !== 'undefined' ? (localStorage.getItem('language') || localStorage.getItem('lang') || navigator.language.slice(0,2).toUpperCase()) : 'EN';
-    setLang(saved === 'TR' || saved === 'DE' || saved === 'FR' ? saved : 'EN');
+    const ln = typeof window !== 'undefined' ? (window.localStorage.getItem('lang') || window.navigator.language.slice(0,2).toUpperCase()) : 'EN';
+    setLang(ln === 'TR' ? 'TR' : 'EN');
   }, []);
-  return content[lang];
+  return lang === 'TR' ? KVKK_TR : KVKK_EN;
 }
