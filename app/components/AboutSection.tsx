@@ -1,6 +1,7 @@
 "use client";
 import React from 'react';
 import { Info, ArrowLeft } from 'lucide-react';
+import { ct } from '@/lib/componentTranslations';
 
 type AboutSectionProps = {
   gold: string;
@@ -17,7 +18,7 @@ export default function AboutSection({ gold, midBlue, language = 'TR', onBack }:
         <h2 style={{ color: gold, margin: 0 }}>Veritas AI</h2>
       </div>
       <p style={{ lineHeight: '1.7', opacity: 0.9, marginBottom: '24px' }}>
-        Veritas Legal AI, hukuk profesyonelleri için belgeleri saniyeler içinde analiz eden gelişmiş bir yapay zeka sistemidir.
+        {ct(language, 'aboutDescription')}
       </p>
       {onBack && (
         <button 
@@ -37,10 +38,9 @@ export default function AboutSection({ gold, midBlue, language = 'TR', onBack }:
           }}
         >
           <ArrowLeft size={16} color={gold} />
-          {language === 'TR' ? 'Geri Dön' : 'Back'}
+          {ct(language, 'back')}
         </button>
       )}
     </div>
   );
 }
-
