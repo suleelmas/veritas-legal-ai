@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ct } from '@/lib/componentTranslations';
 
 interface BetaBannerProps {
@@ -9,6 +9,12 @@ interface BetaBannerProps {
 
 export default function BetaBanner({ language, onReportClick }: BetaBannerProps) {
   const [dismissed, setDismissed] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('language', language);
+    }
+  }, [language]);
 
   if (dismissed) return null;
 
