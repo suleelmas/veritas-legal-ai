@@ -1,7 +1,30 @@
 import React, { useState } from "react";
-import { tr, getLanguage } from "@/lib/translations";
+import { tr } from "@/lib/translations";
 
 const SHOPIER_LOGO = "https://shopier.com/static/images/logo/shopier_logo_200x50_white_bg.png";
+
+const PLAN_NAMES: Record<string, Record<string, string>> = {
+  TR: {
+    'Single Quantum Scan': 'Tek Kuantum Taraması',
+    'Professional': 'Profesyonel',
+    'Quantum Global': 'Kuantum Global',
+  },
+  EN: {
+    'Single Quantum Scan': 'Single Quantum Scan',
+    'Professional': 'Professional',
+    'Quantum Global': 'Quantum Global',
+  },
+  DE: {
+    'Single Quantum Scan': 'Einzelner Quantum-Scan',
+    'Professional': 'Professionell',
+    'Quantum Global': 'Quantum Global',
+  },
+  FR: {
+    'Single Quantum Scan': 'Analyse Quantique Unique',
+    'Professional': 'Professionnel',
+    'Quantum Global': 'Quantique Global',
+  },
+};
 
 type PricingCardProps = {
   gold: string;
@@ -54,7 +77,7 @@ export default function PricingCard({ gold, plan, priceTR, priceGlobal, features
 
   const isTurkey = country === 'TR';
   const displayPrice = isTurkey ? priceTR : priceGlobal;
-  const displayFullName = fullName || fullNameGlobal || plan;
+  const displayFullName = PLAN_NAMES[language]?.[plan] || PLAN_NAMES.EN[plan] || fullName || fullNameGlobal || plan;
   const displayDescription = description || descriptionGlobal;
   const displayFeatures = features || featuresGlobal || [];
   const displayButtonText = buttonText || tr(language, 'getStarted');
@@ -238,7 +261,6 @@ export default function PricingCard({ gold, plan, priceTR, priceGlobal, features
                 </span>
               </div>
             </a>
-            {/* Payment Methods Info */}
             {isTurkey && (
               <div style={{
                 marginTop: '8px',
@@ -272,7 +294,6 @@ export default function PricingCard({ gold, plan, priceTR, priceGlobal, features
                 </div>
               </div>
             )}
-            {/* Payment Disclaimer */}
             <div style={{
               marginTop: '12px',
               padding: '10px',
@@ -355,7 +376,6 @@ export default function PricingCard({ gold, plan, priceTR, priceGlobal, features
             {loading ? '...' : displayButtonText}
           </button>
         )}
-        {/* Payment Disclaimer (for single button) */}
         {(!loading && buttonLink) && (
           <div style={{
             marginTop: '12px',
