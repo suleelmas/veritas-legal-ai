@@ -407,7 +407,7 @@ export default function Home() {
                 id: a.id,
                 title: a.file_name,
                 date: new Date(a.created_at).toLocaleString(localeMap[getLanguage(language)] || 'en-US'),
-                summary: a.analysis_summary || (typeof a.analysis_result === 'string' ? a.analysis_result.substring(0, 200) + '...' : 'Analysis completed'),
+                summary: a.analysis_summary || (typeof a.analysis_result === 'string' ? a.analysis_result.substring(0, 200) + '...' : tr(language, 'analysisCompleted')),
                 fullResult: typeof a.analysis_result === 'string' ? a.analysis_result : JSON.stringify(a.analysis_result),
                 riskScore: a.risk_score || extractRiskScore(typeof a.analysis_result === 'string' ? a.analysis_result : JSON.stringify(a.analysis_result))
               }));
@@ -776,9 +776,9 @@ export default function Home() {
   // Mevzuat detaylarını getir
   const fetchLegislationDetail = (law: string, article: string) => {
     // Basit bir implementasyon - gerçek uygulamada API çağrısı yapılabilir
-    const legislationContent = `${law} - Madde ${article} detayları burada gösterilecek.`;
+    const legislationContent = tr(language, 'legislationPlaceholder', { law, article });
     setSelectedLegislation({
-      title: `${law} - Madde ${article}`,
+      title: tr(language, 'legislationArticleTitle', { law, article }),
       content: legislationContent
     });
     setShowLegislationModal(true);
@@ -1107,10 +1107,10 @@ export default function Home() {
           // setActiveTab('pricing'); // YORUM SATIRINA ALINDI - Redirect yapmasın
           return;
         }
-        throw new Error(data.error || 'Comparison failed');
+        throw new Error(data.error || tr(language, 'comparisonFailed'));
       }
       
-      setResult(data.reply || 'Comparison complete');
+      setResult(data.reply || tr(language, 'comparisonComplete'));
       setComparisonResult(data);
       setAnalysisStatus('');
     } catch (error: any) {
@@ -1208,7 +1208,7 @@ export default function Home() {
         
         // PDF yapısını kontrol et
         if (!arrayBuffer || arrayBuffer.byteLength === 0) {
-          throw new Error('PDF dosyası boş veya geçersiz');
+          throw new Error(tr(language, 'pdfEmptyInvalid'));
         }
         
         // PDF'i yükle - daha esnek ayarlarla
@@ -1223,7 +1223,7 @@ export default function Home() {
         
         // Sayfa sayısını kontrol et
         if (!pdf || !pdf.numPages || pdf.numPages === 0) {
-          throw new Error('PDF dosyasında sayfa bulunamadı');
+          throw new Error(tr(language, 'pdfNoPages'));
         }
         
         // Her sayfadan metin çıkar
@@ -1242,26 +1242,26 @@ export default function Home() {
           } catch (pageError) {
             console.warn(`Sayfa ${i} okunamadı:`, pageError);
             // Sayfa hatası olsa bile devam et
-            fullText += `\n[Sayfa ${i} okunamadı - görsel içerik veya korumalı dosya olabilir]\n`;
+            fullText += `\n[${tr(language, 'pdfPageUnreadable', { page: i })}]\n`;
           }
         }
         
         // Eğer hiç metin çıkarılamadıysa
         if (!fullText || fullText.trim().length === 0) {
-          fullText = `[PDF dosyasından metin çıkarılamadı. Dosya görsel tabanlı, korumalı veya bozuk olabilir. Dosya adı: ${file.name}, Boyut: ${(file.size / 1024).toFixed(2)} KB]`;
+          fullText = `[${tr(language, 'pdfNoText', { name: file.name, size: (file.size / 1024).toFixed(2) })}]`;
         }
         
       } catch (pdfError: any) {
         console.error('PDF okuma hatası:', pdfError);
         // PDF okunamazsa bile kullanıcıya teknik bir rapor sun
-        fullText = `[PDF OKUMA HATASI] Dosya yapısı karmaşık veya geçersiz olabilir. 
-Dosya Bilgileri:
-- Dosya Adı: ${file.name}
-- Dosya Boyutu: ${(file.size / 1024).toFixed(2)} KB
-- Hata Detayı: ${pdfError.message || 'Bilinmeyen hata'}
-- Öneri: Dosyanın şifre korumalı olmadığından, bozuk olmadığından ve standart PDF formatında olduğundan emin olun.
+        fullText = `[${tr(language, 'pdfReadError')}]
+${tr(language, 'pdfFileInfo')}:
+- ${tr(language, 'pdfFileName')}: ${file.name}
+- ${tr(language, 'pdfFileSize')}: ${(file.size / 1024).toFixed(2)} KB
+- ${tr(language, 'pdfErrorDetail')}: ${pdfError.message || tr(language, 'unknownError')}
+- ${tr(language, 'pdfSuggestion')}
 
-Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
+${tr(language, 'pdfAnalysisWarning')}`;
       }
       
       // PDF metnini state'e kaydet (chat için)
@@ -1716,7 +1716,7 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
       
       const title = reportRef.current.querySelector('h3')?.textContent || ui[getLanguage(language)].resultTitle;
       const content = fullContent || result;
-      const date = new Date().toLocaleDateString('tr-TR', { 
+      const date = new Date().toLocaleDateString(localeMap[getLanguage(language)] || 'en-US', { 
         year: 'numeric', 
         month: 'long', 
         day: 'numeric',
@@ -1729,7 +1729,7 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
         <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
         <head>
           <meta charset='utf-8'>
-          <title>Veritas Q-AI - Analiz Raporu</title>
+          <title>${tr(language, 'wordReportTitle')}</title>
           <style>
             body {
               font-family: 'Times New Roman', Arial, sans-serif;
@@ -1769,8 +1769,8 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
         </head>
         <body>
           <div class="header">
-            <h1>Veritas Q-AI - Analiz Raporu</h1>
-            <div class="date">Tarih: ${date}</div>
+            <h1>${tr(language, 'wordReportTitle')}</h1>
+            <div class="date">${tr(language, 'dateLabel')}: ${date}</div>
           </div>
           <h3>${title}</h3>
           <div class="content">${content.replace(/\n/g, '<br>')}</div>
@@ -2634,8 +2634,8 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
                             marginBottom: '20px'
                           }}>
                             {isTR
-                              ? `(${contractCount} sözleşme × 8 saat × ${hourlyRate.toLocaleString('tr-TR')} TL) - (${contractCount} sözleşme × ${veritasRate.toLocaleString('tr-TR')} TL)`
-                              : `(${contractCount} contracts × 8 hours × ${currencySymbol}${hourlyRate}) - (${contractCount} contracts × ${currencySymbol}${veritasRate})`
+                              ? `(${contractCount} ${tr(language, 'contractsUnit')} × 8 ${tr(language, 'hoursUnit')} × ${hourlyRate.toLocaleString(localeMap[getLanguage(language)] || 'en-US')} TL) - (${contractCount} ${tr(language, 'contractsUnit')} × ${veritasRate.toLocaleString(localeMap[getLanguage(language)] || 'en-US')} TL)`
+                              : `(${contractCount} ${tr(language, 'contractsUnit')} × 8 ${tr(language, 'hoursUnit')} × ${currencySymbol}${hourlyRate.toLocaleString(localeMap[getLanguage(language)] || 'en-US')}) - (${contractCount} ${tr(language, 'contractsUnit')} × ${currencySymbol}${veritasRate.toLocaleString(localeMap[getLanguage(language)] || 'en-US')})`
                             }
                           </div>
                           <div style={{
@@ -4388,7 +4388,7 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
             onMouseEnter={(e) => e.currentTarget.style.opacity = '0.7'}
             onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
           >
-            KVKK Aydınlatma Metni
+            {tr(language, 'footerKvkk')}
           </a>
           <a 
             href="/privacy" 
@@ -4404,7 +4404,7 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
             onMouseEnter={(e) => e.currentTarget.style.opacity = '0.7'}
             onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
           >
-            GDPR
+            {tr(language, 'footerGdpr')}
           </a>
           <a 
             href="/distance-agreement" 
@@ -4420,7 +4420,7 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
             onMouseEnter={(e) => e.currentTarget.style.opacity = '0.7'}
             onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
           >
-            Mesafeli Satış Sözleşmesi
+            {tr(language, 'footerDistance')}
           </a>
           <a 
             href="/privacy" 
@@ -4436,7 +4436,7 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
             onMouseEnter={(e) => e.currentTarget.style.opacity = '0.7'}
             onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
           >
-            Gizlilik Politikası
+            {tr(language, 'footerPrivacy')}
           </a>
         </div>
         
@@ -5107,7 +5107,7 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '4px' }}>
                     <span>💳</span>
-                    <span>Kredi kartına 12 aya varan taksit</span>
+                    <span>{tr(language, 'installmentInfo')}</span>
                   </div>
                   <div style={{ 
                     display: 'flex', 
@@ -5124,7 +5124,7 @@ Sistem bu dosyayı analiz etmeye çalışacak ancak eksik bilgiler olabilir.`;
                     <span style={{ fontWeight: '600' }}>Maximum</span>
                     <span>•</span>
                     <span style={{ fontWeight: '600' }}>Axess</span>
-                    <span>ve diğer tüm kartlar</span>
+                    <span>{tr(language, 'andOtherCards')}</span>
                   </div>
                 </div>
               )}
