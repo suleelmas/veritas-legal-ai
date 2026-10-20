@@ -4,13 +4,18 @@ import { createClient } from '@/utils/supabase/server';
 export async function POST(req: NextRequest) {
   try {
     const supabase = await createClient();
-    const { user_id, file_name, report } = await req.json();
-    if (!user_id || !file_name || !report) {
+    const { file_name, report } = await req.json();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (!file_name || !report) {
       return NextResponse.json({ error: "Eksik veri." }, { status: 400 });
     }
-    // Kullanıcıya özel insert
+
     const { data, error } = await supabase.from('analyses').insert({
-      user_id,
+      user_id: user.id,
       file_name,
       report
     }).select();
