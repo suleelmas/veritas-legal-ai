@@ -1,10 +1,35 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
+import { createClient } from "@/utils/supabase/server";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 export async function POST(req: Request) {
   try {
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const adminEmail = process.env.ADMIN_EMAIL || '';
+    const isAdmin = !!(user.email && adminEmail && user.email.toLowerCase() === adminEmail.toLowerCase());
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('package_type')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error('[Chat API] Profile lookup failed:', profileError.message);
+      return NextResponse.json({ error: "Unable to verify plan" }, { status: 503 });
+    }
+
+    const allowedPackages = new Set(['professional', 'enterprise', 'quantum_global']);
+    if (!isAdmin && !allowedPackages.has(profile?.package_type || '')) {
+      return NextResponse.json({ error: "Eligible plan required", requiresUpgrade: true }, { status: 403 });
+    }
+
     const { question, pdfText, conversationHistory, targetLang } = await req.json();
     
     if (!process.env.OPENAI_API_KEY) {
@@ -57,9 +82,7 @@ export async function POST(req: Request) {
     });
   } catch (error: any) {
     console.error("Chat API Hatası:", error);
-    return NextResponse.json({ 
-      error: `Sistem hatası: ${error.message}` 
-    }, { status: 500 });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
