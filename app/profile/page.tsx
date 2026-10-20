@@ -3,9 +3,85 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createBrowserClient } from '@supabase/ssr';
+import { getLanguage, localeMap, type Language } from '@/lib/translations';
 
-type UserPackage = "free" | "basic" | "professional" | "enterprise" | null;
+type UserPackage = "free" | "basic" | "professional" | "enterprise" | "quantum_global" | null;
 type ProfileTab = "overview" | "settings" | "subscription" | "security";
+
+const PROFILE_TEXT: Record<Language, Record<string, string>> = {
+  TR: {
+    loadingProfile: 'Profil yükleniyor...', backHome: 'Ana Sayfaya Dön', profile: 'Profil',
+    photoSoon: 'Fotoğraf yükleme özelliği yakında', bugHunter: 'Bug Avcısı / Beta Üyesi',
+    overview: 'Genel Bakış', settings: 'Ayarlar', subscription: 'Abonelik', security: 'Güvenlik',
+    currentPackage: 'Mevcut Paket', analysesUsed: 'Kullanılan Analizler', remainingOne: 'Bu ay {count} analiz hakkınız kaldı.', remainingMany: 'Bu ay {count} analiz hakkınız kaldı.',
+    monthlyLimit: 'Aylık limitinize ulaştınız. Analize devam etmek için paketinizi yükseltin.',
+    totalAnalyses: 'Toplam Analiz', packageType: 'Paket Türü', fullName: 'Ad Soyad', fullNamePlaceholder: 'Adınızı ve soyadınızı girin',
+    emailAddress: 'E-posta Adresi', emailLocked: 'E-posta adresi değiştirilemez.', updating: 'Güncelleniyor...', updateProfile: 'Profili Güncelle',
+    updateSuccess: 'Profil başarıyla güncellendi!', updateError: 'Profil güncellenirken hata oluştu',
+    currentPlan: 'Mevcut Plan', planFeatures: 'Plan Özellikleri:', upgradePlan: 'Paketi Yükselt',
+    authentication: 'Kimlik Doğrulama', loginMethod: 'Giriş Yöntemi', accountCreated: 'Hesap Oluşturma', lastSignIn: 'Son Giriş',
+    securityNote: 'Hesabınız Google OAuth kimlik doğrulamasıyla korunmaktadır. Parola yönetimi gerekmez.',
+    free: 'Ücretsiz', basic: 'Temel', professional: 'Profesyonel', enterprise: 'Kurumsal', quantum_global: 'Kuantum Global',
+    featureFree1: 'Ayda 1 analiz', featureFree2: 'Temel AI analizi', featureFree3: 'Web erişimi',
+    featureBasic1: 'Ayda 10 analiz', featureBasic2: 'AI destekli analiz', featureBasic3: '7/24 web erişimi', featureBasic4: 'Dosya takibi',
+    featurePro1: 'Ayda 50 analiz', featurePro2: 'PDF & Word indirme', featurePro3: 'Kapsamlı mevzuat taraması', featurePro4: 'Yapılandırılmış hukuki görüş', featurePro5: 'Hızlı işlem',
+    featureEnt1: 'Sınırsız analiz', featureEnt2: 'PDF & Word indirme', featureEnt3: 'Analiz geçmişi', featureEnt4: 'Dosya yönetimi', featureEnt5: 'En yüksek öncelik', featureEnt6: 'Kurumsal destek'
+  },
+  EN: {
+    loadingProfile: 'Loading profile...', backHome: 'Back to Home', profile: 'Profile',
+    photoSoon: 'Photo upload feature coming soon', bugHunter: 'Bug Hunter / Beta Member',
+    overview: 'Overview', settings: 'Settings', subscription: 'Subscription', security: 'Security',
+    currentPackage: 'Current Package', analysesUsed: 'Analyses Used', remainingOne: 'You have {count} analysis remaining this month.', remainingMany: 'You have {count} analyses remaining this month.',
+    monthlyLimit: 'You have reached your monthly limit. Upgrade to continue analyzing.',
+    totalAnalyses: 'Total Analyses', packageType: 'Package Type', fullName: 'Full Name', fullNamePlaceholder: 'Enter your full name',
+    emailAddress: 'Email Address', emailLocked: 'Email cannot be changed.', updating: 'Updating...', updateProfile: 'Update Profile',
+    updateSuccess: 'Profile updated successfully!', updateError: 'Error updating profile',
+    currentPlan: 'Current Plan', planFeatures: 'Plan Features:', upgradePlan: 'Upgrade Plan',
+    authentication: 'Authentication', loginMethod: 'Login Method', accountCreated: 'Account Created', lastSignIn: 'Last Sign In',
+    securityNote: 'Your account is secured with Google OAuth authentication. No password management is required.',
+    free: 'Free', basic: 'Basic', professional: 'Professional', enterprise: 'Enterprise', quantum_global: 'Quantum Global',
+    featureFree1: '1 analysis per month', featureFree2: 'Basic AI analysis', featureFree3: 'Web access',
+    featureBasic1: '10 analyses per month', featureBasic2: 'AI-powered analysis', featureBasic3: '24/7 web access', featureBasic4: 'File tracking',
+    featurePro1: '50 analyses per month', featurePro2: 'PDF & Word download', featurePro3: 'Comprehensive legislation scanning', featurePro4: 'Structured legal opinion', featurePro5: 'Fast processing',
+    featureEnt1: 'Unlimited analyses', featureEnt2: 'PDF & Word download', featureEnt3: 'Analysis history', featureEnt4: 'File management', featureEnt5: 'Highest priority', featureEnt6: 'Corporate support'
+  },
+  FR: {
+    loadingProfile: 'Chargement du profil...', backHome: 'Retour à l’accueil', profile: 'Profil',
+    photoSoon: 'Le téléversement de photo sera bientôt disponible', bugHunter: 'Chasseur de bugs / Membre bêta',
+    overview: 'Vue d’ensemble', settings: 'Paramètres', subscription: 'Abonnement', security: 'Sécurité',
+    currentPackage: 'Forfait actuel', analysesUsed: 'Analyses utilisées', remainingOne: 'Il vous reste {count} analyse ce mois-ci.', remainingMany: 'Il vous reste {count} analyses ce mois-ci.',
+    monthlyLimit: 'Vous avez atteint votre limite mensuelle. Passez à un forfait supérieur pour continuer les analyses.',
+    totalAnalyses: 'Analyses totales', packageType: 'Type de forfait', fullName: 'Nom complet', fullNamePlaceholder: 'Saisissez votre nom complet',
+    emailAddress: 'Adresse e-mail', emailLocked: 'L’adresse e-mail ne peut pas être modifiée.', updating: 'Mise à jour...', updateProfile: 'Mettre à jour le profil',
+    updateSuccess: 'Profil mis à jour avec succès !', updateError: 'Erreur lors de la mise à jour du profil',
+    currentPlan: 'Forfait actuel', planFeatures: 'Fonctionnalités du forfait :', upgradePlan: 'Changer de forfait',
+    authentication: 'Authentification', loginMethod: 'Méthode de connexion', accountCreated: 'Compte créé le', lastSignIn: 'Dernière connexion',
+    securityNote: 'Votre compte est protégé par l’authentification Google OAuth. Aucun mot de passe n’est à gérer.',
+    free: 'Gratuit', basic: 'Basique', professional: 'Professionnel', enterprise: 'Entreprise', quantum_global: 'Quantique Global',
+    featureFree1: '1 analyse par mois', featureFree2: 'Analyse IA de base', featureFree3: 'Accès web',
+    featureBasic1: '10 analyses par mois', featureBasic2: 'Analyse assistée par IA', featureBasic3: 'Accès web 24 h/24 et 7 j/7', featureBasic4: 'Suivi des fichiers',
+    featurePro1: '50 analyses par mois', featurePro2: 'Téléchargement PDF & Word', featurePro3: 'Analyse complète de la législation', featurePro4: 'Avis juridique structuré', featurePro5: 'Traitement rapide',
+    featureEnt1: 'Analyses illimitées', featureEnt2: 'Téléchargement PDF & Word', featureEnt3: 'Historique des analyses', featureEnt4: 'Gestion des fichiers', featureEnt5: 'Priorité maximale', featureEnt6: 'Support entreprise'
+  },
+  DE: {
+    loadingProfile: 'Profil wird geladen...', backHome: 'Zur Startseite', profile: 'Profil',
+    photoSoon: 'Foto-Upload ist demnächst verfügbar', bugHunter: 'Bug-Jäger / Beta-Mitglied',
+    overview: 'Übersicht', settings: 'Einstellungen', subscription: 'Abonnement', security: 'Sicherheit',
+    currentPackage: 'Aktuelles Paket', analysesUsed: 'Verwendete Analysen', remainingOne: 'Diesen Monat ist noch {count} Analyse verfügbar.', remainingMany: 'Diesen Monat sind noch {count} Analysen verfügbar.',
+    monthlyLimit: 'Sie haben Ihr Monatslimit erreicht. Wechseln Sie zu einem höheren Paket, um weiter zu analysieren.',
+    totalAnalyses: 'Analysen insgesamt', packageType: 'Pakettyp', fullName: 'Vollständiger Name', fullNamePlaceholder: 'Geben Sie Ihren vollständigen Namen ein',
+    emailAddress: 'E-Mail-Adresse', emailLocked: 'Die E-Mail-Adresse kann nicht geändert werden.', updating: 'Wird aktualisiert...', updateProfile: 'Profil aktualisieren',
+    updateSuccess: 'Profil erfolgreich aktualisiert!', updateError: 'Fehler beim Aktualisieren des Profils',
+    currentPlan: 'Aktueller Tarif', planFeatures: 'Tariffunktionen:', upgradePlan: 'Paket upgraden',
+    authentication: 'Authentifizierung', loginMethod: 'Anmeldemethode', accountCreated: 'Konto erstellt', lastSignIn: 'Letzte Anmeldung',
+    securityNote: 'Ihr Konto ist durch Google OAuth geschützt. Eine Passwortverwaltung ist nicht erforderlich.',
+    free: 'Kostenlos', basic: 'Basis', professional: 'Professionell', enterprise: 'Unternehmen', quantum_global: 'Quantum Global',
+    featureFree1: '1 Analyse pro Monat', featureFree2: 'Grundlegende KI-Analyse', featureFree3: 'Webzugriff',
+    featureBasic1: '10 Analysen pro Monat', featureBasic2: 'KI-gestützte Analyse', featureBasic3: '24/7-Webzugriff', featureBasic4: 'Dateiverfolgung',
+    featurePro1: '50 Analysen pro Monat', featurePro2: 'PDF- & Word-Download', featurePro3: 'Umfassende Gesetzgebungsprüfung', featurePro4: 'Strukturierte rechtliche Einschätzung', featurePro5: 'Schnelle Verarbeitung',
+    featureEnt1: 'Unbegrenzte Analysen', featureEnt2: 'PDF- & Word-Download', featureEnt3: 'Analyseverlauf', featureEnt4: 'Dateiverwaltung', featureEnt5: 'Höchste Priorität', featureEnt6: 'Unternehmenssupport'
+  }
+};
 
 export default function ProfilePage() {
   const [supabase] = useState(() => createBrowserClient(
@@ -22,7 +98,7 @@ export default function ProfilePage() {
   const [userName, setUserName] = useState("");
   const [userEmail, setUserEmail] = useState("");
   const [updating, setUpdating] = useState(false);
-  const [language, setLanguage] = useState<'TR' | 'EN'>('EN');
+  const [language, setLanguage] = useState<Language>('EN');
   const [isEarlyBird, setIsEarlyBird] = useState(false);
 
   const gold = "#c7b079";
@@ -44,8 +120,8 @@ export default function ProfilePage() {
       setUserName(session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || "");
       
       // Dil tercihini localStorage'dan yükle
-      const savedLanguage = localStorage.getItem('language') || 'EN';
-      setLanguage(savedLanguage === 'TR' ? 'TR' : 'EN');
+      const savedLanguage = localStorage.getItem('language') || localStorage.getItem('lang') || window.navigator.language.slice(0, 2).toUpperCase();
+      setLanguage(getLanguage(savedLanguage));
 
       try {
         const { data: profile, error } = await supabase
@@ -79,10 +155,10 @@ export default function ProfilePage() {
       });
 
       if (error) throw error;
-      alert('Profile updated successfully!');
+      alert(PROFILE_TEXT[language].updateSuccess);
     } catch (err: any) {
       console.error('Update error:', err);
-      alert('Error updating profile: ' + err.message);
+      alert(PROFILE_TEXT[language].updateError + ': ' + err.message);
     } finally {
       setUpdating(false);
     }
@@ -94,28 +170,15 @@ export default function ProfilePage() {
       'free': 1,
       'basic': 10,
       'professional': 50,
-      'enterprise': Infinity
+      'enterprise': Infinity,
+      'quantum_global': Infinity
     };
     return limits[pkg || 'free'] || 1;
   };
 
-  const getPackageName = (pkg: UserPackage, lang: 'TR' | 'EN' = 'EN'): string => {
-    if (!pkg) return lang === 'TR' ? 'Ücretsiz' : 'Free';
-    const names: Record<string, Record<Exclude<UserPackage, null>, string>> = {
-      TR: {
-        'free': 'Ücretsiz',
-        'basic': 'Basic',
-        'professional': 'Professional',
-        'enterprise': 'Enterprise'
-      },
-      EN: {
-        'free': 'Free',
-        'basic': 'Basic',
-        'professional': 'Professional',
-        'enterprise': 'Enterprise'
-      }
-    };
-    return names[lang][pkg || 'free'] || 'Free';
+  const getPackageName = (pkg: UserPackage): string => {
+    const key = pkg || 'free';
+    return PROFILE_TEXT[language][key] || PROFILE_TEXT.EN[key] || key;
   };
 
   // Avatar oluşturma fonksiyonu
@@ -150,36 +213,23 @@ export default function ProfilePage() {
   };
 
   const getPackageFeatures = (pkg: UserPackage): string[] => {
+    const t = PROFILE_TEXT[language];
     if (!pkg) return [];
-    const features: Record<Exclude<UserPackage, null>, string[]> = {
-      'free': [
-        '1 Analysis per month',
-        'Basic AI Analysis',
-        'Web Access'
-      ],
-      'basic': [
-        '10 Analyses per month',
-        'AI-Powered Analysis',
-        '24/7 Web Access',
-        'File Tracking'
-      ],
-      'professional': [
-        '50 Analyses per month',
-        'PDF & Word Download',
-        'Comprehensive Legislation Scanning',
-        'Structured Legal Opinion',
-        'Fast Processing'
-      ],
-      'enterprise': [
-        'Unlimited Analyses',
-        'PDF & Word Download',
-        'Analysis History',
-        'File Management',
-        'Highest Priority',
-        'Corporate Support'
-      ]
-    };
-    return features[pkg || 'free'] || [];
+    if (pkg === 'free') return [t.featureFree1, t.featureFree2, t.featureFree3];
+    if (pkg === 'basic') return [t.featureBasic1, t.featureBasic2, t.featureBasic3, t.featureBasic4];
+    if (pkg === 'professional') return [t.featurePro1, t.featurePro2, t.featurePro3, t.featurePro4, t.featurePro5];
+    return [t.featureEnt1, t.featureEnt2, t.featureEnt3, t.featureEnt4, t.featureEnt5, t.featureEnt6];
+  };
+
+  const t = PROFILE_TEXT[language];
+  const tx = (key: string, params?: Record<string, string | number>) => {
+    let value = t[key] || PROFILE_TEXT.EN[key] || key;
+    if (params) {
+      for (const [name, replacement] of Object.entries(params)) {
+        value = value.replace(new RegExp(`\\{${name}\\}`, 'g'), String(replacement));
+      }
+    }
+    return value;
   };
 
   if (loading) {
@@ -194,7 +244,7 @@ export default function ProfilePage() {
       }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: '24px', marginBottom: '20px' }}>⏳</div>
-          <div>Loading profile...</div>
+          <div>{t.loadingProfile}</div>
         </div>
       </div>
     );
@@ -220,9 +270,9 @@ export default function ProfilePage() {
         justifyContent: 'space-between'
       }}>
         <Link href="/" style={{ textDecoration: 'none', color: gold, fontWeight: 'bold', fontSize: '20px' }}>
-          ← Back to Home
+          ← {t.backHome}
         </Link>
-        <div style={{ color: gold, fontWeight: 'bold' }}>Profile</div>
+        <div style={{ color: gold, fontWeight: 'bold' }}>{t.profile}</div>
       </nav>
 
       <div style={{ display: 'flex', minHeight: 'calc(100vh - 70px)' }}>
@@ -266,7 +316,7 @@ export default function ProfilePage() {
                 justifyContent: 'center',
                 cursor: 'not-allowed',
                 opacity: 0.6
-              }} title={language === 'TR' ? 'Fotoğraf yükleme özelliği yakında' : 'Photo upload feature coming soon'}>
+              }} title={t.photoSoon}>
                 <span style={{ fontSize: '16px' }}>📷</span>
               </div>
             </div>
@@ -291,7 +341,7 @@ export default function ProfilePage() {
                   letterSpacing: '0.5px',
                   boxShadow: `0 2px 8px rgba(199, 176, 121, 0.4)`
                 }}>
-                  🐛 {language === 'TR' ? 'Bug Hunter / Beta Member' : 'Bug Hunter / Beta Member'}
+                  🐛 {t.bugHunter}
                 </span>
               </div>
             )}
@@ -306,14 +356,14 @@ export default function ProfilePage() {
               opacity: 0.5,
               fontStyle: 'italic'
             }}>
-              {language === 'TR' ? 'Fotoğraf yükleme özelliği yakında' : 'Photo upload feature coming soon'}
+              {t.photoSoon}
             </div>
           </div>
 
           <nav style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {(['overview', 'settings', 'subscription', 'security'] as ProfileTab[]).map((tab) => (
               <button
-                key={tab}
+                key={t[tab]}
                 onClick={() => setActiveTab(tab)}
                 style={{
                   padding: '12px 15px',
@@ -344,7 +394,7 @@ export default function ProfilePage() {
           {/* Overview Tab */}
           {activeTab === 'overview' && (
             <div>
-              <h1 style={{ color: gold, fontSize: '2rem', marginBottom: '30px' }}>Overview</h1>
+              <h1 style={{ color: gold, fontSize: '2rem', marginBottom: '30px' }}>{t.overview}</h1>
               
               {/* Package Card */}
               <div style={{
@@ -356,12 +406,12 @@ export default function ProfilePage() {
                 boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
               }}>
                 <h2 style={{ color: gold, fontSize: '1.5rem', marginBottom: '20px' }}>
-                  Current Package: {getPackageName(userPackage)}
+                  {t.currentPackage}: {getPackageName(userPackage)}
                 </h2>
                 
                 <div style={{ marginBottom: '25px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                    <span style={{ color: lightText }}>Analyses Used</span>
+                    <span style={{ color: lightText }}>{t.analysesUsed}</span>
                     <span style={{ color: gold, fontWeight: 'bold' }}>
                       {analysisCount} / {limit === Infinity ? '∞' : limit}
                     </span>
@@ -392,8 +442,8 @@ export default function ProfilePage() {
                     fontSize: '14px'
                   }}>
                     {limit - analysisCount > 0 
-                      ? `You have ${limit - analysisCount} analysis${limit - analysisCount > 1 ? 'es' : ''} remaining this month.`
-                      : 'You have reached your monthly limit. Upgrade to continue analyzing.'
+                      ? tx(limit - analysisCount === 1 ? 'remainingOne' : 'remainingMany', { count: limit - analysisCount })
+                      : t.monthlyLimit
                     }
                   </div>
                 )}
@@ -411,7 +461,7 @@ export default function ProfilePage() {
                   <div style={{ color: gold, fontSize: '2rem', fontWeight: 'bold', marginBottom: '10px' }}>
                     {analysisCount}
                   </div>
-                  <div style={{ color: lightText, fontSize: '14px' }}>Total Analyses</div>
+                  <div style={{ color: lightText, fontSize: '14px' }}>{t.totalAnalyses}</div>
                 </div>
                 <div style={{
                   background: midBlue,
@@ -423,7 +473,7 @@ export default function ProfilePage() {
                   <div style={{ color: gold, fontSize: '2rem', fontWeight: 'bold', marginBottom: '10px' }}>
                     {getPackageName(userPackage)}
                   </div>
-                  <div style={{ color: lightText, fontSize: '14px' }}>Package Type</div>
+                  <div style={{ color: lightText, fontSize: '14px' }}>{t.packageType}</div>
                 </div>
               </div>
             </div>
@@ -432,7 +482,7 @@ export default function ProfilePage() {
           {/* Settings Tab */}
           {activeTab === 'settings' && (
             <div>
-              <h1 style={{ color: gold, fontSize: '2rem', marginBottom: '30px' }}>Settings</h1>
+              <h1 style={{ color: gold, fontSize: '2rem', marginBottom: '30px' }}>{t.settings}</h1>
               
               <div style={{
                 background: midBlue,
@@ -449,7 +499,7 @@ export default function ProfilePage() {
                     marginBottom: '10px',
                     fontSize: '14px'
                   }}>
-                    Full Name
+                    {t.fullName}
                   </label>
                   <input
                     type="text"
@@ -464,7 +514,7 @@ export default function ProfilePage() {
                       color: lightText,
                       fontSize: '16px'
                     }}
-                    placeholder="Enter your full name"
+                    placeholder={t.fullNamePlaceholder}
                   />
                 </div>
 
@@ -476,7 +526,7 @@ export default function ProfilePage() {
                     marginBottom: '10px',
                     fontSize: '14px'
                   }}>
-                    Email Address
+                    {t.emailAddress}
                   </label>
                   <input
                     type="email"
@@ -495,7 +545,7 @@ export default function ProfilePage() {
                     }}
                   />
                   <div style={{ color: lightText, fontSize: '12px', marginTop: '5px', opacity: 0.7 }}>
-                    Email cannot be changed
+                    {t.emailLocked}
                   </div>
                 </div>
 
@@ -515,7 +565,7 @@ export default function ProfilePage() {
                     transition: 'opacity 0.2s'
                   }}
                 >
-                  {updating ? 'Updating...' : 'Update Profile'}
+                  {updating ? t.updating : t.updateProfile}
                 </button>
               </div>
             </div>
@@ -524,7 +574,7 @@ export default function ProfilePage() {
           {/* Subscription Tab */}
           {activeTab === 'subscription' && (
             <div>
-              <h1 style={{ color: gold, fontSize: '2rem', marginBottom: '30px' }}>Subscription</h1>
+              <h1 style={{ color: gold, fontSize: '2rem', marginBottom: '30px' }}>{t.subscription}</h1>
               
               <div style={{
                 background: midBlue,
@@ -535,11 +585,11 @@ export default function ProfilePage() {
                 marginBottom: '30px'
               }}>
                 <h2 style={{ color: gold, fontSize: '1.5rem', marginBottom: '20px' }}>
-                  Current Plan: {getPackageName(userPackage)}
+                  {t.currentPlan}: {getPackageName(userPackage)}
                 </h2>
                 
                 <div style={{ marginBottom: '25px' }}>
-                  <h3 style={{ color: lightText, fontSize: '16px', marginBottom: '15px' }}>Plan Features:</h3>
+                  <h3 style={{ color: lightText, fontSize: '16px', marginBottom: '15px' }}>{t.planFeatures}</h3>
                   <ul style={{ color: lightText, lineHeight: '2', paddingLeft: '20px' }}>
                     {getPackageFeatures(userPackage).map((feature, idx) => (
                       <li key={idx} style={{ marginBottom: '8px' }}>✓ {feature}</li>
@@ -593,7 +643,7 @@ export default function ProfilePage() {
                         e.currentTarget.style.opacity = '1';
                       }}
                     >
-                      <span style={{ color: '#000000' }}>Upgrade Plan</span>
+                      <span style={{ color: '#000000' }}>{t.upgradePlan}</span>
                     </button>
                   </Link>
                 )}
@@ -604,7 +654,7 @@ export default function ProfilePage() {
           {/* Security Tab */}
           {activeTab === 'security' && (
             <div>
-              <h1 style={{ color: gold, fontSize: '2rem', marginBottom: '30px' }}>Security</h1>
+              <h1 style={{ color: gold, fontSize: '2rem', marginBottom: '30px' }}>{t.security}</h1>
               
               <div style={{
                 background: midBlue,
@@ -614,16 +664,16 @@ export default function ProfilePage() {
                 boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
               }}>
                 <div style={{ marginBottom: '25px' }}>
-                  <h3 style={{ color: gold, fontSize: '18px', marginBottom: '15px' }}>Authentication</h3>
+                  <h3 style={{ color: gold, fontSize: '18px', marginBottom: '15px' }}>{t.authentication}</h3>
                   <div style={{ color: lightText, fontSize: '14px', lineHeight: '1.8' }}>
                     <div style={{ marginBottom: '10px' }}>
-                      <strong>Login Method:</strong> Google OAuth
+                      <strong>{t.loginMethod}:</strong> Google OAuth
                     </div>
                     <div style={{ marginBottom: '10px' }}>
-                      <strong>Account Created:</strong> {new Date(user.created_at).toLocaleDateString()}
+                      <strong>{t.accountCreated}:</strong> {new Date(user.created_at).toLocaleDateString(localeMap[language])}
                     </div>
                     <div>
-                      <strong>Last Sign In:</strong> {user.last_sign_in_at ? new Date(user.last_sign_in_at).toLocaleDateString() : 'N/A'}
+                      <strong>{t.lastSignIn}:</strong> {user.last_sign_in_at ? new Date(user.last_sign_in_at).toLocaleDateString(localeMap[language]) : 'N/A'}
                     </div>
                   </div>
                 </div>
@@ -635,7 +685,7 @@ export default function ProfilePage() {
                   color: lightText,
                   fontSize: '14px'
                 }}>
-                  🔒 Your account is secured with Google OAuth authentication. No password management required.
+                  🔒 {t.securityNote}
                 </div>
               </div>
             </div>
