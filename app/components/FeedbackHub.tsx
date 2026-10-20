@@ -70,7 +70,7 @@ export default function FeedbackHub({
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to submit suggestion');
+        throw new Error(ct(language, 'feedbackSubmitError'));
       }
 
       setSuccess(true);
@@ -83,7 +83,7 @@ export default function FeedbackHub({
       }, 2000);
     } catch (error: any) {
       console.error('Feedback submission error:', error);
-      alert(error.message || ct(language, 'feedbackSubmitError'));
+      alert(ct(language, 'feedbackSubmitError'));
     } finally {
       setLoading(false);
     }
