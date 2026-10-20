@@ -170,6 +170,15 @@ export default function Home() {
   const [currentLoadingMessageIndex, setCurrentLoadingMessageIndex] = useState(0);
   const [result, setResult] = useState("");
   const [language, setLanguage] = useState<string>("EN");
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedLanguage = window.localStorage.getItem('language') || window.localStorage.getItem('lang');
+      if (savedLanguage) {
+        setLanguage(getLanguage(savedLanguage));
+      }
+    }
+  }, []);
   const [userCredits, setUserCredits] = useState<number>(0);
   const [showCreditModal, setShowCreditModal] = useState(false);
   const [contractCount, setContractCount] = useState<number>(10);
