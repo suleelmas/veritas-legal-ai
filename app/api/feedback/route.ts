@@ -8,9 +8,8 @@ export async function POST(req: Request) {
     
     const title = formData.get('title') as string;
     const description = formData.get('description') as string;
-    const user_id = formData.get('user_id') as string;
-    const user_email = formData.get('user_email') as string;
     const screenshot = formData.get('screenshot') as File | null;
+    const { data: { user } } = await supabase.auth.getUser();
 
     if (!title || !description) {
       return NextResponse.json({ error: "Title and description are required" }, { status: 400 });
@@ -28,8 +27,8 @@ export async function POST(req: Request) {
     const { data, error } = await supabase
       .from('feedbacks')
       .insert({
-        user_id: user_id !== 'anonymous' ? user_id : null,
-        user_email: user_email !== 'anonymous' ? user_email : null,
+        user_id: user?.id || null,
+        user_email: user?.email || null,
         title,
         description,
         status: 'pending',
