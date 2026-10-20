@@ -10,11 +10,10 @@ function getUserKey(req: Request) {
 export async function POST(req: Request) {
   try {
     const supabase = await createClient();
-    const { action, amount } = await req.json();
+    const { action } = await req.json();
     
-    // Session kontrolü
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     
@@ -35,24 +34,11 @@ export async function POST(req: Request) {
           .update({ credit: creditRow.credit - 1 })
           .eq("user_key", userKey);
       }
-    } else if (action === 'increment' && amount) {
-      // Kredi ekle
-      const { data: creditRow } = await supabase
-        .from("user_credits")
-        .select("credit")
-        .eq("user_key", userKey)
-        .maybeSingle();
-      
-      if (creditRow) {
-        await supabase
-          .from("user_credits")
-          .update({ credit: (creditRow.credit || 0) + amount })
-          .eq("user_key", userKey);
-      } else {
-        await supabase
-          .from("user_credits")
-          .insert({ user_key: userKey, credit: amount });
-      }
+    } else if (action === 'increment') {
+      // Credits may only be granted by a verified payment/server-side flow.
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    } else {
+      return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }
     
     return NextResponse.json({ success: true });
