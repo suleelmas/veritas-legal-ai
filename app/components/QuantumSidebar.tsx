@@ -2,7 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CASE_LAW_ROULETTE_DATA, JURISDICTION_STATS, SYSTEM_STATUS } from '@/lib/constants';
+import { CASE_LAW_ROULETTE_DATA, CASE_LAW_ROULETTE_I18N, JURISDICTION_STATS, SYSTEM_STATUS } from '@/lib/constants';
+import { getCountryName, getLanguage } from '@/lib/translations';
 import { ct } from '@/lib/componentTranslations';
 
 type Tab = "analyze" | "pricing" | "about" | "history";
@@ -54,7 +55,8 @@ export default function QuantumSidebar({
 
   const getAllCases = () => {
     const allCases: { country: string; text: string; emoji: string }[] = [];
-    Object.entries(CASE_LAW_ROULETTE_DATA).forEach(([country, cases]) => {
+    const localizedCases = CASE_LAW_ROULETTE_I18N[getLanguage(language)] || CASE_LAW_ROULETTE_I18N.EN;
+    Object.entries(localizedCases).forEach(([country, cases]) => {
       const emoji = JURISDICTION_STATS[country as keyof typeof JURISDICTION_STATS].emoji;
       cases.forEach(caseText => allCases.push({ country, text: caseText, emoji }));
     });
@@ -72,7 +74,7 @@ export default function QuantumSidebar({
       });
     }, 20000);
     return () => clearInterval(interval);
-  }, []);
+  }, [language]);
 
   if (!sidebarOpen) return null;
 
@@ -184,7 +186,7 @@ export default function QuantumSidebar({
           <h5 style={{ color: gold, fontSize: '0.8rem', fontWeight: 'bold', marginBottom: '12px', textAlign: 'center' }}>{ct(language, 'activeJurisdictions')}</h5>
           <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             {Object.entries(JURISDICTION_STATS).map(([code, stats]) => (
-              <motion.div key={code} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1, filter: stats.active ? `drop-shadow(0 0 8px ${gold}66)` : 'none' }} transition={{ delay: 0.1 * Object.keys(JURISDICTION_STATS).indexOf(code) }} style={{ position: 'relative', cursor: 'pointer', filter: stats.active ? `drop-shadow(0 0 6px ${gold}44)` : 'none', transition: 'all 0.3s' }} onMouseEnter={(e) => { e.currentTarget.style.filter = `drop-shadow(0 0 12px ${gold}88)`; e.currentTarget.style.transform = 'scale(1.1)'; }} onMouseLeave={(e) => { e.currentTarget.style.filter = stats.active ? `drop-shadow(0 0 6px ${gold}44)` : 'none'; e.currentTarget.style.transform = 'scale(1)'; }} title={`${stats.name}: ${(stats.documentCount / 1000).toFixed(0)}K ${ct(language, 'documents')}`}>
+              <motion.div key={code} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1, filter: stats.active ? `drop-shadow(0 0 8px ${gold}66)` : 'none' }} transition={{ delay: 0.1 * Object.keys(JURISDICTION_STATS).indexOf(code) }} style={{ position: 'relative', cursor: 'pointer', filter: stats.active ? `drop-shadow(0 0 6px ${gold}44)` : 'none', transition: 'all 0.3s' }} onMouseEnter={(e) => { e.currentTarget.style.filter = `drop-shadow(0 0 12px ${gold}88)`; e.currentTarget.style.transform = 'scale(1.1)'; }} onMouseLeave={(e) => { e.currentTarget.style.filter = stats.active ? `drop-shadow(0 0 6px ${gold}44)` : 'none'; e.currentTarget.style.transform = 'scale(1)'; }} title={`${getCountryName(language, code)}: ${(stats.documentCount / 1000).toFixed(0)}K ${ct(language, 'documents')}`}>
                 <div style={{ fontSize: '28px', textAlign: 'center' }}>{stats.emoji}</div>
                 {stats.active && <motion.div animate={{ opacity: [0.5, 1, 0.5], scale: [1, 1.1, 1] }} transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }} style={{ position: 'absolute', top: '-2px', right: '-2px', width: '8px', height: '8px', borderRadius: '50%', background: '#4ade80', boxShadow: `0 0 6px #4ade80` }} />}
               </motion.div>
