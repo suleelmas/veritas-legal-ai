@@ -4,29 +4,44 @@ import { createClient } from "@/utils/supabase/server";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// Admin Email Listesi
-const ADMIN_EMAILS = ['elmas7853@gmail.com'];
-
 export async function POST(req: Request) {
   try {
-    const { pdfText1, pdfText2, targetLang, userPackage, isGlobalPackage } = await req.json();
+    const { pdfText1, pdfText2, targetLang } = await req.json();
+
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const adminEmail = process.env.ADMIN_EMAIL || '';
+    const isAdmin = !!(user.email && adminEmail && user.email.toLowerCase() === adminEmail.toLowerCase());
+
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('package_type')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error('[Compare API] Profile lookup failed:', profileError.message);
+      return NextResponse.json({ error: "Unable to verify plan" }, { status: 503 });
+    }
+
+    const userPackage = profile?.package_type || 'free';
+    const isGlobalPackage = isAdmin || userPackage === 'enterprise' || userPackage === 'quantum_global';
 
     if (!pdfText1 || !pdfText2) {
       return NextResponse.json({ error: "Both documents are required" }, { status: 400 });
     }
 
-    // Paket kontrolü
-    if (!userPackage || userPackage === 'free') {
+    // Paket kontrolü yalnızca sunucuda doğrulanmış profil bilgisine dayanır.
+    if (!isAdmin && userPackage !== 'professional' && !isGlobalPackage) {
       return NextResponse.json({ 
         error: "Document comparison requires Professional or Global package",
         requiresUpgrade: true 
       }, { status: 403 });
     }
-
-    // Session kontrolü
-    const supabase = await createClient();
-    const { data: { session } } = await supabase.auth.getSession();
-    const isAdmin = session?.user?.email && ADMIN_EMAILS.includes(session.user.email);
 
     // Dil tespiti (Professional için aynı dil kontrolü)
     const detectLanguage = (text: string): string => {
@@ -41,7 +56,7 @@ export async function POST(req: Request) {
     const lang2 = detectLanguage(pdfText2);
 
     // Professional paket için aynı dil kontrolü
-    if (userPackage === 'professional' && lang1 !== lang2) {
+    if (!isAdmin && userPackage === 'professional' && lang1 !== lang2) {
       return NextResponse.json({ 
         error: "Professional package only supports same-language comparison. Upgrade to Global for cross-language comparison.",
         requiresUpgrade: true 
@@ -102,9 +117,7 @@ Format: [Madde/Bölüm] | [Değişiklik Tipi: Eklendi/Silindi/Değiştirildi] | 
     });
   } catch (error: any) {
     console.error('Comparison API error:', error);
-    return NextResponse.json({ 
-      error: error.message || 'Internal server error' 
-    }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
