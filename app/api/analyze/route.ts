@@ -5,6 +5,7 @@ import PDFParser from 'pdf2json';
 import { applyWeightedRanking, getWeightedDocuments } from "@/lib/weightedSearch";
 import { detectJurisdiction } from "@/lib/jurisdictionDetection";
 import { getJurisdictionAnalysisInstructions } from "@/lib/legalSources/jurisdictionAnalysisInstructions";
+import { createClient as createServerSupabaseClient } from "@/utils/supabase/server";
 
 // Runtime configuration for Next.js App Router
 export const runtime = 'nodejs';
@@ -963,7 +964,16 @@ export async function POST(req: Request) {
   
   try {
     console.log('[API] Request body parse ediliyor...');
-    const { pdfText, pdfBase64, targetLang, userSelectedCountry, userEmail, userId, fileName } = await req.json();
+    const { pdfText, pdfBase64, targetLang, userSelectedCountry, fileName } = await req.json();
+
+    // Never trust user identity fields from the request body.
+    const authSupabase = await createServerSupabaseClient();
+    const { data: { user: authenticatedUser }, error: authError } = await authSupabase.auth.getUser();
+    if (authError && authError.name !== 'AuthSessionMissingError') {
+      console.warn('[API] Auth verification warning:', authError.message);
+    }
+    const verifiedUserEmail = authenticatedUser?.email || null;
+    const verifiedUserId = authenticatedUser?.id || undefined;
     console.log('[API] Request body parse edildi!');
     console.log('[API] Request body alındı:', {
       hasPdfText: !!pdfText,
@@ -1058,14 +1068,13 @@ export async function POST(req: Request) {
     
     // ADMIN BYPASS: Belirli email için tüm kontrolleri atla
     const adminEmail = process.env.ADMIN_EMAIL || '';
-    const isAdmin = userEmail && adminEmail && userEmail.toLowerCase() === adminEmail.toLowerCase();
+    const isAdmin = !!(verifiedUserEmail && adminEmail && verifiedUserEmail.toLowerCase() === adminEmail.toLowerCase());
     
     const userKey = getUserKey(req);
     
     // Helper function to save analysis and send notifications
-    const saveAnalysisAndNotify = async (analysisResult: string, fileName: string = 'document.pdf', userIdParam?: string) => {
-      // Use userIdParam if provided, otherwise fall back to userId from request
-      const finalUserId = userIdParam || userId;
+    const saveAnalysisAndNotify = async (analysisResult: string, fileName: string = 'document.pdf') => {
+      const finalUserId = verifiedUserId;
       
       try {
         // Parse analysis result to check for critical risks
@@ -1142,7 +1151,7 @@ export async function POST(req: Request) {
             // Continue even if DB save fails
           }
         } else {
-          console.warn('[saveAnalysisAndNotify] userId not provided, skipping database save', { userId, userIdParam, finalUserId });
+          console.warn('[saveAnalysisAndNotify] No authenticated user; skipping database save.');
         }
 
         // Calculate risk score and summary
@@ -1164,7 +1173,7 @@ export async function POST(req: Request) {
         if (hasCriticalRisk) {
           await sendTelegramNotification(
             `🚨 <b>KRİTİK ANALİZ TAMAMLANDI</b>\n\n` +
-            `📧 Kullanıcı: ${userEmail || 'Anonim'}\n` +
+            `📧 Kullanıcı: ${verifiedUserEmail || 'Anonim'}\n` +
             `📄 Dosya: ${fileName}\n` +
             `📋 Belge Türü: ${documentType}\n` +
             `⚠️ <b>Risk Skoru:</b> ${highRiskCount}/${riskCount} Yüksek Risk\n` +
@@ -1178,7 +1187,7 @@ export async function POST(req: Request) {
           // Regular analysis notification
           await sendTelegramNotification(
             `📊 <b>YENİ ANALİZ TAMAMLANDI</b>\n\n` +
-            `📧 Kullanıcı: ${userEmail || 'Anonim'}\n` +
+            `📧 Kullanıcı: ${verifiedUserEmail || 'Anonim'}\n` +
             `📄 Dosya: ${fileName}\n` +
             `📋 Belge Türü: ${documentType}\n` +
             `📊 <b>Risk Skoru:</b> ${riskCount} Risk Tespit Edildi (${highRiskCount} Yüksek)\n` +
@@ -1202,7 +1211,7 @@ export async function POST(req: Request) {
         targetLang || 'tr',
         resolvedJurisdiction,
         async (text) => {
-          await saveAnalysisAndNotify(text, fileName || 'admin-document.pdf', userId);
+          await saveAnalysisAndNotify(text, fileName || 'admin-document.pdf');
         }
       );
       // performLegalAnalysis artık direkt Response döndürüyor
@@ -1261,7 +1270,7 @@ export async function POST(req: Request) {
             await supabase.from("user_credits")
               .update({ credit: creditRow.credit - 1 })
               .eq("user_key", userKey);
-            await saveAnalysisAndNotify(text, fileName || 'document.pdf', userId);
+            await saveAnalysisAndNotify(text, fileName || 'document.pdf');
           }
         );
         // performLegalAnalysis artık direkt Response döndürüyor
@@ -1275,7 +1284,7 @@ export async function POST(req: Request) {
           resolvedJurisdiction,
           async (text) => {
             await supabase.from("user_analysis_rights").insert({ user_key: userKey });
-            await saveAnalysisAndNotify(text, fileName || 'document.pdf', userId);
+            await saveAnalysisAndNotify(text, fileName || 'document.pdf');
           }
         );
         // performLegalAnalysis artık direkt Response döndürüyor
