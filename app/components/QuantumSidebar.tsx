@@ -134,7 +134,7 @@ export default function QuantumSidebar({
       {isAdmin && user && (
         <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.4 }} style={{ marginTop: '20px', padding: '12px', background: `linear-gradient(135deg, ${gold}22, ${gold}11)`, borderRadius: '10px', border: `2px solid ${gold}66`, textAlign: 'center', boxShadow: `0 0 15px ${gold}33` }}>
           <div style={{ fontSize: '24px', marginBottom: '6px' }}>⭐</div>
-          <div style={{ color: gold, fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '4px' }}>Plan: Veritas VIP / Developer</div>
+          <div style={{ color: gold, fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '4px' }}>{ct(language, 'vipDeveloperPlan')}</div>
           <div style={{ color: '#e0e0e0', fontSize: '0.7rem', opacity: 0.8 }}>{ct(language, 'unlimitedAnalysis')}</div>
         </motion.div>
       )}
@@ -239,7 +239,7 @@ export default function QuantumSidebar({
           <div style={{ padding: '12px', background: `rgba(19, 27, 38, 0.6)`, borderRadius: '8px', border: `1px solid ${gold}33`, fontFamily: '"JetBrains Mono", "Roboto Mono", monospace', fontSize: '0.7rem', position: 'relative' }} title={ct(language, 'databaseTooltip')} onMouseEnter={(e) => { e.currentTarget.style.background = `rgba(19, 27, 38, 0.8)`; e.currentTarget.style.borderColor = gold; }} onMouseLeave={(e) => { e.currentTarget.style.background = `rgba(19, 27, 38, 0.6)`; e.currentTarget.style.borderColor = `${gold}33`; }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
               <motion.div animate={{ opacity: [0.4, 1, 0.4], scale: [1, 1.2, 1] }} transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }} style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#4ade80', boxShadow: `0 0 8px #4ade80` }} />
-              <span style={{ color: '#4ade80', fontWeight: 'bold', fontSize: '0.75rem', letterSpacing: '0.5px' }}>Quantum Engine: Online</span>
+              <span style={{ color: '#4ade80', fontWeight: 'bold', fontSize: '0.75rem', letterSpacing: '0.5px' }}>{ct(language, 'quantumEngineOnline')}</span>
             </div>
             <div style={{ color: '#b0b0b0', fontSize: '0.65rem', marginBottom: '4px', opacity: 0.8 }}>
               {ct(language, 'lastDataSync')} {(() => {
