@@ -280,7 +280,28 @@ export default function AnalysisResult({
       alternativeApproaches: "Alternatif Yaklaşımlar",
       overall: "Genel Durum",
       details: "Detaylar",
-      criticalIssues: "Kritik Sorunlar"
+      criticalIssues: "Kritik Sorunlar",
+      criticalRisksDetected: "Kritik Riskler Tespit Edildi!",
+      vipOnly: "Bu özellik sadece VIP kullanıcılar içindir. Lütfen paketinizi yükseltin.",
+      vipOnlyTitle: "Bu özellik sadece VIP kullanıcılar içindir",
+      generatingPdf: "PDF Hazırlanıyor...",
+      downloadPdf: "PDF İndir",
+      pleaseWaitPdf: "Lütfen bekleyin, bu işlem birkaç saniye sürebilir.",
+      riskScoreLabel: "Risk Skoru",
+      compliancePercentage: "Uyumluluk Yüzdesi",
+      trustIndex: "Güven Endeksi",
+      riskDistributionChart: "Risk Dağılım Grafiği",
+      complianceLabel: "Uyumluluk",
+      trustLabel: "Güven",
+      analysisResult: "Analiz Sonucu",
+      chatTitle: "Bu Analiz Hakkında Sorunuz mu Var?",
+      chatEmpty: "Analiz hakkında sorularınızı buraya yazabilirsiniz. AI, analiz sonuçlarına göre yanıt verecektir.",
+      you: "Siz",
+      thinking: "Düşünüyor...",
+      chatPlaceholder: "Sorunuzu buraya yazın...",
+      sending: "Gönderiliyor...",
+      send: "Gönder",
+      actionFallback: "Eylem"
     },
     EN: {
       summary: "Comprehensive Summary",
@@ -313,7 +334,28 @@ export default function AnalysisResult({
       alternativeApproaches: "Alternative Approaches",
       overall: "Overall Status",
       details: "Details",
-      criticalIssues: "Critical Issues"
+      criticalIssues: "Critical Issues",
+      criticalRisksDetected: "Critical Risks Detected!",
+      vipOnly: "This feature is only available for VIP users. Please upgrade your plan.",
+      vipOnlyTitle: "This feature is only available for VIP users",
+      generatingPdf: "Generating PDF...",
+      downloadPdf: "Download PDF",
+      pleaseWaitPdf: "Please wait, this may take a few seconds.",
+      riskScoreLabel: "Risk Score",
+      compliancePercentage: "Compliance Percentage",
+      trustIndex: "Trust Index",
+      riskDistributionChart: "Risk Distribution Chart",
+      complianceLabel: "Compliance",
+      trustLabel: "Trust",
+      analysisResult: "Analysis Result",
+      chatTitle: "Do You Have Questions About This Analysis?",
+      chatEmpty: "You can ask questions about the analysis here. AI will respond based on the analysis results.",
+      you: "You",
+      thinking: "Thinking...",
+      chatPlaceholder: "Type your question here...",
+      sending: "Sending...",
+      send: "Send",
+      actionFallback: "Action"
     },
     DE: {
       summary: "Umfassende Zusammenfassung",
@@ -346,11 +388,86 @@ export default function AnalysisResult({
       alternativeApproaches: "Alternative Ansätze",
       overall: "Gesamtstatus",
       details: "Details",
-      criticalIssues: "Kritische Probleme"
+      criticalIssues: "Kritische Probleme",
+      criticalRisksDetected: "Kritische Risiken erkannt!",
+      vipOnly: "Diese Funktion ist nur für VIP-Benutzer verfügbar. Bitte upgraden Sie Ihren Plan.",
+      vipOnlyTitle: "Diese Funktion ist nur für VIP-Benutzer verfügbar",
+      generatingPdf: "PDF wird erstellt...",
+      downloadPdf: "PDF herunterladen",
+      pleaseWaitPdf: "Bitte warten Sie, dies kann einige Sekunden dauern.",
+      riskScoreLabel: "Risikobewertung",
+      compliancePercentage: "Compliance-Prozentsatz",
+      trustIndex: "Vertrauensindex",
+      riskDistributionChart: "Risikoverteilungsdiagramm",
+      complianceLabel: "Compliance",
+      trustLabel: "Vertrauen",
+      analysisResult: "Analyseergebnis",
+      chatTitle: "Haben Sie Fragen zu dieser Analyse?",
+      chatEmpty: "Sie können hier Fragen zur Analyse stellen. Die KI antwortet auf Grundlage der Analyseergebnisse.",
+      you: "Sie",
+      thinking: "Denke nach...",
+      chatPlaceholder: "Geben Sie hier Ihre Frage ein...",
+      sending: "Wird gesendet...",
+      send: "Senden",
+      actionFallback: "Aktion"
+    },
+    FR: {
+      summary: "Résumé complet",
+      riskAnalysis: "Analyse des risques juridiques",
+      legalOpinion: "Avis juridique",
+      actionPlan: "Plan d’action",
+      complianceStatus: "État de conformité",
+      legalReferences: "Références juridiques",
+      documentType: "Type de document",
+      parties: "Parties",
+      applicableLaws: "Dispositions juridiques applicables",
+      severity: "Gravité",
+      probability: "Probabilité",
+      impact: "Impact",
+      urgency: "Urgence",
+      potentialConsequences: "Conséquences potentielles",
+      mitigationSuggestions: "Mesures d’atténuation",
+      affectedArticles: "Articles concernés",
+      priority: "Priorité",
+      action: "Action",
+      legalBasis: "Base juridique",
+      deadline: "Échéance",
+      responsibleParty: "Partie responsable",
+      implementationSteps: "Étapes de mise en œuvre",
+      estimatedCost: "Coût estimé",
+      expectedOutcome: "Résultat attendu",
+      validity: "Validité",
+      enforceability: "Force exécutoire",
+      recommendations: "Recommandations",
+      alternativeApproaches: "Approches alternatives",
+      overall: "État général",
+      details: "Détails",
+      criticalIssues: "Problèmes critiques",
+      criticalRisksDetected: "Risques critiques détectés !",
+      vipOnly: "Cette fonctionnalité est réservée aux utilisateurs VIP. Veuillez passer à une offre supérieure.",
+      vipOnlyTitle: "Cette fonctionnalité est réservée aux utilisateurs VIP",
+      generatingPdf: "Génération du PDF...",
+      downloadPdf: "Télécharger le PDF",
+      pleaseWaitPdf: "Veuillez patienter, cette opération peut prendre quelques secondes.",
+      riskScoreLabel: "Score de risque",
+      compliancePercentage: "Pourcentage de conformité",
+      trustIndex: "Indice de confiance",
+      riskDistributionChart: "Graphique de répartition des risques",
+      complianceLabel: "Conformité",
+      trustLabel: "Confiance",
+      analysisResult: "Résultat de l’analyse",
+      chatTitle: "Vous avez des questions sur cette analyse ?",
+      chatEmpty: "Vous pouvez poser ici vos questions sur l’analyse. L’IA répondra à partir des résultats de l’analyse.",
+      you: "Vous",
+      thinking: "Réflexion en cours...",
+      chatPlaceholder: "Saisissez votre question ici...",
+      sending: "Envoi en cours...",
+      send: "Envoyer",
+      actionFallback: "Action"
     }
   };
   
-  const t = translations[language] || translations.TR;
+  const t = translations[language] || translations.EN;
   
   // Bölüm başlığı komponenti
   const SectionHeader = ({ title, icon }: { title: string; icon?: string }) => (
@@ -474,6 +591,19 @@ export default function AnalysisResult({
       'Data Protection': 'Datenschutz',
       'Compliance': 'Rechtliche Einhaltung',
       'Risk Assessment': 'Risikobewertung'
+    },
+    FR: {
+      'BGB': 'Bürgerliches Gesetzbuch - Code civil allemand',
+      'GDPR': 'Règlement général sur la protection des données - Règlement UE 2016/679',
+      'TCO': 'Code de commerce turc',
+      'TBK': 'Code turc des obligations',
+      'KVKK': 'Loi turque sur la protection des données personnelles',
+      'UCC': 'Uniform Commercial Code - Droit commercial des États-Unis',
+      'CISG': 'Convention des Nations unies sur les contrats de vente internationale de marchandises',
+      'Force Majeure': 'Force majeure - Circonstances imprévisibles empêchant l’exécution du contrat',
+      'Data Protection': 'Protection des données',
+      'Compliance': 'Conformité juridique',
+      'Risk Assessment': 'Évaluation des risques'
     }
   };
   
@@ -525,7 +655,7 @@ export default function AnalysisResult({
   const enrichTextWithTooltips = (text: string): React.ReactNode => {
     if (!text || typeof text !== 'string') return text;
     
-    const terms = legalTerms[language] || legalTerms.TR;
+    const terms = legalTerms[language] || legalTerms.EN;
     const termKeys = Object.keys(terms).sort((a, b) => b.length - a.length); // Uzun terimler önce
     
     let parts: (string | React.ReactElement)[] = [text];
@@ -634,11 +764,7 @@ export default function AnalysisResult({
     // VIP kontrolü
     if (!isVIP) {
       console.log('PDF: VIP kontrolü başarısız');
-      alert(language === 'TR' 
-        ? 'Bu özellik sadece VIP kullanıcılar içindir. Lütfen paketinizi yükseltin.' 
-        : language === 'EN' 
-        ? 'This feature is only available for VIP users. Please upgrade your plan.'
-        : 'Diese Funktion ist nur für VIP-Benutzer verfügbar. Bitte upgraden Sie Ihren Plan.');
+      alert(t.vipOnly);
       return;
     }
     
@@ -916,7 +1042,7 @@ export default function AnalysisResult({
                 minWidth: '300px',
               }}
             >
-              🚨 {language === 'TR' ? 'Kritik Riskler Tespit Edildi!' : language === 'EN' ? 'Critical Risks Detected!' : language === 'DE' ? 'Kritische Risiken erkannt!' : 'Critical Risks Detected!'}
+              🚨 {t.criticalRisksDetected}
             </div>
           )}
           
@@ -960,14 +1086,11 @@ export default function AnalysisResult({
                 e.currentTarget.style.background = isVIP ? goldColor : '#666';
                 e.currentTarget.style.color = `${isVIP ? '#f5f3e8' : '#ffffff'} !important`; // Rengi koru
               }}
-              title={!isVIP ? (language === 'TR' ? 'Bu özellik sadece VIP kullanıcılar içindir' : 'This feature is only available for VIP users') : ''}
+              title={!isVIP ? t.vipOnlyTitle : ''}
             >
               <Download size={16} strokeWidth={2} />
               <span>
-                {isGeneratingPDF 
-                  ? (language === 'TR' ? 'PDF Hazırlanıyor...' : language === 'EN' ? 'Generating PDF...' : 'PDF wird erstellt...')
-                  : (language === 'TR' ? 'PDF İndir' : language === 'EN' ? 'Download PDF' : language === 'DE' ? 'PDF Herunterladen' : 'Download PDF')
-                }
+                {isGeneratingPDF ? t.generatingPdf : t.downloadPdf}
               </span>
             </button>
           )}
@@ -1013,7 +1136,7 @@ export default function AnalysisResult({
               marginBottom: '12px',
               letterSpacing: '0.5px'
             }}>
-              {language === 'TR' ? 'PDF Hazırlanıyor...' : language === 'EN' ? 'Generating PDF...' : 'PDF wird erstellt...'}
+              {t.generatingPdf}
             </div>
             <div style={{ 
               color: '#1a365d', 
@@ -1022,7 +1145,7 @@ export default function AnalysisResult({
               opacity: 0.8,
               letterSpacing: '0.3px'
             }}>
-              {language === 'TR' ? 'Lütfen bekleyin, bu işlem birkaç saniye sürebilir.' : language === 'EN' ? 'Please wait, this may take a few seconds.' : 'Bitte warten Sie, dies kann einige Sekunden dauern.'}
+              {t.pleaseWaitPdf}
             </div>
           </div>
         </div>
@@ -1050,7 +1173,7 @@ export default function AnalysisResult({
             breakInside: 'avoid',
           }}>
             <div style={{ color: goldColor, fontSize: '0.9rem', marginBottom: '8px', fontWeight: 'bold' }}>
-              {language === 'TR' ? 'Risk Skoru' : language === 'EN' ? 'Risk Score' : language === 'DE' ? 'Risikobewertung' : 'Risk Score'}
+              {t.riskScoreLabel}
             </div>
             <div style={{ 
               color: calculateRiskScore() >= 70 ? '#dc2626' : calculateRiskScore() >= 40 ? '#ea580c' : '#3b82f6', 
@@ -1074,7 +1197,7 @@ export default function AnalysisResult({
             breakInside: 'avoid',
           }}>
             <div style={{ color: goldColor, fontSize: '0.9rem', marginBottom: '8px', fontWeight: 'bold' }}>
-              {language === 'TR' ? 'Uyumluluk Yüzdesi' : language === 'EN' ? 'Compliance Percentage' : language === 'DE' ? 'Compliance-Prozentsatz' : 'Compliance Percentage'}
+              {t.compliancePercentage}
             </div>
             <div style={{ 
               color: calculateComplianceScore() >= 80 ? '#16a34a' : calculateComplianceScore() >= 50 ? '#ea580c' : '#dc2626', 
@@ -1100,7 +1223,7 @@ export default function AnalysisResult({
             breakInside: 'avoid',
           }}>
             <div style={{ color: goldColor, fontSize: '0.9rem', marginBottom: '8px', fontWeight: 'bold' }}>
-              {language === 'TR' ? 'Güven Endeksi' : language === 'EN' ? 'Trust Index' : language === 'DE' ? 'Vertrauensindex' : 'Trust Index'}
+              {t.trustIndex}
             </div>
             <div style={{ 
               color: calculateTrustIndex() >= 70 ? '#16a34a' : calculateTrustIndex() >= 40 ? '#ea580c' : '#dc2626', 
@@ -1130,7 +1253,7 @@ export default function AnalysisResult({
           minHeight: isPrinting ? '500px' : 'auto',
         }}>
           <div style={{ color: goldColor, fontSize: '1.1rem', marginBottom: '20px', fontWeight: 'bold', textAlign: 'center' }}>
-            {language === 'TR' ? 'Risk Dağılım Grafiği' : language === 'EN' ? 'Risk Distribution Chart' : language === 'DE' ? 'Risikoverteilungsdiagramm' : 'Risk Distribution Chart'}
+            {t.riskDistributionChart}
           </div>
           <ResponsiveContainer width="100%" height={isPrinting ? 500 : 300}>
             {(() => {
@@ -1139,17 +1262,17 @@ export default function AnalysisResult({
               const trustIndex = calculateTrustIndex();
               const chartData = [
                 {
-                  name: language === 'TR' ? 'Risk Skoru' : language === 'EN' ? 'Risk Score' : 'Risk Score',
+                  name: t.riskScoreLabel,
                   value: riskScore,
                   color: riskScore >= 70 ? '#dc2626' : riskScore >= 40 ? '#ea580c' : '#3b82f6'
                 },
                 {
-                  name: language === 'TR' ? 'Uyumluluk' : language === 'EN' ? 'Compliance' : 'Compliance',
+                  name: t.complianceLabel,
                   value: complianceScore,
                   color: complianceScore >= 80 ? '#16a34a' : complianceScore >= 50 ? '#ea580c' : '#dc2626'
                 },
                 {
-                  name: language === 'TR' ? 'Güven' : language === 'EN' ? 'Trust' : 'Trust',
+                  name: t.trustLabel,
                   value: trustIndex,
                   color: trustIndex >= 70 ? '#16a34a' : trustIndex >= 40 ? '#ea580c' : '#dc2626'
                 }
@@ -1522,7 +1645,7 @@ export default function AnalysisResult({
                             {t.priority}: {action.priority}
                           </span>
                         )}
-                        {action.action || `Eylem ${index + 1}`}
+                        {action.action || `${t.actionFallback} ${index + 1}`}
                       </h3>
                       
                       {action.legal_basis && (
@@ -1739,7 +1862,7 @@ export default function AnalysisResult({
           ) : (
             // JSON değilse, ham metin göster
             <>
-              <SectionHeader title="Analiz Sonucu" icon="📊" />
+              <SectionHeader title={t.analysisResult} icon="📊" />
               <div 
                 className="block min-h-[200px]"
                 style={{
@@ -1780,7 +1903,7 @@ export default function AnalysisResult({
             gap: '10px'
           }}>
             <span>💬</span>
-            <span>{language === 'TR' ? 'Bu Analiz Hakkında Sorunuz mu Var?' : language === 'EN' ? 'Do You Have Questions About This Analysis?' : language === 'DE' ? 'Haben Sie Fragen zu dieser Analyse?' : 'Do You Have Questions About This Analysis?'}</span>
+            <span>{t.chatTitle}</span>
           </div>
 
           {/* Chat Mesajları */}
@@ -1804,11 +1927,7 @@ export default function AnalysisResult({
                 padding: '20px',
                 fontSize: '0.9rem'
               }}>
-                {language === 'TR' 
-                  ? 'Analiz hakkında sorularınızı buraya yazabilirsiniz. AI, analiz sonuçlarına göre yanıt verecektir.' 
-                  : language === 'EN'
-                  ? 'You can ask questions about the analysis here. AI will respond based on the analysis results.'
-                  : 'Sie können hier Fragen zur Analyse stellen. Die KI wird basierend auf den Analyseergebnissen antworten.'}
+                {t.chatEmpty}
               </div>
             ) : (
               chatMessages.map((msg, index) => (
@@ -1841,7 +1960,7 @@ export default function AnalysisResult({
                       fontWeight: 'bold'
                     }}>
                       {msg.role === 'user' 
-                        ? (language === 'TR' ? 'Siz' : language === 'EN' ? 'You' : 'Sie')
+                        ? t.you
                         : 'AI'}
                     </div>
                     {msg.content}
@@ -1867,7 +1986,7 @@ export default function AnalysisResult({
                   gap: '10px'
                 }}>
                   <span>🤔</span>
-                  <span>{language === 'TR' ? 'Düşünüyor...' : language === 'EN' ? 'Thinking...' : 'Denke nach...'}</span>
+                  <span>{t.thinking}</span>
                 </div>
               </div>
             )}
@@ -1889,11 +2008,7 @@ export default function AnalysisResult({
                   handleChatSend();
                 }
               }}
-              placeholder={language === 'TR' 
-                ? 'Sorunuzu buraya yazın...' 
-                : language === 'EN'
-                ? 'Type your question here...'
-                : 'Geben Sie hier Ihre Frage ein...'}
+              placeholder={t.chatPlaceholder}
               disabled={chatLoading}
               style={{
                 flex: 1,
@@ -1945,9 +2060,7 @@ export default function AnalysisResult({
                 }
               }}
             >
-              {chatLoading 
-                ? (language === 'TR' ? 'Gönderiliyor...' : language === 'EN' ? 'Sending...' : 'Wird gesendet...')
-                : (language === 'TR' ? 'Gönder' : language === 'EN' ? 'Send' : 'Senden')}
+              {chatLoading ? t.sending : t.send}
             </button>
           </div>
         </div>
@@ -2092,13 +2205,13 @@ export default function AnalysisResult({
           e.currentTarget.style.background = isVIP ? goldColor : '#666';
           e.currentTarget.style.color = `${isVIP ? '#f5f3e8' : '#ffffff'} !important`; // Rengi koru
         }}
-        title={!isVIP ? (language === 'TR' ? 'Bu özellik sadece VIP kullanıcılar içindir' : 'This feature is only available for VIP users') : ''}
+        title={!isVIP ? t.vipOnlyTitle : ''}
       >
         <Download size={16} strokeWidth={2} />
         <span>
           {isGeneratingPDF 
-            ? (language === 'TR' ? 'PDF Hazırlanıyor...' : language === 'EN' ? 'Generating PDF...' : 'PDF wird erstellt...')
-            : (language === 'TR' ? 'PDF İndir' : language === 'EN' ? 'Download PDF' : language === 'DE' ? 'PDF Herunterladen' : 'Download PDF')
+            ? t.generatingPdf
+            : t.downloadPdf
           }
         </span>
       </button>
