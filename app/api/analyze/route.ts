@@ -21,10 +21,15 @@ export async function GET(req: Request) {
 }
 
 // Telegram Notification Helper
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "8415963295:AAEgRJ3QX2ZBVsIh5lxiXhFOf_-7WTpIOdc";
-const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || "8418884482";
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
 async function sendTelegramNotification(message: string, isCritical: boolean = false) {
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
+    console.warn('[Telegram] Notification skipped: environment variables are not configured.');
+    return;
+  }
+
   try {
     const telegramUrl = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
     const emoji = isCritical ? "🚨" : "📊";
@@ -705,7 +710,6 @@ async function performLegalAnalysis(pdfText: string, targetLang: string, jurisdi
   console.log('[performLegalAnalysis] FONKSİYON ÇAĞRILDI!');
   console.log('[performLegalAnalysis] PDF metin uzunluğu:', pdfText?.length || 0);
   console.log('[performLegalAnalysis] Target lang:', targetLang);
-  console.log('[performLegalAnalysis] PDF metin ilk 200 karakter:', pdfText?.substring(0, 200) || 'BOŞ');
   console.log('[performLegalAnalysis] ========================================');
 
   const legalContext = await retrieveLegalContext(pdfText, jurisdiction);
@@ -892,8 +896,6 @@ PLACEHOLDER_PDF_TEXT`;
   
   // Prompt'u güncelle - PDF metnini kısaltılmış versiyonla değiştir
   const finalAnalysisPrompt = analysisPrompt.replace('PLACEHOLDER_PDF_TEXT', truncatedPdfText);
-  console.log("[RAG DEBUG] finalAnalysisPrompt ilk 3000:", finalAnalysisPrompt.substring(0, 3000));
-console.log("[RAG DEBUG] kaynak bölümü var mı:", finalAnalysisPrompt.includes("VERİTABANINDAN GETİRİLEN GÜNCEL HUKUKİ KAYNAKLAR"));
   // Prompt uzunluğunu kontrol et
   const promptLength = finalAnalysisPrompt.length;
   console.log('[performLegalAnalysis] Prompt uzunluğu:', promptLength, 'PDF metin uzunluğu:', cleanedPdfText.length, 'Kısaltılmış PDF uzunluğu:', truncatedPdfText.length);
@@ -927,11 +929,8 @@ console.log("[RAG DEBUG] kaynak bölümü var mı:", finalAnalysisPrompt.include
       pdfText
     );
     
-    console.log('[performLegalAnalysis] YANIT DETAYLI:', {
-      yanitUzunlugu: analysisResult.length,
-      ilk200Karakter: analysisResult.substring(0, 200),
-      son200Karakter: analysisResult.substring(Math.max(0, analysisResult.length - 200)),
-      tamYanit: analysisResult
+    console.log('[performLegalAnalysis] Yanıt oluşturuldu:', {
+      yanitUzunlugu: analysisResult.length
     });
     
     // onFinish callback'ini çağır
@@ -960,7 +959,6 @@ export async function POST(req: Request) {
   console.log('[API] POST /api/analyze çağrıldı - ROUTE ÇALIŞIYOR!');
   console.log('[API] Request method:', req.method);
   console.log('[API] Request URL:', req.url);
-  console.log('[API] Request headers:', Object.fromEntries(req.headers.entries()));
   console.log('========================================');
   
   try {
@@ -970,10 +968,7 @@ export async function POST(req: Request) {
     console.log('[API] Request body alındı:', {
       hasPdfText: !!pdfText,
       hasPdfBase64: !!pdfBase64,
-      targetLang,
-      userEmail,
-      userId,
-      fileName
+      targetLang
     });
 
     // Eğer pdfBase64 geliyorsa, önce PDF'i parse et
@@ -1303,8 +1298,7 @@ export async function POST(req: Request) {
           usedDisks
         });
         console.log('[API] performLegalAnalysis çağrılmadan önce - finalPdfText uzunluğu:', finalPdfText?.length || 0);
-        console.log('[API] performLegalAnalysis çağrılmadan önce - finalPdfText ilk 200 karakter:', finalPdfText?.substring(0, 200) || 'BOŞ');
-        console.log('[API] performLegalAnalysis çağrılmadan önce - targetLang:', targetLang || 'tr');
+            console.log('[API] performLegalAnalysis çağrılmadan önce - targetLang:', targetLang || 'tr');
         const result = performLegalAnalysis(
           finalPdfText, 
           targetLang || 'tr',
