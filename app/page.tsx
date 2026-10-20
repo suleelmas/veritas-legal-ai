@@ -1029,7 +1029,7 @@ export default function Home() {
       });
       
       const data = await res.json();
-      const assistantMessage = data.reply || data.error || text.chatFallback;
+      const assistantMessage = data.reply || text.chatFallback;
       
       setChatMessages(prev => [...prev, { role: 'assistant', content: assistantMessage }]);
     } catch (error) {
@@ -1103,11 +1103,11 @@ export default function Home() {
       
       if (!res.ok) {
         if (data.requiresUpgrade) {
-          alert(data.error || text.packageUpgradeRequired);
+          alert(text.packageUpgradeRequired);
           // setActiveTab('pricing'); // YORUM SATIRINA ALINDI - Redirect yapmasın
           return;
         }
-        throw new Error(data.error || tr(language, 'comparisonFailed'));
+        throw new Error(tr(language, 'comparisonFailed'));
       }
       
       setResult(data.reply || tr(language, 'comparisonComplete'));
@@ -1915,7 +1915,7 @@ ${tr(language, 'pdfAnalysisWarning')}`;
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to submit bug report');
+        throw new Error(tr(language, 'bugReportError'));
       }
 
       // Başarılı gönderim sonrası toast göster
@@ -1923,7 +1923,7 @@ ${tr(language, 'pdfAnalysisWarning')}`;
     } catch (error: any) {
       console.error('Feedback submission error:', error);
       // Hata mesajını kullanıcıya göster
-      alert(error.message || tr(language, 'bugReportError'));
+      alert(tr(language, 'bugReportError'));
       throw error;
     }
   };
