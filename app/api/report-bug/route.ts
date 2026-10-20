@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { createClient } from "@/utils/supabase/server";
 
 // Vercel'in önbelleğe almasını engellemek için dinamik yapıyoruz
 export const dynamic = 'force-dynamic';
@@ -14,6 +15,10 @@ const VERCEL_MAX_PAYLOAD = 4.5 * 1024 * 1024; // 4.5MB in bytes
 
 export async function POST(req: Request) {
   try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    const verifiedEmail = user?.email || null;
+
     // Content-Type'a göre veriyi al (FormData veya JSON)
     const contentType = req.headers.get('content-type') || '';
     let body: any = null;
@@ -44,10 +49,7 @@ export async function POST(req: Request) {
     // 2. Vercel ortam değişkeni kontrolü
     if (!token || !chatId) {
        console.error("Vercel'de TOKEN veya CHAT_ID eksik!");
-       return NextResponse.json({ 
-         error: "Sistem yapılandırması eksik. Lütfen yöneticiye bildirin.",
-         debug: { hasToken: !!token, hasChatId: !!chatId } 
-       }, { status: 500 });
+       return NextResponse.json({ error: "Service temporarily unavailable" }, { status: 503 });
     }
 
     // type veya title'ı kullan (öncelik type'da)
@@ -58,7 +60,7 @@ export async function POST(req: Request) {
                     `────────────────────\n` +
                     `**Tür:** ${reportType}\n` +
                     `**Açıklama:** ${description}\n` +
-                    `**E-posta:** ${body.email || 'Belirtilmedi'}\n` +
+                    `**E-posta:** ${verifiedEmail || 'Belirtilmedi'}\n` +
                     `────────────────────`;
 
     // 3. Telegram'a gönderim - Görsel varsa sendPhoto, yoksa sendMessage
