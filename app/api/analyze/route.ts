@@ -1154,7 +1154,8 @@ export async function POST(req: Request) {
           console.warn('[saveAnalysisAndNotify] No authenticated user; skipping database save.');
         }
 
-        // Calculate risk score and summary
+        // Privacy-preserving operational notification.
+        // Never send user identity, file name, document excerpts or analysis summaries to Telegram.
         const riskCount = parsedResult?.risk_cards?.length || 0;
         const highRiskCount = parsedResult?.risk_cards?.filter((card: any) => 
           card.severity?.toLowerCase().indexOf('yüksek') !== -1 || 
@@ -1163,37 +1164,29 @@ export async function POST(req: Request) {
           card.severity?.toLowerCase().indexOf('critical') !== -1
         ).length || 0;
         
-        const complianceScore = parsedResult?.compliance_status?.overall || 'Bilinmiyor';
-        const documentType = parsedResult?.document_type || 'Belirtilmemiş';
-        const summaryPreview = parsedResult?.summary ? 
-          (parsedResult.summary.length > 150 ? parsedResult.summary.substring(0, 150) + '...' : parsedResult.summary) : 
-          'Özet mevcut değil';
+        const complianceScore = parsedResult?.compliance_status?.overall || 'Belirtilmedi';
+        const documentType = parsedResult?.document_type || 'Belirtilmedi';
 
-        // Send Telegram notification for critical analyses
         if (hasCriticalRisk) {
           await sendTelegramNotification(
             `🚨 <b>KRİTİK ANALİZ TAMAMLANDI</b>\n\n` +
-            `📧 Kullanıcı: ${verifiedUserEmail || 'Anonim'}\n` +
-            `📄 Dosya: ${fileName}\n` +
+            `🌍 Yargı Alanı: ${resolvedJurisdiction}\n` +
             `📋 Belge Türü: ${documentType}\n` +
-            `⚠️ <b>Risk Skoru:</b> ${highRiskCount}/${riskCount} Yüksek Risk\n` +
-            `📊 <b>Uyumluluk:</b> ${complianceScore}\n` +
-            `🔍 <b>Özet:</b> ${summaryPreview}\n\n` +
-            `⚠️ Yüksek riskli hukuki sorunlar tespit edildi!\n` +
-            `🔍 Detaylı rapor hazırlandı.`,
+            `⚠️ Risk: ${highRiskCount}/${riskCount} yüksek/kritik\n` +
+            `✅ Uyumluluk: ${complianceScore}\n` +
+            `🟢 Durum: İşlem başarılı\n\n` +
+            `🔒 Kullanıcı kimliği ve belge içeriği gizlilik nedeniyle bildirimde yer almıyor.`,
             true
           );
         } else {
-          // Regular analysis notification
           await sendTelegramNotification(
             `📊 <b>YENİ ANALİZ TAMAMLANDI</b>\n\n` +
-            `📧 Kullanıcı: ${verifiedUserEmail || 'Anonim'}\n` +
-            `📄 Dosya: ${fileName}\n` +
+            `🌍 Yargı Alanı: ${resolvedJurisdiction}\n` +
             `📋 Belge Türü: ${documentType}\n` +
-            `📊 <b>Risk Skoru:</b> ${riskCount} Risk Tespit Edildi (${highRiskCount} Yüksek)\n` +
-            `✅ <b>Uyumluluk:</b> ${complianceScore}\n` +
-            `🔍 <b>Özet:</b> ${summaryPreview}\n\n` +
-            `✅ Analiz başarıyla tamamlandı.`,
+            `📊 Risk: ${riskCount} toplam, ${highRiskCount} yüksek/kritik\n` +
+            `✅ Uyumluluk: ${complianceScore}\n` +
+            `🟢 Durum: İşlem başarılı\n\n` +
+            `🔒 Kullanıcı kimliği ve belge içeriği gizlilik nedeniyle bildirimde yer almıyor.`,
             false
           );
         }
