@@ -177,6 +177,9 @@ export default function Header({
                   key={l} 
                   onClick={() => {
                     setLanguage(l);
+                    if (typeof window !== 'undefined') {
+                      window.localStorage.setItem('language', l);
+                    }
                     setLanguageMenuOpen(false);
                   }} 
                   style={{ 
