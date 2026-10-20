@@ -71,24 +71,29 @@ async function syncResmiGazete() {
   }
 }
 
-export async function POST() {
+function isAuthorized(req: Request): boolean {
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
+    console.error('[SYNC-RG] CRON_SECRET is not configured.');
+    return false;
+  }
+  return req.headers.get('authorization') === `Bearer ${cronSecret}`;
+}
+
+async function handleAuthorizedSync(req: Request) {
+  if (!isAuthorized(req)) {
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   const result = await syncResmiGazete();
   return Response.json(result, { status: result.success ? 200 : 500 });
 }
 
-// GET endpoint - Cron job ve manuel çağrılar için
-export async function GET(req: Request) {
-  // Vercel cron job'ları otomatik olarak authorization header ekler
-  // Manuel çağrılar için opsiyonel kontrol
-  const authHeader = req.headers.get('authorization');
-  const cronSecret = process.env.CRON_SECRET;
-  
-  if (cronSecret && authHeader && authHeader !== `Bearer ${cronSecret}`) {
-    return Response.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+export async function POST(req: Request) {
+  return handleAuthorizedSync(req);
+}
 
-  const result = await syncResmiGazete();
-  return Response.json(result, { status: result.success ? 200 : 500 });
+export async function GET(req: Request) {
+  return handleAuthorizedSync(req);
 }
 
 
