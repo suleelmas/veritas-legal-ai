@@ -1218,7 +1218,7 @@ export async function POST(req: Request) {
       return result;
     }
     
-    // TEST MODU: Geçici olarak kredi kontrolünü esnet - detaylı loglama ile
+    // Kredi ve ücretsiz kullanım hakkını doğrula.
     console.log('[API] Kredi/hak kontrolü başlatılıyor...');
     
     try {
