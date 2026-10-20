@@ -1,11 +1,16 @@
 import { NextResponse } from "next/server";
 
-const TELEGRAM_BOT_TOKEN = "8415963295:AAEgRJ3QX2ZBVsIh5lxiXhFOf_-7WTpIOdc";
-const TELEGRAM_CHAT_ID = "8418884482";
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
 export async function POST(req: Request) {
   try {
     const { email, suggestion } = await req.json();
+
+    if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
+      console.error('[Request Feature] Telegram environment variables are not configured.');
+      return NextResponse.json({ error: 'Service temporarily unavailable' }, { status: 503 });
+    }
 
     if (!suggestion || !suggestion.trim()) {
       return NextResponse.json({ error: "Suggestion is required" }, { status: 400 });
@@ -47,11 +52,11 @@ export async function POST(req: Request) {
     const telegramResponse = await response.json();
 
     if (!response.ok || !telegramResponse.ok) {
-      console.error('Telegram API error:', telegramResponse);
-      return NextResponse.json({ 
-        error: 'Telegram gönderim hatası', 
-        details: telegramResponse 
-      }, { status: 500 });
+      console.error('Telegram API error:', {
+        status: response.status,
+        ok: telegramResponse?.ok === true
+      });
+      return NextResponse.json({ error: 'Unable to submit request' }, { status: 502 });
     }
 
     return NextResponse.json({ 
@@ -60,9 +65,7 @@ export async function POST(req: Request) {
     });
   } catch (error: any) {
     console.error('Request Feature API error:', error);
-    return NextResponse.json({ 
-      error: error.message || 'Internal server error' 
-    }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
