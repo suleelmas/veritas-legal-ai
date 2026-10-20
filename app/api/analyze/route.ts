@@ -1210,7 +1210,7 @@ export async function POST(req: Request) {
     }
     
     // TEST MODU: Geçici olarak kredi kontrolünü esnet - detaylı loglama ile
-    console.log('[API] Kredi kontrolü başlatılıyor...', { userKey, userEmail });
+    console.log('[API] Kredi/hak kontrolü başlatılıyor...');
     
     try {
       // 1. KREDİ KONTROLÜ
@@ -1221,9 +1221,8 @@ export async function POST(req: Request) {
         .maybeSingle();
       
       console.log('[API] Kredi kontrolü sonucu:', { 
-        creditRow, 
-        creditError: creditError?.message,
-        hasCredit: creditRow && creditRow.credit > 0 
+        hasError: !!creditError,
+        hasCredit: !!(creditRow && creditRow.credit > 0)
       });
       
       // 2. İlk ücretsiz hakkı kontrolü
@@ -1234,28 +1233,20 @@ export async function POST(req: Request) {
         .maybeSingle();
       
       console.log('[API] Ücretsiz hak kontrolü sonucu:', { 
-        usedDisks, 
-        rightsError: rightsError?.message,
+        hasError: !!rightsError,
         hasUsedFree: !!usedDisks 
       });
       
-      // Tablo yoksa veya hata varsa, analizi yine de yap (TEST MODU)
+      // Production güvenliği: kredi/hak kontrolü doğrulanamazsa analizi çalıştırma.
       if (creditError || rightsError) {
-        console.warn('[API] Kredi/rights tablolarına erişim hatası - TEST MODU: Analiz yapılıyor', {
+        console.error('[API] Kredi/hak kontrolü doğrulanamadı.', {
           creditError: creditError?.message,
           rightsError: rightsError?.message
         });
-        // Hata olsa bile analizi yap - streaming
-        const result = performLegalAnalysis(
-          finalPdfText, 
-          targetLang || 'tr',
-          resolvedJurisdiction,
-          async (text) => {
-            await saveAnalysisAndNotify(text, fileName || 'document.pdf', userId);
-          }
+        return NextResponse.json(
+          { error: 'Usage authorization could not be verified. Please try again later.' },
+          { status: 503 }
         );
-        // performLegalAnalysis artık direkt Response döndürüyor
-        return result;
       }
       
       if (creditRow && creditRow.credit > 0) {
@@ -1290,40 +1281,18 @@ export async function POST(req: Request) {
         // performLegalAnalysis artık direkt Response döndürüyor
         return result;
       } else {
-        // TEST MODU: Hakkı yoksa bile analizi yap (geçici olarak) - streaming
-        console.warn('[API] Kullanıcının hakkı yok ama TEST MODU aktif - analiz yapılıyor', {
-          userKey,
-          userEmail,
-          creditRow,
-          usedDisks
-        });
-        console.log('[API] performLegalAnalysis çağrılmadan önce - finalPdfText uzunluğu:', finalPdfText?.length || 0);
-            console.log('[API] performLegalAnalysis çağrılmadan önce - targetLang:', targetLang || 'tr');
-        const result = performLegalAnalysis(
-          finalPdfText, 
-          targetLang || 'tr',
-          resolvedJurisdiction,
-          async (text) => {
-            await saveAnalysisAndNotify(text, fileName || 'document.pdf', userId);
-          }
+        console.warn('[API] Analiz hakkı bulunmayan kullanıcı için istek reddedildi.');
+        return NextResponse.json(
+          { error: 'Analysis credit or an eligible plan is required.', requiresUpgrade: true },
+          { status: 402 }
         );
-        console.log('[API] performLegalAnalysis çağrıldı, result alındı');
-        // performLegalAnalysis artık direkt Response döndürüyor
-        return result;
       }
     } catch (checkError: any) {
-      // Kontrol sırasında hata olursa, analizi yine de yap (TEST MODU) - streaming
-      console.error('[API] Kredi kontrolü sırasında hata - TEST MODU: Analiz yapılıyor', checkError);
-      const result = performLegalAnalysis(
-        finalPdfText, 
-        targetLang || 'tr',
-        resolvedJurisdiction,
-        async (text) => {
-          await saveAnalysisAndNotify(text, fileName || 'document.pdf', userId);
-        }
+      console.error('[API] Kredi/hak kontrolü sırasında beklenmeyen hata:', checkError?.message || checkError);
+      return NextResponse.json(
+        { error: 'Usage authorization could not be verified. Please try again later.' },
+        { status: 503 }
       );
-      // performLegalAnalysis artık direkt Response döndürüyor
-      return result;
     }
   } catch (error: any) {
     console.error("OpenAI/Supabase Hatası:", error);
