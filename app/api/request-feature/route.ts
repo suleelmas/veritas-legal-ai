@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@/utils/supabase/server";
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
 export async function POST(req: Request) {
   try {
-    const { email, suggestion } = await req.json();
+    const { suggestion } = await req.json();
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    const verifiedEmail = user?.email || null;
 
     if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
       console.error('[Request Feature] Telegram environment variables are not configured.');
@@ -14,6 +18,9 @@ export async function POST(req: Request) {
 
     if (!suggestion || !suggestion.trim()) {
       return NextResponse.json({ error: "Suggestion is required" }, { status: 400 });
+    }
+    if (suggestion.length > 4000) {
+      return NextResponse.json({ error: "Suggestion is too long" }, { status: 413 });
     }
 
     // Get current timestamp
@@ -30,7 +37,7 @@ export async function POST(req: Request) {
     // Telegram mesaj formatı
     const message = `💡 YENİ ÖNERİ / İSTEK
 
-📧 Gönderen: ${email || 'Anonim'}
+📧 Gönderen: ${verifiedEmail || 'Anonim'}
 💭 Öneri: ${suggestion}
 🕐 Gönderim Saati: ${timestamp}`;
 
@@ -45,7 +52,6 @@ export async function POST(req: Request) {
       body: JSON.stringify({
         chat_id: TELEGRAM_CHAT_ID,
         text: message,
-        parse_mode: 'HTML'
       })
     });
 
