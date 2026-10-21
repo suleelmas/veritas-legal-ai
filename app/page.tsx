@@ -1405,27 +1405,6 @@ ${tr(language, 'pdfAnalysisWarning')}`;
       
       console.log('[handleAnalyze] Sonuç set edildi, uzunluk:', resultText.length, 'İlk 200 karakter:', resultText.substring(0, 200));
       
-      // Analiz sayısını artır (compare mode'da yok ama burada var)
-      // Admin için analysis_count artırma
-      // userId zaten fonksiyonun başında tanımlı
-      if (userId && !isAdmin) {
-        try {
-          const newCount = analysisCount + 1;
-          setAnalysisCount(newCount);
-          // Supabase'e kaydet (hata alsa bile devam et)
-          try {
-            await supabase
-              .from('profiles')
-              .update({ analysis_count: newCount })
-              .eq('id', userId);
-          } catch (updateError) {
-            // Sessizce devam et
-          }
-        } catch (err) {
-          // Sessizce devam et
-        }
-      }
-      
       /* STREAMING KODU - KALDIRILDI (ReadableStream is already locked hatası nedeniyle)
        * Streaming kodu aşağıda yorum satırında, gerekirse tekrar açılabilir
        * Ancak şu an Compare mode gibi direkt JSON okuma kullanılıyor
@@ -1490,42 +1469,26 @@ ${tr(language, 'pdfAnalysisWarning')}`;
             setAnalysisCount(newCount);
           }
           
-          // Enterprise, Professional, quantum_global ve Admin kullanıcıları için analizi Supabase'e kaydet
+          // Backend başarılı analizleri zaten analyses tablosuna kaydediyor.
+          // Burada yalnızca geçmiş görünümünü yenile; ikinci kez INSERT yapma.
           if (effectivePackage === 'enterprise' || effectivePackage === 'professional' || effectivePackage === 'quantum_global' || isAdmin) {
-            const finalRiskScore = riskScore || null;
-            
-            const { data: newAnalysis, error: analysisError } = await supabase
+            const { data: allAnalyses } = await supabase
               .from('analyses')
-              .insert({
-                user_id: userId,
-                file_name: file.name,
-                analysis_result: resultText,
-                analysis_summary: analysisSummary,
-                risk_score: finalRiskScore
-              })
-              .select()
-              .single();
+              .select('id, file_name, analysis_summary, created_at, analysis_result, risk_score')
+              .eq('user_id', userId)
+              .order('created_at', { ascending: false })
+              .limit(100);
             
-            if (!analysisError && newAnalysis) {
-              // Geçmişi güncelle
-              const { data: allAnalyses } = await supabase
-                .from('analyses')
-                .select('id, file_name, analysis_summary, created_at, analysis_result, risk_score')
-                .eq('user_id', userId)
-                .order('created_at', { ascending: false })
-                .limit(100);
-              
-              if (allAnalyses) {
-                const history = allAnalyses.map(a => ({
-  id: a.id,
-  title: a.file_name,
-  date: new Date(a.created_at).toLocaleString(localeMap[getLanguage(language)] || 'en-US'),
-  summary: a.analysis_summary || a.analysis_result.substring(0, 200) + '...',
-  fullResult: a.analysis_result,
-  riskScore: a.risk_score || null
-}));
-                setAnalysisHistory(history);
-              }
+            if (allAnalyses) {
+              const history = allAnalyses.map(a => ({
+                id: a.id,
+                title: a.file_name,
+                date: new Date(a.created_at).toLocaleString(localeMap[getLanguage(language)] || 'en-US'),
+                summary: a.analysis_summary || a.analysis_result.substring(0, 200) + '...',
+                fullResult: a.analysis_result,
+                riskScore: a.risk_score || null
+              }));
+              setAnalysisHistory(history);
             }
           }
         } catch (err) {
