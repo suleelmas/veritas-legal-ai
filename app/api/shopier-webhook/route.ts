@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/utils/supabase/server";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 function isValidShopierRequest(req: Request) {
   const user = req.headers.get("shopier-osb-user");
@@ -12,7 +12,12 @@ function isValidShopierRequest(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const supabase = await createClient();
+    if (!process.env.SHOPIER_OSB_USER || !process.env.SHOPIER_OSB_PASS) {
+      console.error("[Shopier] OSB credentials are not configured.");
+      return NextResponse.json({ error: "Service unavailable" }, { status: 503 });
+    }
+
+    const supabase = supabaseAdmin;
     if (!isValidShopierRequest(req)) {
       console.log("Shopier güvenlik kontrolü başarısız!");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -26,12 +31,20 @@ export async function POST(req: Request) {
     }
 
     let creditsToAdd = 0;
-    if (purchased_package?.toLowerCase().includes("basic")) creditsToAdd = 10;
-    else if (purchased_package?.toLowerCase().includes("pro")) creditsToAdd = 50;
+    const normalizedPackage = String(purchased_package || '').toLowerCase();
+    if (normalizedPackage.includes("single") || normalizedPackage.includes("basic")) creditsToAdd = 1;
+    else if (normalizedPackage.includes("professional") || normalizedPackage.includes("pro")) creditsToAdd = 5;
     else if (
-      purchased_package?.toLowerCase().includes("elite") ||
-      purchased_package?.toLowerCase().includes("enterprise")
+      normalizedPackage.includes("quantum global") ||
+      normalizedPackage.includes("global") ||
+      normalizedPackage.includes("elite") ||
+      normalizedPackage.includes("enterprise")
     ) creditsToAdd = 9999;
+
+    if (creditsToAdd === 0) {
+      console.error("[Shopier] Unknown purchased package.");
+      return NextResponse.json({ error: "Unknown package" }, { status: 400 });
+    }
 
     // user_credits tablosunda var mı?
     const { data: userRow } = await supabase
@@ -53,8 +66,8 @@ export async function POST(req: Request) {
         .insert({ user_email: email, credits: creditsToAdd, plan_type: purchased_package });
     }
 
-    console.log("Ödeme Başarılı: " + email);
-    return NextResponse.json({ success: true, message: `Ödeme Başarılı: ${email}` });
+    console.log("[Shopier] Payment processed successfully.");
+    return NextResponse.json({ success: true });
   } catch (err) {
     console.error("Shopier Webhook Hatası:", err);
     return NextResponse.json({ success: false, error: String(err) }, { status: 500 });
