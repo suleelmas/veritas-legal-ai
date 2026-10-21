@@ -417,7 +417,7 @@ export const t: Record<Language, Record<string, string>> = {
     // Final cleanup keys
     imageCompressHint: 'Lütfen daha küçük bir görsel seçin veya görsel olmadan gönderin.',
     reportSentToast: 'Raporunuz Kuantum Hattı Üzerinden İletildi ⚛️',
-    bugReportError: 'Hata bildirimi gönderilirken bir sorun oluştu.',,
+    bugReportError: 'Hata bildirimi gönderilirken bir sorun oluştu.',
     analysisCompleted: 'Analiz tamamlandı',
     comparisonFailed: 'Karşılaştırma başarısız oldu.',
     comparisonComplete: 'Karşılaştırma tamamlandı.',
@@ -438,7 +438,7 @@ export const t: Record<Language, Record<string, string>> = {
     wordReportTitle: 'Veritas Q-AI - Analiz Raporu',
     dateLabel: 'Tarih',
     contractsUnit: 'sözleşme',
-    hoursUnit: 'saat'
+    hoursUnit: 'saat',
     aboutHeroPrefix: 'Veritas Q-AI sadece bir araç değil; küresel bir hukuk ekosistemidir.',
     aboutHeroBold: 'Kuantum Simülasyon Motoru',
     aboutHeroSuffix: 'ile desteklenen sistem, karmaşık belgeleri birden fazla yargı alanında aynı anda analiz eder ve klasik AI\'ın ulaşamadığı hassasiyeti sunar.',
@@ -558,7 +558,7 @@ export const t: Record<Language, Record<string, string>> = {
     // Final cleanup keys
     imageCompressHint: 'Please select a smaller image or send without image.',
     reportSentToast: 'Your report has been sent via Quantum Channel ⚛️',
-    bugReportError: 'An error occurred while submitting the bug report.',,
+    bugReportError: 'An error occurred while submitting the bug report.',
     analysisCompleted: 'Analysis completed',
     comparisonFailed: 'Comparison failed.',
     comparisonComplete: 'Comparison complete.',
@@ -579,7 +579,7 @@ export const t: Record<Language, Record<string, string>> = {
     wordReportTitle: 'Veritas Q-AI - Analysis Report',
     dateLabel: 'Date',
     contractsUnit: 'contracts',
-    hoursUnit: 'hours'
+    hoursUnit: 'hours',
     aboutHeroPrefix: 'Veritas Q-AI is not just a tool; it is a global legal ecosystem. Powered by a',
     aboutHeroBold: 'Quantum Simulation Engine',
     aboutHeroSuffix: ', it analyzes complex documents across multiple jurisdictions simultaneously, delivering precision that classical AI cannot reach.',
@@ -699,7 +699,7 @@ export const t: Record<Language, Record<string, string>> = {
     // Final cleanup keys
     imageCompressHint: 'Veuillez sélectionner une image plus petite ou envoyer sans image.',
     reportSentToast: 'Votre rapport a été envoyé via le Canal Quantique ⚛️',
-    bugReportError: 'Une erreur est survenue lors de l\'envoi du rapport de bug.',,
+    bugReportError: 'Une erreur est survenue lors de l\'envoi du rapport de bug.',
     analysisCompleted: 'Analyse terminée',
     comparisonFailed: 'La comparaison a échoué.',
     comparisonComplete: 'Comparaison terminée.',
@@ -720,7 +720,7 @@ export const t: Record<Language, Record<string, string>> = {
     wordReportTitle: 'Veritas Q-AI - Rapport d’analyse',
     dateLabel: 'Date',
     contractsUnit: 'contrats',
-    hoursUnit: 'heures'
+    hoursUnit: 'heures',
     aboutHeroPrefix: 'Veritas Q-AI n\'est pas qu\'un outil; c\'est un écosystème juridique mondial. Propulsé par un',
     aboutHeroBold: 'Moteur de Simulation Quantique',
     aboutHeroSuffix: ', il analyse des documents complexes sur plusieurs juridictions simultanément, offrant une précision que l\'IA classique ne peut atteindre.',
@@ -840,7 +840,7 @@ export const t: Record<Language, Record<string, string>> = {
     // Final cleanup keys
     imageCompressHint: 'Bitte wählen Sie ein kleineres Bild oder senden Sie ohne Bild.',
     reportSentToast: 'Ihr Bericht wurde über den Quanten-Kanal gesendet ⚛️',
-    bugReportError: 'Beim Senden des Fehlerberichts ist ein Fehler aufgetreten.',,
+    bugReportError: 'Beim Senden des Fehlerberichts ist ein Fehler aufgetreten.',
     analysisCompleted: 'Analyse abgeschlossen',
     comparisonFailed: 'Vergleich fehlgeschlagen.',
     comparisonComplete: 'Vergleich abgeschlossen.',
@@ -861,7 +861,7 @@ export const t: Record<Language, Record<string, string>> = {
     wordReportTitle: 'Veritas Q-AI - Analysebericht',
     dateLabel: 'Datum',
     contractsUnit: 'Verträge',
-    hoursUnit: 'Stunden'
+    hoursUnit: 'Stunden',
     aboutHeroPrefix: 'Veritas Q-AI ist nicht nur ein Werkzeug; es ist ein globales Rechts-Ökosystem. Angetrieben von einer',
     aboutHeroBold: 'Quanten-Simulations-Engine',
     aboutHeroSuffix: ', analysiert es komplexe Dokumente über mehrere Rechtsgebiete hinweg gleichzeitig und liefert Präzision, die klassische KI nicht erreichen kann.',
